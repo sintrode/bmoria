@@ -22,7 +22,7 @@ REM )
 :: lack of applicability on Windows machines
 :parseArgs
 if "%~1"=="" (
-    call sys\startMoria.cmd !seed! !new_game!
+    call sys\game_run.cmd :startMoria !seed! !new_game!
     exit /b
 )
 if /i "%~1"=="-v" (
