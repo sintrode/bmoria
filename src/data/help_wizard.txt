@@ -1,0 +1,16 @@
+:  - Map area (panel)
+^A - Cure all maladies and remove curses
+^B - Print random objects sample to file
+^D - Jump to depth # (level)
+^E - Edit character stats
+^F - Vanquish monsters within sight
+^G - Generate random items
+^H - Wizard Help
+^I - Identify an item
+^L - Wizard light
+^T - Teleport player randomly
+^U - Summon random monster
+^W - Wizard mode on/off
++  - Gain experience
+%  - Generate a dungeon item
+@  - Create an object *CAN CAUSE FATAL ERROR*

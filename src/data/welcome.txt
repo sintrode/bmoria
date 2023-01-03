@@ -1,0 +1,5 @@
+                       Welcome to Moria!
+
+Your first task is to generate a character. You must specify a gender,
+a race, and a class. If this is your first time playing, you may want
+to read the manual first.
