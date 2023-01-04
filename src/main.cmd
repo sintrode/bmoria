@@ -6,8 +6,8 @@
 ::------------------------------------------------------------------------------
 @echo off
 setlocal enabledelayedexpansion
-call sys\read_config.cmd
-call sys\read_version.cmd
+call sys\config.cmd
+call sys\read_constants.cmd
 
 :main
 set "seed=0"

@@ -1,0 +1,258 @@
+::------------------------------------------------------------------------------
+:: Not one of the original files, but batch has no concept of headers and the
+:: constants need to get initialized *somewhere* so we're doing it here.
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
+@echo off
+
+::----- dungeon_tile.h
+set "tile_null_wall=0"
+set "tile_dark_floor=1"
+set "tile_light_floor=2"
+set "max_cave_room=2"
+set "tile_corr_floor=3"
+set "tile_blocked_floor=4" %= a corridor space with cl/st/se door or rubble =%
+set "max_cave_floor=4"
+set "max_open_space=3"
+set "min_closed_space=4"
+set "tmp1_wall=8"
+set "tmp2_wall=9"
+set "min_cave_wall=12"
+set "tile_granite_wall=12"
+set "tile_magma_wall=13"
+set "tile_quartz_wall=14"
+set "tile_boundary_wall=15"
+
+::----- dungeon.h
+set "ratio=3"                       %= Size ratio of the Map screen =%
+set "max_height=66"                 %= Multiple of 11, GEQ 22 =%
+set "max_width=198"                 %= Multiple of 33, GEQ 66 =%
+set "screen_height=22"
+set "screen_width=66"
+set /a quart_height=screen_height/4
+set /a quart_width=screen_width/4
+
+::----- game.h
+set "treasure_max_levels=50"       %= Deepest possible dungeon level =%
+
+:: These three are all related, so don't change them. If you do, change them all.
+:: Also, change player_base_provisions[] and store_choices[].
+set "max_objects_in_game=420"
+set "max_dungeon_objects=344"
+set "object_ident_size=448"        %= 7x64, see object_offset in desc.cmd =%
+set "level_max_objects=175"        %= max objects per level =%
+
+:: Definitions for the pseudo-normal distribution generation
+set "normal_table_size=256"
+set "normal_table_sd=64"           %= standard deviation =%
+
+:: Inventory command screen states
+set "screen.blank=0"
+set "screen.equipment=1"
+set "screen.inventory=2"
+set "screen.wear=3"
+set "screen.help=4"
+set "screen.wrong=5"
+
+:: Game_t struct
+set "game.magic_seed=0"              %= seed for initializing magic items =%
+set "game.town_seed=0"               %= seed for town generation =%
+set "game.character_generated=false" %= don't save score until character generation is finished =%
+set "game.character_saved=false"     %= prevents save on kill after saving a character =%
+set "game.character_is_dead=false"
+set "game.total_winner=false"        %= character beat the Balrog =%
+set "game.teleport_player=false"     %= handle teleport traps =%
+set "game.player_free_turn=false"    %= player has a free turn, so do not move creatures =%
+set "game.to_be_wizard=false"        %= -w option was used during startup =%
+set "game.wizard_mode=false"         %= character is a Wizard when true =%
+set "game.noscore=0"                 %= don't save a score for this game =%
+set "game.use_last_direction=false"  %= 'true' when repeat commands should use last known direction =%
+set "game.doing_inventory_command=0" %= track inventory commands =%
+set "game.last_command= "            %= save of previous player command =%
+set "game.command_count=0"           %= how many times to repeat a specific command =%
+set "game.character_died_from= "     %= what the character died from - starvation, Bat, etc. =%
+
+set "game.treasure.current_id=0"     %= current treasure heap pointer =%
+
+set "game.screen.current_screen_id=0"
+set "game.screen.screen_left_pos=0"
+set "game.screen.screen_bottom_pos=0"
+set "game.screen.wear_low_id=0"
+set "game.screen.wear_high_id=0"
+
+::----- identification.h
+set "counter=0"
+for %%A in (sn_null sn_r sn_ra sn_rf sn_rc sn_rl sn_ha sn_df sn_sa sn_sd sn_se sn_su sn_ft 
+            sn_fb sn_free_action sn_slaying sn_clumsiness sn_weakness sn_slow_descent sn_speed
+            sn_stealth sn_slowness sn_noise sn_great_mass sn_intelligence sn_wisdom
+            sn_infravision sn_might sn_lordliness sn_magi sn_beauty sn_seeing sn_regeneration
+            sn_stupidity sn_dullness sn_blindness sn_timidness sn_teleportation sn_ugliness
+            sn_protection sn_irritation sn_vulnerability sn_enveloping sn_fire sn_slay_evil
+            sn_dragon_slaying sn_empty sn_locked sn_poison_needle sn_gas_trap sn_explosion_device
+            sn_summoning_runes sn_multiple_traps sn_disarmed sn_unlocked sn_slay_animal
+            sn_array_size) do (
+    set "SpecialNameIds.%%A=!counter!"
+    set /a counter+=1
+)
+
+set "max_colors=49"                  %= used with potions =%
+set "max_mushrooms=22"               %= used with mushrooms =%
+set "max_woods=25"                   %= used with staffs =%
+set "max_metals=25"                  %= used with wands =%
+set "max_rocks=32"                   %= used with rings =%
+set "max_amulets=11"                 %= used with amulets =%
+set "max_titles=45"                  %= used with scrolls =%
+set "max_syllables=153"              %= used with scrolls =%
+
+::----- inventory.h
+set "player_inventory_size=34"       %= do not touch this =%
+
+set "item_never_stack_min=0"         %= these never stack =%
+set "item_never_stack_max=63"
+
+set "item_single_stack_min=64"       %= these stack with items of similar sub_category_id =%
+set "item_single_stack_max=192"
+
+set "item_group_min=192"             %= these stack with items of same sub_category_id and misc_use =%
+set "item_group_max=255"
+
+set "inscrip_size=13"
+
+set "counter=22"
+for %%A in (wield head neck bock arm hands right left feet outer light auxiliary) do (
+    set "PlayerEquipment.%%A=!counter!"
+    set /a counter+=1
+)
+
+::----- monster.h
+set "mon_max_creatures=279"          %= number of creature types in the universe =%
+set "mon_attack_types=215"           %= number of monster attack types =%
+set "mon_total_allocations=125"      %= max that can be allocated =%
+set "mon_max_levels=40"              %= maximum level of creatures =%
+set "mon_max_attacks=4"              %= max num attacks in mon's memory =%
+
+::----- player.h
+set "counter=0"
+for %%A in (bth bthb device disarm save) do (
+    set "PlayerClassLevelAdj.%%A=!counter!"
+    set /a counter+=1
+)
+
+set "counter=0"
+for %%A in (a_str a_int a_wis a_dex a_con a_chr) do (
+    set "PlayerAttr.%%A=!counter!"
+    set /a counter+=1
+)
+
+set "class_misc_hit=4"
+set "class_max_level_adjust=5"
+set "player_max_level=40"            %= maximum possible player level =%
+set "player_max_classes=8"           %= number of defined classes =%
+set "player_max_races=8"             %= number of defined races =%
+set "player_max_backgrounds=128"     %= number of types of histories =%
+set "bth_per_plus_to_hit_adjust=3"   %= adjust base-to-hit per plus-to-hit =%
+set "player_name_size=27"
+
+set "py.running_tracker=0"           %= tracker for number of turns taken during one run cycle =%
+set "py.temporary_light_only=false"  %= track if temporary light about player =%
+set "py.max_score=0"                 %= maximum score attained =%
+set "py.pack.unique_items=0"         %= unique inventory items in pack =%
+set "py.pack.weight=0"               %= weight of currently carried items =%
+set "py.pack.heaviness=0"            %= used to calculate if pack is too heavy =%
+set "py.equipment_count=0"           %= number of equipped items =%
+set "py.weapon_is_heavy=false"       %= weapon is too heavy =%
+set "py.carrying_light=false"        %= player has a light source equipped =%
+
+::----- scores.h
+set "max_high_score_entries=1000"    %= number of entries allowed in the score file =%
+
+::----- spells.h
+set "counter=0"
+for %%A in (magicmissile lightning poisongas acid frost fire holyorb) do (
+    set "MagicSpellFlags.%%A=!counter!"
+    set /a counter+=1
+)
+
+::----- store.h
+set "max_owners=18"                  %= number of owners to choose from =%
+set "max_stores=6"                   %= number of different stores =%
+set "store_max_discrete_items=24"    %= max number of discrete objects in inventory =%
+set "store_max_item_types=26"        %= number of items to choose stock from =%
+set "cost_adjustment=100"            %= adjust prices for buying and selling =%
+
+::----- treasure.h
+set "tv_never=-1"                    %= used by find_range for non-search =%
+set "tv_nothing=0"
+set "tv_misc=1"
+set "tv_chest=2"
+
+:: items tested for enchantments
+set "tv_min_wear=10"                 %= min tval for wearable item =%
+set "tv_min_enchant=10"
+set "tv_sling_ammo=10"
+set "tv_bolt=11"
+set "tv_arrow=12"
+set "tv_spike=13"
+set "tv_light=15"
+set "tv_bow=20"
+set "tv_hafted=21"
+set "tv_polearm=22"
+set "tv_sword=23"
+set "tv_digging=25"
+set "tv_boots=30"
+set "tv_gloves=31"
+set "tv_cloak=32"
+set "tv_helm=33"
+set "tv_shield=34"
+set "tv_hard_armor=35"
+set "tv_soft_armor=36"
+set "tv_max_enchant=39"
+set "tv_amulet=40"
+set "tv_ring=45"
+set "tv_max_wear=50"                 %= max tval for wearable item =%
+
+set "tv_staff=55"
+set "tv_wand=65"
+set "tv_scroll1=70"
+set "tv_scroll2=71"
+set "tv_potion1=75"
+set "tv_potion2=76"
+set "tv_flask=77"
+set "tv_food=80"
+set "tv_magic_book=90"
+set "tv_prayer_book=91"
+set "tv_max_object=99"               %= objects with tval above this are never picked up by monsters =%
+set "tv_gold=100"
+set "tv_max_pick_up=100"             %= objects with higher tvals can not be picked up =%
+set "tv_invis_trap=101"
+
+set "tv_min_visible=102"             %= min tval for visible objects =%
+set "tv_vis_trap=102"
+set "tv_rubble=103"
+
+:: the following objects are never deleted when trying to create another one during level generation
+set "tv_min_doors=104"
+set "tv_open_door=104"
+set "tv_closed_door=105"
+set "tv_up_stair=107"
+set "tv_down_stair=108"
+set "tv_secret_door=109"
+set "tv_store_door=110"
+set "tv_max_visible=110"             %= max tval for visible objects =%
+
+::----- types.h
+set "moria_message_size=80"
+
+::----- ui.h
+set "msg_line=0"                     %= message line location =%
+set "message_history_size=22"        %= how many messages to save in the buffer =%
+set "stat_column=0"
+for /F %%A in ('echo prompt $E^| cmd') do set "ESC=%%a"
+
+::----- version.h
+set "current_version_major=0"
+set "current_version_minor=0"
+set "current_version_patch=0"
+exit /b
