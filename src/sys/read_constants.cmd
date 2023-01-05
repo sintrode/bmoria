@@ -255,4 +255,131 @@ for /F %%A in ('echo prompt $E^| cmd') do set "ESC=%%a"
 set "current_version_major=0"
 set "current_version_minor=0"
 set "current_version_patch=0"
+
+::----- dungeon_generate.cpp
+set "counter=0"
+for %%A in (Plain TreasureVault Pillars Maze FourSmallRooms) do (
+    set /a counter+=1
+    set "InnerRoomTypes.%%A=!counter!"
+)
+
+::----- identification.cpp
+set "counter=0"
+for %%A in (Ignored Charges Plusses Light Flags ZPlusses) do (
+    set "ItemMiscUse.%%A=!counter!"
+    set /a counter+=1
+)
+
+::----- mage_spells.cpp
+set "counter=0"
+for %%A in (MagicMissile DetectMonsters PhaseDoor LightArea CureLightWounds
+            FindHiddenTrapsDoors StinkingCloud Confusion LightningBolt
+            TrapDoorDestruction Sleep1 CurePoison TeleportSelf RemoveCurse
+            FrostBolt WallToMud CreateFood RechargeItem1 Sleep2 PolymorphOther
+            IdentifyItem Sleep3 FireBolt SpeedMonster FrostBall RechargeItem2
+            TeleportOther HasteSelf Fireball WordOfDestruction Genocide) do (
+    set /a counter+=1
+    set "MageSpellId.%%A=!counter!"
+)
+
+::----- player_eat.cpp
+set "counter=0"
+for %%A in (Poison Blindness Paranoia Confusion Hallucination CurePoison
+            CureBlindness CureParanoia CureConfusion Weakness Unhealth
+            x x x x RestoreSTR RestoreCON RestoreINT RestoreWIS RestoreDEX
+            RestoreCHR FirstAid MinorCures LightCures x MajorCures
+            PoisonousFood) do (
+    set /a counter+=1
+    set "FoodMagicTypes.%%A=!counter!"
+)
+set "FoodMagicTypes.x="
+
+::----- player_move.cpp
+set "counter=0"
+for %%A in (OpenPit ArrowPit CoveredPit TrapDoor SleepingGas HiddenObject
+            DartOfStr Teleport Rockfall CorrodingGas SummonMonster FireTrap
+            AcidTrap PoisonGasTrap BlindingGas SlowDart DartOfCon SecretDoor) do (
+    set /a counter+=1
+    set "TrapTypes.%%A=!counter!"
+)
+
+set "TrapTypes.ScareMonster=99"
+
+set "counter=100"
+for %%A in (GeneralStore Armory Weaponsmith Temple Alchemist MagicShop) do (
+    set /a counter+=1
+    set "TrapTypes.%%A=!counter!"
+)
+
+::----- player_pray.cpp
+set "counter=0"
+for %%A in (DetectEvil CureLightWounds Bless RemoveFear CallLight FindTraps
+            DetectDoorsStairs SlowPoison BlindCreature Portal CureMediumWounds
+            Chant Sanctuary CreateFood RemoveCurse ResistHeadCold NeutralizePoison
+            OrbOfDraining CureSeriousWounds SenseInvisible ProtectFromEvil
+            Earthquake SenseSurroundings CureCriticalWounds TurnUndead Prayer
+            DispelUndead Heal DispelEvil GlyphOfWarding HolyWord) do (
+    set /a counter+=1
+    set "PriestSpellTypes.%%A=!counter!"
+)
+
+::----- player_quaff.cpp
+set "counter=0"
+for %%A in (Strength Weakness RestoreStrength Intelligence LoseIntelligence
+            RestoreIntelligence Wisdom LoseWisdom RestoreWisdom Charisma
+            Ugliness RestoreCharisma CureLightWounds CureSeriousWounds
+            CureCriticalWounds Healing Constitution GainExperience Sleep
+            Blindness Confusion Poison HasteSelf Slowness) do (
+    set /a counter+=1
+    set "PotionSpellTypes.%%A=!counter!"
+)
+
+set "counter=25"
+for %%A in (Dexterity RestoreDexterity RestoreConstitution
+            CureBlindness CureConfusion CurePoison) do (
+    set /a counter+=1
+    set "PotionSpellTypes.%%A=!counter!"
+)
+
+set "counter=33"
+for %%A in (LoseExperience SaltWater Invulnerability Heroism SuperHeroism
+            Boldness RestoreLifeLevels ResistHeat ResistCold DetectInvisible
+            SlowPoison NeutralizePoison RestoreMana InfraVision) do (
+    set /a counter+=1
+    set "PotionSpellTypes.%%A=!counter!"
+)
+
+::----- staves.cpp
+set "counter=0"
+for %%A in (StaffLight DetectDoorsStairs TrapLocation TreasureLocation ObjectLocation
+            Teleportation Earthquake Summoning x Destruction StarLight HasteMonsters
+            SlowMonsters SleepMonsters CureLightWounds DetectInvisible Speed Slowness
+            MassPolymorph RemoveCurse DetectEvil Curing DispelEvil x Darkness x x x x
+            x x StoreBoughtFlag) do (
+    set /a counter+=1
+    set "StaffSpellTypes.%%A=!counter!"
+)
+
+set "counter=0"
+for %%A in (WandLight LightningBolt FrostBolt FireBolt StoneToMud Polymorph HealMonster
+            HasteMonster SlowMonster ConfuseMonster DrainLife TrapDoorDestruction
+            WandMagicMissile WallBuilding CloneMonster TeleportAway Disarming
+            LightningBall ColdBall FireBall StinkingCloud AcidBall Wonder) do (
+    set /a counter+=1
+    set "WandSpellTypes.%%A=!counter!"
+)
+
+::----- store.cpp
+set "counter=0"
+for %%A in (Received Rejected Offended Insulted) do (
+    set "BidState.%%A=!counter!"
+    set /a counter+=1
+)
+
+::----- ui_inventory.cpp
+set "counter=0"
+for %%A in (CloseMenu Equipment Inventory) do (
+    set "PackMenu.%%A=!counter!"
+    set /a counter+=1
+)
 exit /b
