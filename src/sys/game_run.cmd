@@ -400,6 +400,61 @@ exit /b
 :: Returns:   How much HP and mana should be regenerated
 ::------------------------------------------------------------------------------
 :playerFoodConsumption
+set "regen_amount=%config.player.player_regen_normal%"
+
+if %py.flags.food% LSS %config.player.player_food_alert% (
+    if %py.flags.food% LSS %config.player.player_food_weak% (
+        if %py.flags.food% LSS 0 (
+            set "regen_amount=0"
+        ) else if %py.flags.food% LSS %config.player.player_food_faint% (
+            set "regen_amount=%config.player.player_regen_faint%"
+        ) else if %py.flags.food% LSS %config.player.player_food_weak% (
+            set "regen_amount=%config.player.player_regen_weak%"
+        )
+
+        set /a "is_weak=%py.flags.status%&%config.player.status.py_weak%"
+        if "!is_weak!"=="0" (
+            set /a "py.flags.status|=%config.player.status.py_weak%"
+            call ui.io.cmd :printMessage "You are getting weak from hunger."
+            call player.cmd :playerDisturb 0 0
+            call ui.cmd :printCharacterHungerStatus
+        )
+        set "is_weak="
+
+        if %py.flags.food% LSS %config.player.player_food_faint% (
+            call :game.cmd :randomNumber 8
+            if "!errorlevel!"=="1" (
+                call :game.cmd :randomNumber 5
+                set /a py.flags.paralysis+=!errorlevel!
+                call ui_io.cmd :printMessage "You faint from the lack of food."
+                call player.cmd :playerDisturb 1 0
+            )
+        )
+    ) else (
+        set /a "is_hungry=%py.flags.status%&%config.player.status.py_hungry%"
+        if "!is_hungry!"=="0" (
+            set /a "py.flags.status|=%config.player.status.py_hungry%"
+            call ui_io.cmd :printMessage "You are getting hungry."
+            call player.cmd :playerDisturb 0 0
+            call ui.cmd :printCharacterHungerStatus
+        )
+    )
+)
+
+:: Food consumption
+if %py.flags.speed% LSS 0 (
+    set /a speed_squared=%py.flags.speed%*%py.flags.speed%
+    set /a py.flags.food-=speed_squared
+    set "speed_squared="
+)
+set /a py.flags.food-=%py.flags.food_digested%
+
+if %py.flags.food% LSS 0 (
+    set /a hunger_damage=-%py.flags.food%/16
+    call player.cmd :playerTakesHit !hunger_damage! "starvation"
+    set "hunger_damage="
+    call player.cmd :playerDisturb 1 0
+)
 exit /b !regen_amount!
 
 ::------------------------------------------------------------------------------
@@ -409,6 +464,25 @@ exit /b !regen_amount!
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateRegeneration
+set "amount=%~1"
+if "%py_flags.regenerate_hp%"=="true" (
+    set /a amount=!amount!*3/2
+)
+
+set /a "is_searching=%py.flags.status%&%config.player.status.py_search%"
+if !is_searching! NEQ 0 set /a amount*=2
+set "is_searching="
+if %py.flags.rest% NEQ 0 set /a amount*=2
+
+if %py.flags.poisoned% LSS 1 (
+    if %py.misc.current_hp% LSS %py.misc.max_hp% (
+        call :playerRegenerateHitPoints !amount!
+    )
+)
+
+if %py.misc.current_mana% LSS %py.misc.mana% (
+    call :playerRegenerateMana !amount!
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -418,6 +492,33 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateBlindness
+if %py.flags.blind% LEQ 0 exit /b
+
+set /a "is_blind=%py.flags.status%&%config.player.status.py_blind%"
+if "!is_blind!"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_blind%"
+
+    call ui.cmd :drawDungeonPanel
+    call ui.cmd :printCharacterBlindStatus
+    call player.cmd :playerDisturb 0 1
+
+    call monster.cmd :updateMonsters "false"
+)
+set "is_blind="
+
+set /a py.flags.blind-=1
+
+if "%py.flags.blind%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_blind%"
+
+    call ui.cmd :printCharacterBlindStatus
+    call ui.cmd :drawDungeonPanel
+    call player.cmd :playerDisturb 0 1
+
+    call monster.cmd :updateMonsters "false"
+
+    call ui_io.cmd :printMessage "The veil of darkness lifts."
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -427,6 +528,27 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateConfusion
+if %py.flags.confused% LEQ 0 exit /b
+
+set /a "is_confused=%py.flags.status%&%config.player.status.py_confused%"
+if "!is_confused!"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_confused%"
+    call ui.cmd :printCharacterConfusedState
+)
+set "is_confused="
+
+set /a py.flags.confused-=1
+
+if "%py.flags.confused%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_confused%"
+    
+    call ui.cmd :printCharacterConfusedState
+    call ui_io.cmd :printMessage "You feel less confused now."
+
+    if %py.flags.rest% NEQ 0 (
+        call player.cmd :playerRestOff
+    )
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -436,6 +558,31 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateFearState
+if %py.flags.afraid% LEQ 0 exit /b
+
+set /a "is_afraid=%py.flags.status%&%config.player.status.py_fear%"
+set /a "is_hero=%py.flags.super_heroism%+%py.flags.heroism%"
+if "!is_afraid!"=="0" (
+    if !is_hero! GTR 0 (
+        set "py.flags.afraid=0"
+    ) else (
+        set /a "py.flags.status|=%config.player.status.py_fear%"
+        call ui.cmd :printCharacterFearState
+    )
+) else if !is_hero! GTR 0 (
+    set "py.flags.afraid=1"
+)
+set "is_afraid="
+set "is_hero="
+
+set /a py.flags.afraid-=1
+
+if "%py.flags.afraid%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_fear%"
+    call ui.cmd :printCharacterFearState
+    call ui_io.cmd :printMessage "You feel bolder now."
+    call player.cmd :playerDisturb 0 0
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -445,6 +592,76 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdatePoisonedState
+if %py.flags.poisoned% LEQ 0 exit /b
+
+set /a "is_poisoned=%py.flags.status%&%config.player.status.py_poisoned%"
+if "!is_poisoned!"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_poisoned%"
+    call ui.cmd :printCharacterPoisonedState
+)
+set "is_poisoned="
+
+set /a py.flags.poisoned-=1
+
+if "%py.flags.poisoned%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_poisoned%"
+
+    call ui.cmd :printCharacterPoisonedState
+    call ui_io.cmd :printMessage "You feel better."
+    call player.cmd :playerDisturb 0 0
+    exit /b
+)
+
+:: Batch doesn't have switch statements so you either have a ton of extra
+:: labels or a monstrosity of if statements
+set "damage=0"
+call player_stats.cmd :playerStatAdjustmentConstitution
+set "con_delta=!errorlevel!"
+call :poi!con_delta!
+set "con_delta="
+
+call player.cmd :playerTakesHit !damage! "poison!"
+call player.cmd :playerDisturb 1 0
+set "damage="
+exit /b
+
+:: I am genuinely surprised that this works
+:poi-4
+set "damage=4"
+exit /b
+
+:poi-3
+:poi-2
+set "damage=3"
+exit /b
+
+:poi-1
+set "damage=2"
+exit /b
+
+:poi0
+set "damage=1"
+exit /b
+
+:poi1
+:poi2
+:poi3
+set /a turn_mod=%dg.game_turn%%%2
+if "%turn_mod%"=="0" set "damage=1"
+set "turn_mod="
+exit /b
+
+:poi4
+:poi5
+set /a turn_mod=%dg.game_turn%%%3
+if "%turn_mod%"=="0" set "damage=1"
+set "turn_mod="
+exit /b
+
+:poi6
+set /a turn_mod=%dg.game_turn%%%4
+if "%turn_mod%"=="0" set "damage=1"
+set "turn_mod="
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -454,6 +671,26 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateFastness
+if %py.flags.fast% LEQ 0 exit /b
+
+set /a "is_fast=%py.flags.status%&%config.player.status.py_fast%"
+if "!is_fast!"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_fast%"
+    call player.cmd :playerChangeSpeed -1
+    call ui_io.cmd :printMessage "You feel yourself moving faster."
+    call player.cmd :playerDisturb 0 0
+)
+set "is_fast="
+
+set /a py_flags.fast-=1
+
+if "%py.flags.fast%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_fast%"
+    call player.cmd :playerChangeSpeed 1
+
+    call ui_io.cmd :printMessage "You feel yourself slow down."
+    call player.cmd :playerDisturb 0 0
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -463,6 +700,26 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateSlowness
+if %py.flags.slow% LEQ 0 exit /b
+
+set /a "is_slow=%py.flags.status%&%config.player.status.py_slow%"
+if "!is_slow!"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_slow%"
+    call player.cmd :playerChangeSpeed 1
+    call ui_io.cmd :printMessage "You feel yourself moving slower."
+    call player.cmd :playerDisturb 0 0
+)
+set "is_slow="
+
+set /a py_flags.slow-=1
+
+if "%py.flags.slow%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_slow%"
+    call player.cmd :playerChangeSpeed -1
+
+    call ui_io.cmd :printMessage "You feel yourself speed up."
+    call player.cmd :playerDisturb 0 0
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -483,6 +740,20 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateRestingState
+if %py.flags.rest% GTR 0 (
+    set /a py.flags.rest-=1
+
+    if "!py.flags.rest!"=="0" call player.cmd :playerRestOff
+) else if %py.flags.rest% LSS 0 (
+    set /a py.flags.rest+=1
+
+    if "%py.misc.current_hp%"=="%py.misc.max_hp%" (
+        if "%py.misc.current_mana%"=="%py.misc.mana%" (
+            call player.cmd :playerRestOff
+        )
+    )
+    if "!py.flags.rest!"=="0" call player.cmd :playerRestOff
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -492,6 +763,12 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateHallucination
+if %py.flags.image% LEQ 0 exit /b
+
+call player_run.cmd :playerEndRunning
+set /a py.flags.image-=1
+
+if "%py.flags.image%"=="0" call ui.cmd :drawDungeonPanel
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -501,6 +778,9 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateParalysis
+if %py.flags.paralysis% LEQ 0 exit /b
+set /a py.flags.paralysis-=1
+call player.cmd :playerDisturb 1 0
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -510,6 +790,12 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateEvilProtection
+if %py.flags.protect_evil% LEQ 0 exit /b
+set /a py.flags.protect_evil-=1
+
+if "%py.flags.protect_evil%"=="0" (
+    call ui_io.cmd :printMessage "You no longer feel safe from evil."
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -519,6 +805,33 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateInvulnerability
+if %py.flags.invulnerability% LEQ 0 exit /b
+
+set /a "is_invuln=%py.flags.status%&%config.player.status.py_invuln%"
+if "!is_invuln!"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_invuln%"
+    call player.cmd :playerDisturb 0 0
+
+    set /a py.misc.ac+=100
+    set /a py.misc.display_ac+=100
+
+    call ui.cmd :printCharacterCurrentArmorClass
+    call ui_io.cmd :printMessage "Your skin turns to steel."
+)
+set "is_invuln="
+
+set /a py.flags.invulnerability-=1
+
+if "%py.flags.invulnerability%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_invuln%"
+    call player.cmd :playerDisturb 0 0
+
+    set /a py.misc.ac-=100
+    set /a py.misc.display_ac-=100
+
+    call ui.cmd :printCharacterCurrentArmorClass
+    call ui_io.cmd :printMessage "Your skin returns to normal."
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -528,6 +841,37 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateBlessedness
+if %py.flags.blessed% LEQ 0 exit /b
+
+set /a "is_blessed=%py.flags.status%&%config.player.status.py_blessed%"
+if "!is_blessed!"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_blessed%"
+    call player.cmd :playerDisturb 0 0
+
+    set /a py.misc.bth+=5
+    set /a py.misc.bth_with_bows+=5
+    set /a py.misc.ac+=2
+    set /a py.misc.display_ac+=2
+
+    call ui_io.cmd :printMessage "You feel righteous."
+    call player.cmd :printCharacterCurrentArmorClass
+)
+set "is_blessed="
+
+set /a py.flags.blessed-=1
+
+if "%py.flags.blessed%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_blessed%"
+    call player.cmd :playerDisturb 0 0
+
+    set /a py.misc.bth-=5
+    set /a py.misc.bth_with_bows-=5
+    set /a py.misc.ac-=2
+    set /a py.misc.display_ac-=2
+
+    call ui_io :printMessage "The prayer has expired."
+    call player.cmd :printCharacterCurrentArmorClass
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -537,6 +881,11 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateHeatResistance
+if %py.flags.heat_resistance% LEQ 0 exit /b
+set /a py.flags.heat_resistance-=1
+if "%py.flags.heat_resistance%"=="0" (
+    call ui_io.cmd :printMessage "You no longer feel safe from flame."
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -546,6 +895,11 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateColdResistance
+if %py.flags.cold_resistance% LEQ 0 exit /b
+set /a py.flags.cold_resistance-=1
+if "%py.flags.cold_resistance%"=="0" (
+    call ui_io.cmd :printMessage "You no longer feel safe from cold."
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -555,6 +909,23 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateDetectInvisible
+if %py.flags.detect_invisible% LEQ 0 exit /b
+
+set /a "can_det_inv=%py.flags.status%&%config.player.status.py_det_inv%"
+if "!can_det_inv!"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_det_inv%"
+    set "py.flags.see_invisible=true"
+    call monster.cmd :updateMonsters "false"
+)
+set "can_det_inv="
+
+set /a py.flags.detect_invisible-=1
+
+if "%py.flags.detect_invisible%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_det_inv%"
+    call player.cmd :playerRecalculateBonuses
+    call monster.cmd :updateMonsters "false"
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -564,6 +935,23 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateInfraVision
+if %py.flags.timed_infra% LEQ 0 exit /b
+
+set /a "has_tim_infra=%py.flags.status%&%config.player.status.py_tim_infra%"
+if "!has_tim_infra!"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_tim_infra%"
+    set /a py.flags.see_infra+=1
+    call monster.cmd :updateMonsters "false"
+)
+set "has_tim_infra="
+
+set /a py.flags.timed_infra-=1
+
+if "%py.flags.timed_infra%"=="0" (
+    set /a "py.flags.status&=~%config.player.status.py_tim_infra%"
+    set /a py.flags.see_infra-=1
+    call monster.cmd :updateMonsters "false"
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -573,6 +961,26 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateWordOfRecall
+if %py.flags.word_of_recall% LEQ 0 exit /b
+
+if "%py.flags.word_of_recall%"=="1" (
+    set "dg.generate_new_level=true"
+
+    set /a py.flags.paralysis+=1
+    set "py.flags.word_of_recall=0"
+
+    if %dg.current_level% GTR 0 (
+        set "dg.current_level=0"
+        call ui_io.cmd :printMessage "You feel yourself yanked upwards."
+    ) else (
+        if %py.misc.max_dungeon_depth% NEQ 0 (
+            set "dg.current_level=%py.misc.max.dungeon_depth%"
+            call ui_io.cmd :printMessage "You feel yourself yanked downwards."
+        )
+    )
+) else (
+    set /a py.flags.word_of_recall-=1
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -582,6 +990,54 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerUpdateStatusFlags
+set /a "stat_check=%py.flags.status%&%config.player.status.py_speed%"
+if !stat_check! NEQ 0 (
+    set /a "py.flags.status&=~%config.player.status.py_speed%"
+    call ui.cmd :printCharacterSpeed
+)
+
+set /a "stat_check=%py.flags.status%&%config.player.status.py_paralysed%"
+if !stat_check! NEQ 0 (
+    call ui.cmd :printCharacterMovementState
+    if %py.flags.paralysis% LSS 1 (
+        set /a "py.flags.status&=~%config.player.status.py_paralysed%"
+    ) else if %py.flags.paralysis% GTR 0 (
+        set /a "py.flags.status|=~%config.player.status.py_paralysed%"
+    )
+)
+
+set /a "stat_check=%py.flags.status%&%config.player.status.py_armor%"
+if !stat_check! NEQ 0 (
+    call ui.cmd :printCharacterCurrentArmorClass
+    set /a "py.flags.status&=~%config.player.status.py_armor%"
+)
+
+set /a "stat_check=%py.flags.status%&%config.player.status.py_stats%"
+if !stat_check! NEQ 0 (
+    for /L %%A in (1,1,6) do (
+        set /a "p_stat_check=(%config.player.status.py_str%<<n)&%py.flags.status%"
+        if !p_stat_check! NEQ 0 (
+            call ui.cmd :displayCharacterStats
+        )
+    )
+
+    set /a "py.flags.status&=~%config.player.status.py_stats%"
+)
+
+set /a "stat_check=%py.flags.status%&%config.player.status.py_hp%"
+if !stat_check! NEQ 0 (
+    call ui.cmd :printCharacterMaxHitPoints
+    call ui.cmd :printCharacterCurrentHitPoints
+    set /a "py.flags.status&=~%config.player.status.py_hp%"
+)
+
+set /a "stat_check=%py.flags.status%&%config.player.status.py_mana%"
+if !stat_check! NEQ 0 (
+    call ui.cmd :printCharacterCurrentMana
+    set /a "py.flags.status&=~%config.player.status.py_mana%"
+)
+set "stat_check="
+set "p_stat_check="
 exit /b
 
 ::------------------------------------------------------------------------------
