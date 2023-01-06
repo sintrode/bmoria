@@ -1047,15 +1047,51 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerDetectEnchantment
+for /L %%A in (0,1,%player_inventory_size%) do (
+    set "enchant_item=%%A"
+    if "!enchant_item!"=="%py.pack.unique_items%" (
+        set "enchant_item=22"
+    )
+
+    for %%B in ("!enchant_item!") do (
+        set "item=!py.inventory[%%B]!"
+        set "item.category_id=!py.inventory[%%B].category_id!"
+    )
+
+    if !enchant_item! LSS 22 (
+        set "chance=50"
+    ) else (
+        set "chance=10"
+    )
+
+    if !item.category_id! NEQ %tv_nothing% (
+        call :itemEnchanted item
+        if "!errorlevel!"=="0" (
+            call game.cmd :randomNumber !chance!
+            if "!errorlevel!"=="1" (
+                set "tmp_str=There's something about what you are "
+                call ui_inventory.cmd :playerItemWearingDescription !enchant_item!
+                call player.cmd :playerDisturb 0 0
+                call ui_io.cmd :printMessage "!tmp_str!"
+                call identification.cmd :itemAppendToInscription item %config.identification.id_magik%
+            )
+        )
+    )
+    set "enchant_item="
+    set "item="
+    set "item.category="
+)
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Determine how many times a command is to be repeated
+:: Determine how many times a command is to be repeated.
 ::
 :: Arguments: %1 - The command to rerun
 :: Returns:   The number of times to repeat the command
 ::------------------------------------------------------------------------------
 :getCommandRepeatCount
+call ui_io.cmd :putStringClearToEOL "Repeat count:" "0;0"
+call helper.cmd :getinput "0123456789 " repeat_count
 exit /b !repeat_count!
 
 ::------------------------------------------------------------------------------
@@ -1066,15 +1102,62 @@ exit /b !repeat_count!
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :executeInputCommands
-exit /b
+set "last_input_command=%~1"
+set "find_count=%~2"
 
-::------------------------------------------------------------------------------
-:: Set command based on input
-::
-:: Arguments: %1 - The key pressed by the user
-:: Returns:   None
-::------------------------------------------------------------------------------
-:originalCommands
+set /a "do_repeat=%py.flags.status%&%config.player.status.py_repeat%"
+if !do_repeat! NEQ 0 (
+    call ui.cmd :printCharacterMovementState
+)
+
+set "game.use_last_direction=false"
+set "game.player_free_turn=false"
+
+if %py.running.tracker% NEQ 0 (
+    call player_run.cmd :playerRunAndFind
+    set /a find_count-=1
+
+    if "!find_count!"=="0" (
+        call player_run.cmd :playerEndRunning
+    )
+
+    call ui_io.cmd :putQIO
+    goto :continueExecuteInputCommands
+)
+
+if %game.doing_inventory_command% NEQ 0 (
+    call ui_inventory.cmd :inventoryExecuteCommand %game.doing_inventory_command%
+    goto :continueExecuteInputCommands
+)
+
+call ui_io.cmd :panelMoveCursor "%py.pos.y%;%py.pos.x%"
+set "message_ready_to_print=false"
+
+if %game.command_count% GTR 0 (
+    set "game.use_last_direction=true"
+) else (
+    call ui_io.cmd :getKeyInput last_input_command
+
+    set "repeat_count=0"
+    if "%last_input_command%"=="#" (
+        call :getCommandRepeatCount %last_input_command%
+        set "repeat_count=!errorlevel!"
+    )
+
+    call ui_io.cmd :panelMoveCursor "%py.pos.y%;%py.pos.x%"
+
+    if !repeat_count! GTR 0 (
+        call game_run.cmd :validCountCommand "!last_input_command!"
+        if "!errorlevel!"=="1" (
+            set "game.player_free_turn=true"
+            set "last_input_command= "
+            call ui_io.cmd :printMessage "Invalid command with a count."
+        ) else (
+            set "game.command_count=!repeat_count!"
+            call ui.cmd :printCharacterMovementState
+        )
+    )
+)
 exit /b
 
 ::------------------------------------------------------------------------------
