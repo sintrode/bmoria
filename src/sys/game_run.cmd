@@ -1164,10 +1164,31 @@ exit /b
 :: Allows the player to run in a direction without picking up unwanted items
 ::
 :: Arguments: %1 - The key pressed by the user
-:: Returns:   None
+:: Returns:   0 if moving without pickup, 1 otherwise
 ::------------------------------------------------------------------------------
 :moveWithoutPickup
-exit /b
+set "cmd=!%~1!"
+
+if not "%cmd%" NEQ "-" return 0
+set "count_save=%game.command_count%"
+call game.cmd :getDirectionWithMemory " " "%direction%"
+if "!errorlevel!"=="0" (
+    set "game.command_count=%count_save%"
+    set "cmd=~"
+    if "%direction%"=="1" set "cmd=b"
+    if "%direction%"=="2" set "cmd=j"
+    if "%direction%"=="3" set "cmd=n"
+    if "%direction%"=="4" set "cmd=h"
+    if "%direction%"=="6" set "cmd=l"
+    if "%direction%"=="7" set "cmd=y"
+    if "%direction%"=="8" set "cmd=k"
+    if "%direction%"=="9" set "cmd=u"
+) else (
+    set "cmd= "
+)
+
+set "%~1=!cmd!"
+exit /b 1
 
 ::------------------------------------------------------------------------------
 :: Exit the game
