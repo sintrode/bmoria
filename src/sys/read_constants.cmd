@@ -349,6 +349,12 @@ for %%A in (LoseExperience SaltWater Invulnerability Heroism SuperHeroism
     set "PotionSpellTypes.%%A=!counter!"
 )
 
+::----- rng.cpp
+set "rng_m=2147483647"
+set "rng_a=16807"
+set /a rng_q=rng_m / rng_a
+set /a rng_r=rng_m %% rng_a
+
 ::----- staves.cpp
 set "counter=0"
 for %%A in (StaffLight DetectDoorsStairs TrapLocation TreasureLocation ObjectLocation
