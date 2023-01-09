@@ -1174,15 +1174,7 @@ set "count_save=%game.command_count%"
 call game.cmd :getDirectionWithMemory " " "%direction%"
 if "!errorlevel!"=="0" (
     set "game.command_count=%count_save%"
-    set "cmd=~"
-    if "%direction%"=="1" set "cmd=b"
-    if "%direction%"=="2" set "cmd=j"
-    if "%direction%"=="3" set "cmd=n"
-    if "%direction%"=="4" set "cmd=h"
-    if "%direction%"=="6" set "cmd=l"
-    if "%direction%"=="7" set "cmd=y"
-    if "%direction%"=="8" set "cmd=k"
-    if "%direction%"=="9" set "cmd=u"
+    set "cmd=%direction%"
 ) else (
     set "cmd= "
 )
@@ -1197,6 +1189,13 @@ exit /b 1
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :commandQuit
+call ui_io.cmd :flushInputBuffer
+call ui_io.cmd :getInputConfirmation "Do you really want to quit? "
+if "!errorlevel!"=="0" (
+    set "game.character_is_dead=true"
+    set "dg.generate_new_level=true"
+    set "game.character_died_from=Quitting"
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1206,6 +1205,16 @@ exit /b
 :: Returns:   The number of previous messages to return
 ::------------------------------------------------------------------------------
 :calculateMaxMessageCount
+set "max_messages=%message_history_size%"
+
+if %game.command_count% GTR 0 (
+    if %game.command_count% LSS %message_history_size% (
+        set "max_messages=%game.command_count%"
+    )
+    set "game.command_count=0"
+) else if /I not "%game.last_command%"=="P" (
+    set "max_messages=1"
+)
 exit /b !max_messages!
 
 ::------------------------------------------------------------------------------
@@ -1215,6 +1224,35 @@ exit /b !max_messages!
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :commandPreviousMessage
+call :calculateMaxMessageCount
+set "max_messages=!errorlevel!"
+
+if %max_messages% LEQ 1 (
+    call ui_io.cmd :putString ">" "0;0"
+    call ui_io.cmd :putStringClearToEOL "!messages[%last_message_id%]!" "0;1"
+    exit /b
+)
+
+:: Seems like a lot of work just to call the Alernate Screen Buffer tbh
+call ui_io.cmd :terminalSaveScreen
+
+set "line_number=%max_messages%"
+set "msg_id=%last_message_id%"
+
+for /L %%A in (%max_messages%,-1,0) do (
+    for /f "delims=" %%B in ("!msg_id!") do (
+        call ui_io.cmd :putStringClearToEOL "!messages[%%B]!" "%%A;0"
+    )
+    if "!msg_id!"=="0" (
+        set /a msg_id=%message_history_size%-1
+    ) else (
+        set /a msg_id-=1
+    )
+)
+
+call ui_io.cmd :eraseLine "%line_number%;0"
+call ui_io.cmd :waitForContinueKey "%line_number%"
+call ui_io.cmd :terminalRestoreScreen
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1224,6 +1262,14 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :commandFlipWizardMode
+if "%game.wizard_mode%"=="true" (
+    set "game.wizard_mode=false"
+    call ui_io.cmd :printMessage "Wizard mode off."
+) else (
+    call wizard.cmd :enterWizardMode && call ui_io.cmd :printMessage "Wizard mode on."
+)
+
+call ui.cmd :printCharacterWinner
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1233,6 +1279,16 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :commandSaveAndExit
+if "%game.total_winner%"=="true" (
+    call ui_io.cmd :printMessage "You are a Total Winner. Your character must be retired."
+    call ui_io.cmd :printMessage "Use 'Q' when you are ready to quit."
+) else (
+    set "game.character_died_from=(saved)"
+    call ui.io.cmd :printMessage "Saving game..."
+
+    call game_save.cmd :saveGame && call game_death.cmd :endGame
+    set "game.character_died_from=(alive and well)"
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1242,7 +1298,66 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :commandLocateOnMap
+if %py.flags.blind% GTR 0 (
+    call ui_io.cmd :printMessage "You can't see your map."
+    exit /b
+)
+call player.cmd :playerNoLight && (
+    call ui_io.cmd :printMessage "You can't see your map."
+    exit /b
+)
+
+set /a "player_coord.y=%py.pos.y%", "player_coord.x=%py.pos.x%"
+set /a "old_panel.y=%dg.panel.row%", "old_panel.x=%dg.panel.col%"
+set /a "panel.y=0", "panel.x=0", "dir_val=0"
+
+:: Look at what they need to mimic a fraction of the power of while/break
+:locateOuterWhileLoop
+set /a "panel.y=!dg.panel.row!", "panel.x=!dg.panel.col!"
+set "tmp_str="
+if !panel.y! LSS !old_panel.y! (
+    set "tmp_str=!tmp_str! North"
+) else if !panel.y! GTR !old_panel.y! (
+    set "tmp_str=!tmp_str! South"
+)
+if !panel.x! LSS !old_panel.x! (
+    set "tmp_str=!tmp_str! West"
+) else if !panel.x! GTR !old_panel.x! (
+    set "tmp_str=!tmp_str! East"
+)
+
+set "out_val=Map sector [!panel.y!,!panel.x!], which is!tmp_str! your sector. Look in which direction?"
+
+call game.cmd :getDirectionWithMemory "!out_val!" "!dir_val!" || goto :locateAfterWhileLoop
+
+:: Note that there's no :locateAfterInnerWhileLoop because there's nothing after
+:: the inner while loop so it just goes back to the start of the outer loop
+:locateInnerWhileLoop
+set /a "player_coord.x+=((!dir_val! - 1) %% 3 - 1) * %screen_width% / 2"
+set /a "player_coord.y-=((!dir_val! - 1) /  3 - 1) * %screen_height% / 2"
+
+if !player.coord.x! LSS 0 goto :tooFar
+if !player.coord.y! LSS 0 goto :tooFar
+if !player.coord.x! GEQ !dg.width! goto :tooFar
+if !player.coord.4! GEQ !dg.width! goto :tooFar
+
+call ui.cmd :coordOutsidePanel "!player_coord.y!;!player_coord.x!" "true" && (
+    call ui.cmd :drawDungeonPanel
+    goto :locateOuterWhileLoop
+)
+goto :locateInnerWhileLoop
+
+:locateAfterWhileLoop
+call ui.cmd :coordOutsidePanel "!player_coord.y!;!player_coord.x!" "false" && (
+    call ui.cmd :drawDungeonPanel
+)
 exit /b
+
+:tooFar
+call ui_io.cmd :printMessage "You've gone past the end of your map."
+set /a "player_coord.x-=((!dir_val! - 1) %% 3 - 1) * %screen_width% / 2"
+set /a "player_coord.y+=((!dir_val! - 1) /  3 - 1) * %screen_height% / 2"
+goto :locateOuterWhileLoop
 
 ::------------------------------------------------------------------------------
 :: Toggles the Search feature
@@ -1251,6 +1366,13 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :commandToggleSearch
+set /a "is_searching=%py.flags.status%&%config.player.status.py_search%"
+if "!is_searching!"=="0" (
+    call player.cmd :playerSearchOn
+) else (
+    call player.cnd :playerSearchOff
+)
+set "is_searching="
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1260,6 +1382,44 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :doWizardCommands
+:: There are no switch statement in batch, but labels and variables (which would
+:: normally be used to simulate them) are both case-insensitive, so we're stuck
+:: with a massive if chain instead.
+if "%~1"=="A" (
+    call wizard.cmd :wizareCureAll
+) else if "%~1"=="H" (
+    call wizard.cmd :wizardCharacterAdjustment
+    call ui_io.cmd :messageLineClear
+) else if "%~1"=="K" (
+    call spells.cmd :spellMassGenocide
+) else if "%~1"=="g" (
+    call wizard.cmd :wizardDropRandomItems
+) else if "%~1"=="k" (
+    call wizard.cmd :wizardJumpLevel
+) else if "%~1"=="O" (
+    call game_files.cmd :outputRandomLevelObjectsToFile
+) else if "%~1"=="h" (
+    call game_files.cmd :displayTextHelpFile "%config.files.help_wizard%"
+) else if "%~1"=="I" (
+    call spells.cmd :spellIdentifyItem
+) else if "%~1"=="Y" (
+    call wizard.cmd :wizardLightUpDungeon
+) else if "%~1"=="y" (
+    call spells.cmd :spellMapCurrentArea
+) else if "%~1"=="z" (
+    call player.cmd :playerTeleport 100
+) else if "%~1"=="n" (
+    call wizard.cmd :wizardGenerateObject
+    call ui.cmd drawDungeonPanel
+) else if "%~1"=="W" (
+    call wizard.cmd :wizardGainExperience
+) else if "%~1"=="N" (
+    call wizard.cmd :wizardSummonMonster
+) else if "%~1"=="Z" (
+    call wizard.cmd :wizardCreateObjects
+) else (
+    call ui_io.cmd :putStringClearToEOL "Type '?' or 'h' for help." "0;0"
+)
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1269,6 +1429,145 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :doCommand
+:: See :doWizardCommands for an explanation about why this is like this.
+:: Also, running is weird because modern Umoria translated all commands to
+:: classic roguelike controls before performing things, but I already reused
+:: those commands for other things so now I have to bodge it.
+if "%~1"=="Q" (
+    call :commandQuit
+    set "game.player_free_turn=true"
+)
+if "%~1"=="P" (
+    call :commandPreviousMessage
+    set "game.player_free_turn=true"
+)
+if "%~1"=="Z" (
+    call game_files.cmd :displayTextHelpFile "%config.files.license%"
+    set "game.player_free_turn=true"
+)
+if "%~1"=="W" (
+    call :commandFlipWizardMode
+    set "game.player_free_turn=true"
+)
+if "%~1"=="X" (
+    call :commandSaveAndExit
+    set "game.player_free_turn=true"
+)
+if "%~1"=="=" (
+    call ui_io.cmd :terminalSaveScreen
+    call game.cmd :setGameOptions
+    call ui_io.cmd :terminalRestoreScreen
+    set "game.player_free_turn=true"
+)
+if "%~1"=="{" (
+    call identification.cmd :itemInscribe
+    set "game.player_free_turn=true"
+)
+if "%~1"=="1" call player_move.cmd :playerMove 1 "%do_pickup%"
+if "%~1"=="2" call player_move.cmd :playerMove 2 "%do_pickup%"
+if "%~1"=="3" call player_move.cmd :playerMove 3 "%do_pickup%"
+if "%~1"=="4" call player_move.cmd :playerMove 4 "%do_pickup%"
+if "%~1"=="5" (
+    call player_move.cmd :playerMove 5 "%do_pickup%"
+    if %game.command_count% GTR 1 (
+        set /a game.command.count-=1
+        call player.cmd :playerRestOn
+    )
+)
+if "%~1"=="6" call player_move.cmd :playerMove 6 "%do_pickup%"
+if "%~1"=="7" call player_move.cmd :playerMove 7 "%do_pickup%"
+if "%~1"=="8" call player_move.cmd :playerMove 8 "%do_pickup%"
+if "%~1"=="9" call player_move.cmd :playerMove 9 "%do_pickup%"
+if "%~1"=="run_1" call player_run.cmd :playerFindInitialize 1
+if "%~1"=="run_2" call player_run.cmd :playerFindInitialize 2
+if "%~1"=="run_3" call player_run.cmd :playerFindInitialize 3
+if "%~1"=="run_4" call player_run.cmd :playerFindInitialize 4
+if "%~1"=="run_6" call player_run.cmd :playerFindInitialize 6
+if "%~1"=="run_7" call player_run.cmd :playerFindInitialize 7
+if "%~1"=="run_8" call player_run.cmd :playerFindInitialize 8
+if "%~1"=="run_9" call player_run.cmd :playerFindInitialize 9
+if "%~1"=="/" call identification.cmd :identifyGameObject
+if "%~1"=="<" call :dungeonGoUpLevel
+if "%~1"==">" call :dungeonGoDownLevel
+if "%~1"=="?" (
+    call game_files.cmd :displayTextHelpFile "%config.files.help%"
+    set "game.player_free_turn=true"
+)
+if "%~1"=="B" call player_bash.cmd :playerBash
+if "%~1"=="C" (
+    call ui_io.cmd :terminalSaveScreen
+    call ui.cmd :changeCharacterName
+    call ui_io.cmd :terminalRestoreScreen
+    set "game.player_free_turn=true"
+)
+if "%~1"=="D" call player_traps.cmd :playerDisarmTrap
+if "%~1"=="E" call player_eat.cmd :playerEat
+if "%~1"=="F" call :inventoryRefillLamp
+if "%~1"=="G" call player.cmd :playerGainSpells
+if "%~1"=="V" (
+    call ui_io.cmd :terminalSaveScreen
+    call scores.cmd :showScoresScreen
+    call ui_io.cmd :terminalRestoreScreen
+    set "game.player_free_turn=true"
+)
+if "%~1"=="L" (
+    call :commandLocateOnMap
+    set "game.player_free_turn=true"
+)
+if "%~1"=="R" call player.cmd :playerRestOn
+if "%~1"=="S" (
+    call :commandToggleSearch
+    set "game.player_free_turn=true"
+)
+if "%~1"=="tunnel_1" call player_tunnel.cmd :playerTunnel 1
+if "%~1"=="tunnel_2" call player_tunnel.cmd :playerTunnel 2
+if "%~1"=="tunnel_3" call player_tunnel.cmd :playerTunnel 3
+if "%~1"=="tunnel_4" call player_tunnel.cmd :playerTunnel 4
+if "%~1"=="tunnel_6" call player_tunnel.cmd :playerTunnel 6
+if "%~1"=="tunnel_7" call player_tunnel.cmd :playerTunnel 7
+if "%~1"=="tunnel_8" call player_tunnel.cmd :playerTunnel 8
+if "%~1"=="tunnel_9" call player_tunnel.cmd :playerTunnel 9
+if "%~1"=="a" call staves.cmd :wandAim
+if "%~1"=="M" (
+    call dungeon.cmd :dungeonDisplayMap
+    set "game.player_free_turn=true"
+)
+if "%~1"=="b" (
+    call :examineBook
+    set "game.player_free_turn=true"
+)
+if "%~1"=="c" call player.cmd :playerCloseDoor
+if "%~1"=="d" call ui_inventory.cmd :inventoryExecuteCommand "d"
+if "%~1"=="e" call ui_inventory.cmd :inventoryExecuteCommand "e"
+if "%~1"=="f" call player_throw.cmd :playerThrowItem
+if "%~1"=="i" call ui_inventory.cmd :inventoryExecuteCommand "i"
+if "%~1"=="J" call :dungeonJamDoor
+if "%~1"=="l" (
+    call dungeon_los.cmd :look
+    set "game.player_free_turn=true"
+)
+if "%~1"=="m" call mage_spells.cmd :getAndCastMagicSpell
+if "%~1"=="o" call player.cmd :playerOpenClosedObject
+if "%~1"=="p" call player_pray.cmd :pray
+if "%~1"=="q" call player_quaff.cmd :quaff
+if "%~1"=="r" call scrolls.cmd :scrollRead
+if "%~1"=="s" call player.cmd :playerSearch "%py.pos.y%;%py.pos.x%" "%py.misc.chance_in_search%"
+if "%~1"=="t" call ui_inventory.cmd :inventoryExecuteCommand "t"
+if "%~1"=="u" call staves.cmd :staffUse
+if "%~1"=="v" (
+    call game_files.cmd :displayTextHelpFile "%config.files.versions_history%"
+    set "game.player_free_turn=true"
+)
+if "%~1"=="w" call ui.inventory.cmd :inventoryExecuteCommand "w"
+if "%~1"=="x" call ui.inventory.cmd :inventoryExecuteCommand "x"
+
+set "game.player_free_turn=true"
+if "%game.wizard_mode%"=="true" (
+     call :doWizardCommands "%~1"
+) else (
+    call ui_io.cmd :putStringClearToEOL "Type '?' for help." "0;0"
+)
+set "game.last_command=%~1"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1278,6 +1577,9 @@ exit /b
 :: Returns:   0 if the command accepts a count, 1 otherwise
 ::------------------------------------------------------------------------------
 :validCountCommand
+set "is_valid_count_command=0"
+for /f "delims=DPRSsok123456789+" %%A in ("%~1") do set "is_valid_count_command=1"
+for /L %%A in (1,1,9) do if "%~1"=="run_%%A" set "is_valid_count_command=0"
 exit /b !is_valid_count_command!
 
 ::------------------------------------------------------------------------------
@@ -1287,6 +1589,30 @@ exit /b !is_valid_count_command!
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerRegenerateHitPoints
+set "old_chp=%py.misc.current_hp%"
+set /a new_chp=%py.misc.max_hp% * 100 / %~1 + %config.player.player_regen_base%
+
+set /a "py.misc.current_hp+=new_chp>>16"
+if %py.misc.current_hp% LSS 0 (
+    if %old_chp% GTR 0 (
+        set "py.misc.current_hp=32767" %= SHORT_MAX but who's counting? =%
+    )
+)
+
+set /a "new_chp_fraction=(new_chp&65535)+%py.misc.current_hp_fraction%"
+if %new_chp_fraction% GEQ 65536 (
+    set /a py.misc.current_hp_fraction=%new_chp_fraction%-65536
+    set /a py.misc.current_hp+=1
+) else (
+    set "py.misc.current_hp_fraction=%new_chp_fraction%"
+)
+
+if %py.misc.current_hp% GEQ %py.misc.max_hp% (
+    set "py.misc.current_hp=%py.misc.max_hp%"
+    set "py.misc.current_hp_fraction=0"
+)
+
+if %old_chp% NEQ %py.misc.current_hp% call ui.cmd :printCharacterCurrentHitPoints
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1296,16 +1622,59 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerRegenerateMana
+set "old_cmana=%py.misc.current_mana%"
+set /a new_cmana=%py.misc.max_mana% * 100 / %~1 + %config.player.player_regen_mnbase%
+
+set /a "py.misc.current_mana+=new_cmana>>16"
+if %py.misc.current_mana% LSS 0 (
+    if %old_cmana% GTR 0 (
+        set "py.misc.current_mana=32767" %= SHORT_MAX but who's counting? =%
+    )
+)
+
+set /a "new_mana_fraction=(new_cmana&65535)+%py.misc.current_mana_fraction%"
+if %new_mana_fraction% GEQ 65536 (
+    set /a py.misc.current_mana_fraction=%new_mana_fraction%-65536
+    set /a py.misc.current_mana+=1
+) else (
+    set "py.misc.current_mana_fraction=%new_mana_fraction%"
+)
+
+if %py.misc.current_mana% GEQ %py.misc.max_mana% (
+    set "py.misc.current_mana=%py.misc.max_mana%"
+    set "py.misc.current_mana_fraction=0"
+)
+
+if %old_cmana% NEQ %py.misc.current_mana% call ui.cmd :printCharacterCurrentHitPoints
 exit /b
 
 ::------------------------------------------------------------------------------
 :: Determines if an item is secretly an enchanted weapon or armor
 ::
-:: Arguments: %1 - The item to check
+:: Arguments: %1 - The inventory index of the item to check
 :: Returns:   0 if the item is enchanted, 1 otherwise
 ::------------------------------------------------------------------------------
 :itemEnchanted
-exit /b
+if %item.category_id% LSS %tv_min_enchant% exit /b 1
+if %item.category_id% GTR %tv_max_enchant% exit /b 1
+call inventory.cmd :inventoryItemIsCursed "%~1" && exit /b 1
+call identification.cmd :spellItemIdentified "%~1" && exit /b 1
+
+set /a "is_magic=!py.inventory[%~1].identification! & %config.identification.id_magik%"
+if %is_magic% NEQ 0 exit /b 1
+
+if !py.inventory[%~1].to_hit! GTR 0 exit /b 0
+if !py.inventory[%~1].to_damage! GTR 0 exit /b 0
+if !py.inventory[%~1].to_ac! GTR 0 exit /b 0
+
+if !py.inventory[%~1].misc_use! GTR 0 (
+    set /a "is_enchanted=!py.inventory[%~1].flags! & 1073746047"
+    if !is_enchanted! NEQ 0 exit /b 1
+)
+
+set /a "is_enchanted=!py.inventory[%~1].flags! & 134211968"
+if !is_enchanted! NEQ 0 exit /b 0
+exit /b 1
 
 ::------------------------------------------------------------------------------
 :: Read a book
@@ -1314,6 +1683,70 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :examineBook
+call inventory.cmd :inventoryFindRange %tv_magic_book% %tv_prayer_book% item_pos_start item_pos_end || (
+    call ui_io.cmd :printMessage "You are not carrying any books"
+    exit /b
+)
+
+if %py.flags.blind% GTR 0 (
+    call ui_io.cmd :printMessage "You are blind and cannot read your book."
+    exit /b
+)
+
+call player.cmd :playerNoLight || (
+    call ui_io.cmd :printMessage "You have no light to read by."
+    exit /b
+)
+
+if %py.flags.confused% GTR 0 (
+    call ui_io.cmd :printMessage "You are too confused."
+)
+
+call ui_inventory.cmd item_id "Which book?" cnil cnil
+if "!errorlevel!"=="0" (
+    set "can_read=true"
+    set "treasure_type=!py.inventory[%item_id%].category_id!"
+
+    if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.spell_type_mage%" (
+        if "!treasure_type!" NEQ "%tv_magic_book%" set "can_read=false"
+    ) else if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.spell_type_priest%" (
+        if "!treasure_type!" NEQ "%tv_prayer_book%" set "can_read=false"
+    ) else {
+        set "can_read=false"
+    }
+
+    if "!can_read!"=="false" (
+        call ui_io.cmd :printMessage "You do not understand the language."
+        exit /b
+    )
+
+    set "item_flags=!py.inventory[%item_id%].flags!"
+
+    set "spell_id=0"
+    call :readInSpells !item_flags!
+
+    call ui_io.cmd :terminalSaveScreen
+    call ui.cmd :displaySpellsList "spell_index" !spell_id! "true" "-1"
+    call ui_io.cmd :waitForContinueKey 0
+    call ui_io.cmd :terminalRestoreScreen
+)
+exit /b
+
+::------------------------------------------------------------------------------
+:: Creates an array of spells that can be read
+::
+:: Arguments: %1 - flags of the inventory item being listed
+:: Returns:   None
+::------------------------------------------------------------------------------
+:readInSpells
+call helpers.cmd :getAndClearFirstBit "%~1" item_pos_end
+set /a class_id_offset=%py.misc.class_id%-1
+
+if !magic_spells[%class_id_offset%][%item_pos_end%].level_required! LSS 99 (
+    set "spell_index[!spell_id!]=!item_pos_end!"
+    set /a spell_id+=1
+)
+if !item_flags! NEQ 0 goto :readInSpells
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1323,6 +1756,22 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :dungeonGoUpLevel
+set "tile_id=!dg.floor[%py.pos.y%][%py.pos.x%].treasure_id!"
+
+if %tile_id% NEQ 0 (
+    if "!game.treasure.list[%tile_id%].category_id!"=="%tv_up_stair%" (
+        set /a dg.current_level-=1
+
+        call ui_io.cmd :printMessage "You enter a maze of up staircases."
+        call ui_io.cmd :printMessage "You pass through a one-way door."
+
+        set "dg.generate_level=true"
+    ) else (
+        call ui_io.cmd :printMessage "I see no up staircase there."
+        set "game.player_free_turn=true"
+    )
+)
+set "tile_id="
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1332,6 +1781,22 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :dungeonGoDownLevel
+set "tile_id=!dg.floor[%py.pos.y%][%py.pos.x%].treasure_id!"
+
+if %tile_id% NEQ 0 (
+    if "!game.treasure.list[%tile_id%].category_id!"=="%tv_down_stair%" (
+        set /a dg.current_level+=1
+
+        call ui_io.cmd :printMessage "You enter a maze of down staircases."
+        call ui_io.cmd :printMessage "You pass through a one-way door."
+
+        set "dg.generate_level=true"
+    ) else (
+        call ui_io.cmd :printMessage "I see no down staircase there."
+        set "game.player_free_turn=true"
+    )
+)
+set "tile_id="
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1341,6 +1806,72 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :dungeonJamDoor
+set "game.player_free_turn=true"
+set "coord.x=%py.pos.x%"
+set "coord.y=%py.pos.y%"
+
+call game.cmd "cnil" direction || exit /b
+call player.cmd :playerMovePosition "%direction%" "%coord.y%;%Coord.x%"
+
+for %%A in (creature_id treasure_id) do (
+    set "tile.%%A=!dg.floor[%coord.y%][%coord.x%].%%A!"
+)
+if "!tile.treasure_id!"=="0" (
+    call ui_io.cmd :printMessage "That isn't a door."
+    exit /b
+)
+
+for /f "delims=" %%A in ("!tile.treasure_id!") do (
+    for %%B in (category_id misc_use) do (
+        set "item.%%B=!game.treasure_list[%%A].%%B!"
+    )
+)
+set "item_id=!item.category_id!"
+set "item.category_id="
+if %item_id% NEQ %tv_closed_door% (
+    if %item_id% NEQ %tv_open_door% (
+        call ui_io.cmd :printMessage "That isn't a door."
+        exit /b
+    )
+)
+
+if "%item_id%"=="%tv_open_door%" (
+    call ui_io.cmd :printMessage "The door must be closed first."
+    exit /b
+)
+
+:: At this point, the door is both closed and a door
+if "!tile.creature_id!"=="0" (
+    call inventory.cmd :inventoryFindRange "%tv_spike%" "%tv_never%" item_pos_start item_pos_end
+    if "!errorlevel!"=="0" (
+        set "game.player_free_turn=true"
+
+        call ui_io.cmd :printMessageNoCommandInterrupt "You jam the door with a spike."
+
+        if %item.misc_use% GTR 0 (
+            set /a item.misc_use-=1
+        )
+
+        REM Successive spikes have a progressively smaller effect
+        REM Series is: 0 20 30 37 43 48 52 56 60 64 67 70 ...
+        set /a "item.misc_use-=1+190/(10-!item.misc_use!)"
+
+        for /f "delims=" %%A in ("!item_pos_start!") do (
+            if !py.inventory[%%A].items_count! GTR 1 (
+                set /a py.inventory[%%A].items_count-=1
+                set /a py.pack.weight-=!py.inventory[%%A].weight!
+            ) else (
+                call inventory.cmd :inventoryDestroyItem "%%~A"
+            )
+        )
+    ) else (
+        call ui_io.cmd :printMessage "But you have no spikes."
+    )
+) else (
+    set "game.player_free_turn=false"
+    call ui_io.cmd :printMessage "A monster is in your way."
+)
+
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1350,6 +1881,38 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :inventoryRefillLamp
+set "game.player_free_turn=true"
+
+if !py.inventory[%PlayerEquipment.Light%].sub_category_id! NEQ 0 (
+    call ui_io.cmd :printMessage "But you are not using a lamp."
+    exit /b
+)
+
+call inventory.cmd :inventoryFindRange "%tv_flask%" "%tv_never%" item_pos_start item_pos_end || (
+    call ui_io.cmd :printMessage "You have no oil."
+    exit /b
+)
+
+set "game.player_free_turn=false"
+
+set "item.misc_use=!py.inventory[%PlayerEquipment.Light%].misc_use"
+set /a item.misc_use+=!py.inventory[%item_pos_start%].misc_use!
+
+set /a "lamp_half_full=%config.treasure.object_lamp_max_capacity%/2"
+if !item.misc_use! GTR %config.treasure.object_lamp_max_capacity% (
+    set "item.misc_use=%config.treasture.object_lamp_max_capacity%"
+    call ui_io.cmd :printMessage "Your lamp overflows, spilling oil on the ground."
+    call ui_io.cmd :printMessage "Your lamp is full."
+) else if !item.misc_use! GTR %lamp_half_full% (
+    call ui_io.cmd :printMessage "Your lamp is more than half full."
+) else if !item.misc_use! EQU %lamp_half_full% (
+    call ui_io.cmd :printMessage "Your lamp is half full."
+) else (
+    call ui_io.cmd :printMessage "Your lamp is less than half full."
+)
+
+call identification.cmd :itemTypeRemainingCountDescription !item_pos_start!
+call inventory.cmd :inventoryDestroyItem !item_pos_start!
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1359,4 +1922,146 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playDungeon
+call :playerInitializePlayerLight
+call :playerUpdateMaxDungeonDepth
+call :resetDungeonFlags
+
+set "find_count=0"
+set "dg.panel.row=-1"
+set "dg.panel.col=-1"
+
+:: Light up the area around the character
+call ui.cmd :dungeonResetView
+
+set /a "is_searching=%py.flags.status%&%config.player.status.py_search%"
+if %is_searching% NEQ 0 call player.cmd :playerSearchOff
+
+:: Light critters but do not move them
+call monster.cmd :updateMonsters "false"
+
+:: Print the depth
+call ui.cmd :printCharacterCurrentDepth
+
+set "last_input_command=0"
+
+:playLoop
+set /a dg.game_turn+=1
+
+:: Change the store contents every 1000 turns in the dungeon
+set /a rotate_stock=%dg.game_turn%%%1000
+if %dg.current_level% NEQ 0 (
+    if "%rotate_stock%"=="0" (
+        call store_inventory.cmd :storeMaintenance
+    )
+)
+set "rotate_stock="
+
+call game.cmd :randomNumber "%config.monsters.mon_chance_of_new%"
+if "!errorlevel!"=="1" (
+    call monster_manager.cmd :monsterPlaceNewWithinDistance 1 "%config.monsters.mon_max_sight%" "false"
+)
+
+call :playerUpdateLightStatus
+
+:: Update counters and messages
+call :playerUpdateHeroStatus
+call :playerFoodConsumption
+call :playerUpdateRegeneration "!errorlevel!"
+
+call :playerUpdateBlindness
+call :playerUpdateConfusion
+call :playerUpdateFearState
+call :playerUpdatePoisonedState
+call :playerUpdateSpeed
+call :playerUpdateRestingState
+
+call :playerUpdateHallucination
+call :playerUpdateParalysis
+call :playerUpdateEvilProtection
+call :playerUpdateInvulnerability
+call :playerUpdateBlessedness
+call :playerUpdateHeatResistance
+call :playerUpdateColdResistance
+call :playerUpdateDetectInvisible
+call :playerUpdateInfraVision
+call :playerUpdateWordOfRecall
+
+:: Random teleportation
+if "%py.flags.teleport%"=="true" (
+    call game.cmd :randomNumber 100
+    if "!errorlevel!"=="1" (
+        call player.cmd :playerDisturb 0 0
+        call player.cmd :playerTeleport 40
+    )
+)
+
+:: See if we're too weak to hold a weapon or carry a pack
+set /a "too_heavy=%py.flags.status%&%config.player.status.py_str_wgt%"
+if %too_heavy% NEQ 0 (
+    call player.cmd :playerStrength
+)
+set "too_heavy="
+
+set /a "can_study=%py.flags.status%&%config.player.status.py_study%"
+if %can_study% NEQ 0 (
+    call ui.cmd :printCharacterStudyInstruction
+)
+set "can_study="
+
+call :playerUpdateStatusFlags
+
+:: Tiny chance for detecting enchantment
+::  1st level characters check every 2160 turns
+:: 40th level characters check every  416 turns
+set /a "chance=10+750/(5+%py.misc.level%)"
+set /a "f_turn=%dg.game_turn% & 15"
+if "%f_turn%"=="0" (
+    if "%py.flags.confused%"=="0" (
+        call game.cmd :randomChance %chance%
+        if "!errorlevel!"=="1" (
+            call :playerDetectEnchantment
+        )
+    )
+)
+set "chance="
+set "f_turn="
+
+:: Purge the monster list if needed
+set /a free_mons=%mon_total_allocations%-%next_free_monster_id%
+if %free_mons% LSS 10 call monster_manager.cmd :compactMonsters
+
+:: Are we in a good state to accept commands?
+if %py.flags.paralysis% LSS 1 (
+    if "%py.flags.rest%"=="1" (
+        if "%game.character_is_dead%"=="false" (
+            call :executeInputCommands "!last_input_command!" "!find_count!"
+        )
+    )
+)
+if %py.flags.paralysis% GEQ 1 (
+    call ui_io.cmd :panelMoveCursor "%py.pos.y%;%py.pos.x%"
+    call ui_io.cmd :putQIO
+)
+if %py.flags.rest% NEQ 0 (
+    call ui_io.cmd :panelMoveCursor "%py.pos.y%;%py.pos.x%"
+    call ui_io.cmd :putQIO
+)
+if "%game.character_is_dead%"=="true" (
+    call ui_io.cmd :panelMoveCursor "%py.pos.y%;%py.pos.x%"
+    call ui_io.cmd :putQIO
+)
+
+if "%game.teleport_player%"=="true" (
+    call player.cmd :playerTeleport 100
+)
+
+if "%dg.generate_new_level%"=="false" (
+    call monster.cmd :updateMonsters "true"
+)
+
+if "%dg.generate_level%"=="false" (
+    if "%eof_flag%"=="0" (
+        goto :playLoop
+    )
+)
 exit /b
