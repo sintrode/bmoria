@@ -112,29 +112,141 @@ if "!errorlevel!"=="1" set /a offset=-!offset!
 set /a sd=%~1+!offset!
 exit /b !sd!
 
+::------------------------------------------------------------------------------
+:: Set or unset various boolean 
+::------------------------------------------------------------------------------
 :setGameOptions
+call ui_io.cmd :putStringClearToEOL "  Space when finished, y/n to set options, - to move cursor" "0;0"
+
+for /L %%A in (0,1,10) do (
+    set /a option_line=%%A+1
+    set "display_line=!game_options[%%A].desc!                                      "
+    set "display_line=!display_line:~0,38!"
+    for /f %%B in ("!game_options[%%A].var!") do (
+        call ui_io.cmd :putStringClearToEOL "!display_line! : !%%B!" "!option_line!;0"
+    )
+)
+call ui_io.cmd :eraseLine "11;0"
+set "option_line="
+set "display_line="
+
+set "option_id=0"
+:setGameOptionsLoop
+set /a option_offset=!option_id!+1
+call ui_io.cmd :moveCursor "!option_offset!;40"
+
+call ui_io.cmd :getKeyInput key
+if "!key!"==" " goto :setGameOptionsEndLoop
+if "!key!"=="-" (
+    if !option_offset! LSS 10 (
+        set /a option_id+=1
+    ) else (
+        set "option_id=0"
+    )
+)
+if /I "!key!"=="Y" (
+    call ui_io.cmd :putString "true " "!option_offset!;40"
+    for /f "delims=" %%A in ("!game_options[%option_id%]!") do set "!%%A!=true"
+
+    if !option_offset! LSS 10 (
+        set /a option_id+=1
+    ) else (
+        set "option_id=0"
+    )
+)
+if /I "!key!"=="N" (
+    call ui_io.cmd :putString "false" "!option_offset!;40"
+    for /f "delims=" %%A in ("!game_options[%option_id%]!") do set "!%%A!=false"
+
+    if !option_offset! LSS 10 (
+        set /a option_id+=1
+    ) else (
+        set "option_id=0"
+    )
+)
+:setGameOptionsEndLoop
+set "option_id="
+set "option_offset="
 exit /b
 
-:validGameVersion
-exit /b
-
-:isCurrentGameVersion
-exit /b
-
+::------------------------------------------------------------------------------
+:: Returns a non-five random number between 1 and 9
+::
+:: Arguments: None
+:: Returns:   1, 2, 3, 4, 6, 7, 8 or 9
+::------------------------------------------------------------------------------
 :getRandomDirection
-exit /b
+call game.cmd :randomNumber 9
+if "!errorlevel!"=="5" (
+    goto :getRandomDirection
+) else (
+    set "dir=!errorlevel!"
+)
+exit /b !dir!
 
-:mapRoguelikeKeysToKeypad
-exit /b
-
+::------------------------------------------------------------------------------
+:: Prompts for a direction. Remembers that direction for repeated commands.
+::
+:: Arguments: %1 - The prompt to display
+::            %2 - The variable representing the direction to move in
+:: Returns:   0 if a valid command is entered, 1 otherwise
+::------------------------------------------------------------------------------
 :getDirectionWithMemory
-exit /b
+if "%game.use_last_direction%"=="true" (
+    set "!%~2!=!py.prev_dir!"
+    exit /b 0
+)
+if "%~1"=="CNIL" (
+    set "dir_prompt=Which direction?"
+)
 
+:getDirectionWithMemoryLoop
+set "old_count=%game.command_count%"
+call ui_io.cmd :getCommand "%~1" command || (
+    set "game.player_free_turn=true"
+    exit /b 1
+)
+set "game.command_count=%old_count%"
+if !command! GEQ 1 (
+    if !command! LEQ 9 (
+        if !command! NEQ 5 (
+            set "py.prev_dir=!command!"
+            set "%~2%=!py.prev_dir!"
+            exit /b 0
+        )
+    )
+)
+call ui_io.cmd :terminalBellSound
+goto :getDirectionWithMemoryLoop
+
+::------------------------------------------------------------------------------
+:: Like getDirectionWithMemory but doesn't remember the past
+::
+:: Arguments: %1 - The prompt to display
+::            %2 - The variable representing the direction to move in
+:: Returns:   0 if a valid command is entered, 1 otherwise
+::------------------------------------------------------------------------------
 :getAllDirections
-exit /b
+call ui_io.cmd :getCommand "%~1" command || (
+    set "game.player_free_turn=true"
+    exit /b 1
+)
+if !command! GEQ 1 (
+    if !command! LEQ 9 (
+        set "%~2=!command!"
+        exit /b 0
+    )
+)
+call ui_io.cmd :terminalBellSound
+goto :getAllDirections
 
+::------------------------------------------------------------------------------
+:: Quits the game
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :exitProgram
-exit /b
-
-:abortProgram
+call ui_io.cmd :flushInputBuffer
+call io_io.cmd :terminalRestore
 exit /b

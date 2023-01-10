@@ -263,6 +263,28 @@ for %%A in (Plain TreasureVault Pillars Maze FourSmallRooms) do (
     set "InnerRoomTypes.%%A=!counter!"
 )
 
+:: game.cpp
+set "counter=0"
+for %%A in (
+    "Running: cut known corners`config.options.run_cut_corners"
+    "Running: examine potential corners`config.options.run_examine_corners"
+    "Running: print self during run`config.options.run_print_self"
+    "Running: stop when map sector changes`config.options.find_bound"
+    "Running: run through open doors`config.options.run_ignore_doors"
+    "Prompt to pick up objects`config.options.prompt_to_pickup"
+    "Rogue-like commands`config.options.use_roguelike_keys"
+    "Show weights in inventory`config.options.show_inventory_weights"
+    "Highlight and notice mineral seams`config.options.highlight_seams"
+    "Beep for invalid character`config.options.error_beep_sound"
+    "Display rest/repeat counts`config.options.display_counts"
+) do (
+    for /f "tokens=1,2 delims=`" %%B in ("%%~A") do (
+        set "game_options[!counter!].desc=%%B"
+        set "game_options[!counter!].var=%%C"
+    )
+    set /a counter+=1
+)
+
 ::----- identification.cpp
 set "counter=0"
 for %%A in (Ignored Charges Plusses Light Flags ZPlusses) do (
