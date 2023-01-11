@@ -118,12 +118,12 @@ set "py.misc.stealth_factor=!character_races[%py.misc_race_id%].stealth!"
 set "py.misc.saving_throw=!character_races[%py.misc_race_id%].saving_throw_base!"
 set "py.misc.hit_die=!character_races[%py.misc_race_id%].hit_points_base!"
 call player_stats.cmd :playerDamageAdjustment
-set "py.misc.plusses_to_damage=!character_races[%py.misc_race_id%].%errorlevel%!"
+set "py.misc.plusses_to_damage=!errorlevel!"
 call player_stats.cmd :playerToHitAdjustment
-set "py.misc.plusses_to_hit=!character_races[%py.misc_race_id%].%errorlevel%!"
+set "py.misc.plusses_to_hit=!errorlevel!"
 set "py.misc.magical_ac=0"
 call player_stats.cmd :playerArmorClassAdjustment
-set "py.misc.ac=!character_races[%py.misc_race_id%].%errorlevel%!"
+set "py.misc.ac=!errorlevel!"
 set "py.misc.experience_factor=!character_races[%py.misc_race_id%].exp_factor_base!"
 set "py.misc.see_infra=!character_races[%py.misc_race_id%].infra_vision!"
 exit /b
@@ -237,9 +237,45 @@ if !history_id! GEQ 1 goto :characterGetHistoryOuterLoop
 
 call :playerClearHistory
 
-:: TODO: Word wrap for history text
+:: Word wrap for history text
+set "cursor_start=0"
+call helpers.cmd :strlen "!history_block!"
+set /a cursor_end=!errorlevel!-1
+
+:stripLeadingHistoryBlockWhitespace
+if "!history_block:~%cursor_start%,1!"==" " (
+    set /a cursor_start+=1
+    goto :stripLeadingHistoryBlockWhitespace
+)
+set /a current_cursor_position=cursor_end-cursor_start
+
+if %current_cursor_position% GTR 60 (
+    set "current_cursor_position=60"
+    call :findPreviousSpace NEQ
+
+    set /a new_cursor_start=cursor_start+current_cursor_position
+
+    call :findPreviousSpace EQU
+) else (
+    set "flag=true"
+)
+
+set /a line_length=%current_cursor_position%-%cursor_start%
+set "py.mis.history[!line_number!]=!history_block:~%cursor_start%,%line_length%"
+set /a line_number+=1
+set "line_length="
+set "cursor_start=!new_cursor_start!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Ridiculous hack for a while loop nested inside of an if because you can't
+:: have labels in code blocks in batch. To be fair, the C++ version of this was
+:: a triple-nested while loop, so...
+::
+:: Arguments: %1 - A random number between 1 and 100
+::            %2 - The required roll for a character background
+:: Returns:   None
+::------------------------------------------------------------------------------
 :check_test
 if %~1 GTR !character_backgrounds[%~2].roll! (
     set /a background_id+=1
@@ -247,26 +283,291 @@ if %~1 GTR !character_backgrounds[%~2].roll! (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Searches the string for whitespace and moves the cursor to the previous
+:: position based on whether we are or aren't looking for empty space.
+::
+:: Arguments: %1 - Whether or not to check for whitespace
+:: Returns:   None
+::------------------------------------------------------------------------------
+:findPreviousSpace
+set /a current_char=cursor_start+current_cursor_position-1
+if "!history_block:~%current_char%,1!" %~1 " " (
+    set /a current_cursor_position-=1
+    goto :findPreviousSpace
+)
+exit /b
+
+::------------------------------------------------------------------------------
+:: Gets the character's gender.
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :characterSetGender
+call ui_io.cmd :clearToBottom 20
+call ui_io.cmd :putString "Choose a gender (? for Help):" "20;2"
+call ui_io.cmd :putString "m) Male          f) Female" "21;2"
+
+call ui_io.cmd :moveCursor "20;29"
+call ui_io.cmd :getKeyInput key
+for /f "delims=mMfF?" %%A in ("!key!") do (
+    call ui_io.cmd :terminalBellSound
+    goto :characterSetGender
+)
+
+if /I "!key!"=="f" (
+    call player.cmd :playerSetGender "false"
+    call ui_io.cmd :putString "Female" "4;15"
+) else if /I "!key!"=="m" (
+    call player.cmd :playerSetGender "true"
+    call ui_io.cmd :putString "Male" "4;15"
+) else (
+    call game_files.cmd :displayTextHelpFile "%config.files.welcome_screen%"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Computes the character's age, height, and weight
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :characterSetAgeHeightWeight
+call rng.cmd :randomNumber %py.misc.race_id.max_age%
+set /a py.misc.age=!character_races[%py.misc.race_id%].base_age!+!errorlevel!
+
+call player.cmd :isMale
+if "!errorlevel!"=="0" (
+    set "infix=male"
+) else (
+    set "infix=female"
+)
+for %%A in (height_base height_mod weight_base weight_mod) do (
+    set %%A=!character_races[%py.misc.race_id%].%infix%_%%A!
+)
+
+call game.cmd :randomNumberNormalDistribution %height_base% %height_mod%
+set "py.misc.height=!errorlevel!"
+call game.cmd :randomNumberNormalDistribution %weight_base% %weight_mod%
+set "py.misc.weight=!errorlevel!"
+call player_stats.cmd :playerDisarmAdjustment
+set /a py.misc.disarm=!character_races[%py.misc.race_id%].disarm_chance_base!+!errorlevel!
 exit /b
 
+::------------------------------------------------------------------------------
+:: Returns the number of valid classes for a given race
+::
+:: Arguments: %1 - The race_id of the player's race
+::            %2 - The variable to contain the list of valid classes
+:: Returns:   The number of valid classes for a given race
+::------------------------------------------------------------------------------
 :displayRaceClasses
-exit /b
+set "coord.y=21"
+set "coord.x=2"
+set "class_id=0"
+set "mask=1"
 
+call ui_io.cmd :clearToBottom 20
+call ui_io.cmd :putString "Choose a class (? for Help):" "20;2"
+
+for /L %%A in (0,1,%player_max_classes%) do (
+    set /a "masked_bit_field=!character_races[%~1].classes_bit_field! & !mask!"
+    if !masked_bit_field! NEQ 0 (
+        set letter=!class_id!+97
+        cmd /c exit /b !letter!
+        set "description=!=ExitCodeAscii!) !classes[%%A].title!"
+        call ui_io.cmd :putString "!description!" "!coord.y!;!coord.x!"
+        set "!%~2![!class_id!]=%%A"
+
+        set /a coord.x+=15
+        if !coord.x! GTR 70 (
+            set "coord.x=2"
+            set /a coord.y+=1
+        )
+        set /a class_id+=1
+    )
+    set /a "mask<<=1"
+)
+exit /b !class_id!
+
+::------------------------------------------------------------------------------
+:: Actually set the character stats
+::
+:: Arguments: %1 - The selected class_id of the character
+:: Returns:   None
+::------------------------------------------------------------------------------
 :generateCharacterClass
+call ui_io.cmd :clearToBottom 20
+call ui_io.cmd :putString "!classes[%py.misc.class_id%].title!" "5;15"
+
+:: Tweak stats based on class
+for /L %%A in (0,1,5) do (
+    call :createModifyPlayerStat !py.stats.max[%%A]! !classes[%py.misc.class%].stats[%%A]!
+    set "py.stats.max[%%A]=!errorlevel!"
+    set "py.stats.current[%%A]=!py.stats.max[%%A]!"
+    call player_stats.cmd :playerSetAndUseStat %%A
+)
+
+call player_stats.cmd :playerDamageAdjustment
+set "py.misc.plusses_to_damage=!errorlevel!"
+call player_stats.cmd :playerToHitAdjustment
+set "py.misc.plusses_to_hit=!errorlevel!"
+call player_stats.cmd :playerArmorClassAdjustment
+set "py.misc.magical_ac=!errorlevel!"
+set "py.misc.ac=0"
+
+:: Displayed values
+set "py.misc.display_to_damage=%py.misc.plusses_to_damage%"
+set "py.misc.display_to_hit=%py.misc.plusses_to_hit%"
+set "py.misc.display_to_ac=%py.misc.magical_ac%"
+set /a py.misc.display_ac=%py.misc.ac%+%py.misc.display_to_ac%
+
+set /a py.misc.hit_die+=!classes[%py.misc.class_id%].hit_points!
+call player_stats.cmd :playerStatAdjustmentConstitution
+set /a py.misc.max_hp+!errorlevel!+%py.misc_hit_die%
+set "py.misc.current_hp=%py.misc.max_hp%"
+set "py.misc.current_hp_fraction=0"
+
+set /a min_value=(%player_max_level%*3/8*(%py.misc.hit_die%-1))+%player_max_level%
+set /a max_value=(%player_max_level%*5/8*(%py.misc.hit_die%-1))+%player_max_level%
+set "py.base_hp_levels[0]=%py.misc.hit_die%"
+
+:generateHpLevels
+for /L %%A in (1,1,%player_max_level%) do (
+    call rng.rnd :randomNumber %py.misc.hit_die%
+    set "py.base_hp_levels[%%A]=!errorlevel!"
+
+    for /F "delims=" %%B in ('set /a %%A-1') do (
+        set /a py.base_hp_levels[%%A]+=!py.base_hp_levels[%%B]!
+    )
+)
+if !py.base_hp_levels[%player_max_level%]! GEQ %min_value% (
+    if !py.base_hp_levels[%player_max_level%]! LEQ %max_value% (
+        goto :concludeCharacterGeneration
+    )
+)
+goto :generateHpLevels
+
+:concludeCharacterGeneration
+set "py.misc.bth+=!classes[%py.misc.class_id%].base_to_hit!"
+set "py.misc.bth_with_bows+=!classes[%py.misc.class_id%].base_to_hit_with_bows!"
+set "py.misc.chance_in_search+=!classes[%py.misc.class_id%].searching!"
+set "py.misc.disarm+=!classes[%py.misc.class_id%].disarm_traps!"
+set "py.misc.fos+=!classes[%py.misc.class_id%].fos!"
+set "py.misc.stealth_factor+=!classes[%py.misc.class_id%].stealth!"
+set "py.misc.saving_throw+=!classes[%py.misc.class_id%].saving_throw!"
+set "py.misc.experience_factor+=!classes[%py.misc.class_id%].experience_factor!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Gets the character class from user input
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :characterGetClass
+for /L %%A in (0,1,%player_max_classes%) do set "class_list[%%A]=0"
+call :displayRaceClasses %py.misc.race_id% class_list
+set "class_count=!errorlevel!"
+
+set "py.misc.class_id=0"
+:characterGetClassLoop
+call ui_io.cmd :moveCursor "20;31"
+call ui_io.cmd :getKeyInput key
+for /F "delims=abcdefABCDEF?" %%A in ("!key!") do goto :characterGetClassLoop
+
+set "counter=0"
+for %%A in (a b c d e f) do (
+    set "ascii[%%A]=!counter!"
+    set /a counter+=1
+)
+set "key_val=!ascii[%key%]!"
+
+if !ascii[%key%]! LSS %class_count% (
+    call :generateCharacterClass !class_list[%key_val%]!
+    goto :characterGetClassAfterLoop
+) else if "!key!"=="?" (
+    call game_files.cmd :displayTextHelpFile "%config.files.welcome_screen%"
+) else (
+    call ui_io.cmd :terminalBellSound
+)
+goto :characterGetClassLoop
+
+:characterGetClassAfterLoop
 exit /b
 
+::------------------------------------------------------------------------------
+:: Given a stat value, return a monetary value
+::
+:: Arguments: %1 - The value of the stat to base the calculation on
+:: Returns:   5*(%~1-10)
+::------------------------------------------------------------------------------
 :monetaryValueCalculatedFromStat
-exit /b
+set /a stat=5 * (%~1 - 10)
+exit /b !stat!
 
+::------------------------------------------------------------------------------
+:: Base the character's starting gold on their starting stats and social class
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerCalculateStartGold
+set /a value=5 * (!py.stats.max[%PlayerAttr.a_str%]! - 10)
+set /a value+=5 * (!py.stats.max[%PlayerAttr.a_int%]! - 10)
+set /a value+=5 * (!py.stats.max[%PlayerAttr.a_wis%]! - 10)
+set /a value+=5 * (!py.stats.max[%PlayerAttr.a_con%]! - 10)
+set /a value+=5 * (!py.stats.max[%PlayerAttr.a_dex%]! - 10)
+
+call rng.cmd :rnd 25
+set /a new_gold=%py.misc.social_class% * 6 + !errorlevel! + 325
+set /a new_gold-=value
+set /a new_gold+=5 * (!py.stats.max[%PlayerAttr.a_chr%]! - 10)
+
+:: Women start with more money because the pockets on their pants are too small
+call player.cmd :isMale || set /a new_gold+=50
+
+if %new_gold% LSS 80 set "new_gold=80"
+set "py.misc.au=%new_gold%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: The main loop for character creation
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :characterCreate
+call ui.cmd :printCharacterInformation
+call :characterChooseRace
+call :characterSetGender
+
+set "done=true"
+:getCharacteristicsLoop
+call :characterGenerateStatsAndRace
+call :characterGetHistory
+call :characterSetAgeHeightWeight
+call :displayCharacterHistory
+call ui.cmd :printCharacterVitalStatistics
+call ui.cmd :printCharacterStats
+
+call ui_io.cmd :clearToBottom 20
+call ui_io.cmd :putString "Press N to reroll or Y to accept characteristics" "20;2"
+
+call ui_io.cmd :getKeyInput key
+if /I "!key!"=="y" set "done=true"
+if "!done!"=="false" goto :getCharacteristicsLoop
+set "done="
+
+call :characterGetClass
+call :playerCalculateStartGold
+call ui.cmd :printCharacterStats
+call ui.cmd :printCharacterAbilities
+call ui.cmd :getCharacterName
+
+call ui_io.cmd :putStringClearToEOL "[ Press any key to continue, or Q to exit. ]" "23;17"
+call ui_io.cmd :getKeyInput key
+if /I "!key!"=="Q" call game.cmd :exitProgram
+call ui_io.cmd :eraseLine "23;0"
 exit /b
