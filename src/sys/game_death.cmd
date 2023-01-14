@@ -144,7 +144,7 @@ if "%game.character_generated%"=="true" (
     call scores.cmd :recordNewHighScore
     call scores.cmd :showScoresScreen
 )
-call ui_io.cmd :eraseLine "23;0"
+call ui_io.cmd :eraseLine "23;1"
 call game.cmd :exitProgram
 exit /b
 

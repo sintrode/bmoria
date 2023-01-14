@@ -96,7 +96,7 @@ call identification.cmd :magicInitializeItemNames
 
 :: Actually begin the game at this point
 cls
-call ui_io.cmd :putString "Press ? for help" 0 63
+call ui_io.cmd :putString "Press ? for help" "0;63"
 call ui.cmd :printCharacterStatsBlock
 
 if "%generate%"=="true" call dungeon_generate.cmd :generateCave
