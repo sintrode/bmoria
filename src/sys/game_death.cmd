@@ -26,10 +26,10 @@ if "%game.total_winner%"=="false" (
 )
 call :centerAndPrint "!player_title!" 8
 call :centerAndPrint "!royal_title!" 10
-call ui_io.cmd :putString "%py.misc.level%" 11
+call ui_io.cmd :putString "%py.misc.level%" "11;30"
 call :centerAndPrint "%py.misc.exp% Exp" 12
 call :centerAndPrint "%py.misc.au% Au" 13
-call ui_io.cmd :putString "%dg.current_level%" 14
+call ui_io.cmd :putString "%dg.current_level%" "14;34"
 call :centerAndPrint "%game.character_died_from%" 16
 
 call helpers.cmd :humanDateString day
@@ -86,7 +86,7 @@ call player.cmd :isMale
 if "!errorlevel!"=="0" (
     call ui_io.cmd :putString "KING" "17;45"
 ) else (
-    call ui_io.cmd :putString "QUEEN" "17:45"
+    call ui_io.cmd :putString "QUEEN" "17;45"
 )
 call ui_io.cmd :flushInputBuffer
 call ui_io.cmd :waitForContinueKey 23
