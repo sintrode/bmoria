@@ -1723,7 +1723,7 @@ if "!errorlevel!"=="0" (
     set "item_flags=!py.inventory[%item_id%].flags!"
 
     set "spell_id=0"
-    call :readInSpells !item_flags!
+    call :readInSpells item_flags
 
     call ui_io.cmd :terminalSaveScreen
     call ui.cmd :displaySpellsList "spell_index" !spell_id! "true" "-1"

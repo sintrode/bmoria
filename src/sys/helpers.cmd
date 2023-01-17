@@ -2,25 +2,108 @@
 call %*
 exit /b
 
+::------------------------------------------------------------------------------
+:: Returns the position of the first set bit and clears that bit
+::
+:: Arguments: %1 - The name of the flag variable to process
+:: Returns:   The first bit set, or -1 if no one bits are found
+::------------------------------------------------------------------------------
 :getAndClearFirstBit
-exit /b
+set "mask=1"
 
+for /L %%A in (0,1,31) do (
+    set /a "is_masked=!%~1!&!mask!"
+    if not "!is_masked!"=="0" (
+        set /a "!%~1!&=~!mask!"
+        exit /b %%A
+    )
+    set /a "mask<<=1"
+)
+exit /b -1
+
+::------------------------------------------------------------------------------
+:: Used to replace a placeholder in a haggling comment with the actual value.
+:: When this subroutine is called, the template will already be in place. This
+:: was a bit tricky in C++, but it's much easier in batch as long as the
+:: identifier doesn't contain a percent sign like it originally did.
+::
+:: Arguments: %1 - The name of the variable containing the template string
+::            %2 - The identifier to be replaced
+::            %3 - The value to replace the identifier with
+:: Returns:   None
+::------------------------------------------------------------------------------
 :insertNumberIntoString
+set "template_string=!%~1!"
+set "template_replacee=%~2"
+set "template_replacer=%~3"
+set "%~1=!template_string:%template_replacee%=%template_replacer%!"
+set "template_string="
+set "template_replacee="
+set "template_replacer="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Used to add a plural suffix to an item description if necessary
+::
+:: Arguments: %1 - The name of the variable containing the template string
+::            %2 - The identifier to be replaced
+::            %3 - The value to replace the identifier with
+:: Returns:   None
+::------------------------------------------------------------------------------
 :insertStringIntoString
+set "template_string=!%~1!"
+set "template_replacee=%~2"
+set "template_replacer=%~3"
+if "%template_replacer%"=="CNIL" set "template_replacer="
+
+set "%~1=!template_string:%template_replacee%=%template_replacer%!"
+set "template_string="
+set "template_replacee="
+set "template_replacer="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determines if a specified character is a vowel or not. Used to see if the
+:: next word needs to be "a" or "an." Note that we're being lazy and using the
+:: actual first letter rather than the starting sound, so things like "an unique"
+:: will still happen.
+::
+:: Arguments: %1 - The character to validate
+:: Returns:   0 if the character is a vowel
+::            1 otherwise
+::------------------------------------------------------------------------------
 :isVowel
-exit /b
+if /I "%~1"=="a" exit /b 0
+if /I "%~1"=="e" exit /b 0
+if /I "%~1"=="i" exit /b 0
+if /I "%~1"=="o" exit /b 0
+if /I "%~1"=="u" exit /b 0
+exit /b 1
 
-:stringToNumber
-exit /b
-
+::------------------------------------------------------------------------------
+:: Returns the number of seconds since Jan 1 1970 at midnight
+:: https://stackoverflow.com/a/11385908
+::
+:: Arguments: None
+:: Returns:   A standard UNIX timestamp
+::------------------------------------------------------------------------------
 :getCurrentUnixTime
-exit /b
+setlocal
+for /f %%x in ('wmic path win32_utctime get /format:list ^| findstr "="') do set "%%~x"
+set /a z=(14-100%Month%%%100)/12, y=10000%Year%%%10000-z
+set /a ut=y*365+y/4-y/100+y/400+(153*(100%Month%%%100+12*z-3)+2)/5+Day-719469
+set /a ut=ut*86400+100%Hour%%%100*3600+100%Minute%%%100*60+100%Second%%%100
+endlocal & exit /b !ut!
 
+::------------------------------------------------------------------------------
+:: Prints a date in the ISO standard format
+::
+:: Arguments: %1 - The variable to store the output in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :humanDateString
+for /f "delims=" %%A in ('wmic os get localdatetime ^| find "."') do set "dt=%%A"
+set "%~1=!dt:~0,4!-!dt:~4,2!-!dt:~6,2!"
 exit /b
 
 ::------------------------------------------------------------------------------
