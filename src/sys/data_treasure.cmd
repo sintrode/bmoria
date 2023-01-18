@@ -564,4 +564,5 @@ set    "game_objects[%object_count%].to_ac=%~4"
 set    "game_objects[%object_count%].damage.dice=%~5"
 set    "game_objects[%object_count%].damage.sides=%~6"
 set    "game_objects[%object_count%].depth_first_found=%~7"
+set /a object_count+=1
 exit /b

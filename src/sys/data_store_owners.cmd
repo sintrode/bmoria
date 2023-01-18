@@ -178,4 +178,5 @@ set "store_owners[%owner_count%].min_inflate=%~4"
 set "store_owners[%owner_count%].haggles_per=%~5"
 set "store_owners[%owner_count%].race=%~6"
 set "store_owners[%owner_count%].max_insults=%~7"
+set /a owner_count+=1
 exit /b
