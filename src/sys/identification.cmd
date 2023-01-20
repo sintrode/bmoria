@@ -290,71 +290,332 @@ if "%~1"=="%tv_food%" (
 )
 exit /b -1
 
+::------------------------------------------------------------------------------
+:: Removes the Tried flag for a given object
+::
+:: Arguments: %1 - The index of the object to clear the flag for
+:: Returns:   None
+::------------------------------------------------------------------------------
 :clearObjectTriedFlag
+set /a "objects_identified[%~1]&=~%config.identification.od_tried%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Adds the Tried flag for a given object
+::
+:: Arguments: %1 - The index of the object to set the flag for
+:: Returns:   None
+::------------------------------------------------------------------------------
 :setObjectTriedFlag
+set /a "objects_identified[%~1]|=%config.identification.od_tried%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determines if an object is known or not
+::
+:: Arguments: %1 - The index of the object to check
+:: Returns:   0 if the object is known
+::            1 if the object is unknown
+::------------------------------------------------------------------------------
 :isObjectKnown
-exit /b
+set /a "is_known=!objects_identified[%~1]! & %config.identification.od_known1%"
+exit /b !is_known!
 
+::------------------------------------------------------------------------------
+:: Remove the "secret" symbol for the identity of a specified object
+::
+:: Arguments: %1 - The category ID
+::            %2 - The subcategory ID
+:: Returns:   None
+::------------------------------------------------------------------------------
 :itemSetAsIdentified
+call :objectPositionOffset "%~1" "%~2"
+set "id=!errorlevel!"
+if !id! LSS 0 exit /b
+
+set /a "id<<=6"
+set /a "id+=(%~2 & (item_single_stack_min - 1))"
+set /a "objects_identified[!id!]|=%config.identification.od_known1%"
+
+call :clearObjectTriedFlag !id!
 exit /b
 
+::------------------------------------------------------------------------------
+:: Remove an automatically-generated description
+::
+:: Arguments: %1 - The name of the item to process
+:: Returns:   None
+::------------------------------------------------------------------------------
 :unsample
+set /a "%~1.identification&=~(%config.identification.id_magik% | %config.identification.id_empty%)"
+
+call :objectPositionOffset "!%~1.category_id!" "!%~1.sub_category_id!"
+set "id=!errorlevel!"
+set /a "id<<=6"
+set /a "id+=(%~2 & (item_single_stack_min - 1))"
+
+call :clearObjectTriedFlag !id!
 exit /b
 
+::------------------------------------------------------------------------------
+:: Remove the "secret" symbol for the identity of plusses
+::
+:: Arguments: %1 - The name of the item to process
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellItemIdentifyAndRemoveRandomInscription
+call :unsample "%~1"
+set /a "%~1.identification|=%config.identification.id_known2%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Validates that a specified spell item has been identified
+::
+:: Arguments: %1 - The name of the item to validate
+:: Returns:   0 if the item has been identified before
+::            1 otherwise
+::------------------------------------------------------------------------------
 :spellItemIdentified
-exit /b
+set /a "is_known=!%~1.identification! & %config.identification.id_known2%"
+exit /b !is_known!
 
+::------------------------------------------------------------------------------
+:: Removes the flag that specifies that a given item has been identified
+::
+:: Arguments: %1 - The name of the item to process
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellItemRemoveIdentification
+set /a "%~1.identification&=~%config.identification.id_known2%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Removes the flag that specifies that a given item has an empty ID
+::
+:: Arguments: %1 - The name of the item to process
+:: Returns:   None
+::------------------------------------------------------------------------------
 :itemIdentificationClearEmpty
+set /a "%~1.identification&=~%config.identification.id_empty%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Sets the flag that identifies an item as storebought
+::
+:: Arguments: %1 - The name of the item to process
+:: Returns:   None
+::------------------------------------------------------------------------------
 :itemIdentifyAsStoreBought
+set /a "%~1.identification|=%config.identification.id_store_bought%"
+call :spellItemIdentifyAndRemoveRandomInscription "%~1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Checks if a given item is marked as having been bought in a store because
+:: for some unknown in-universe reason, store owners won't buy back items.
+::
+:: Arguments: %1 - The identification flag value of the item to validate
+:: Returns:   0 if the item has been bought in a store
+::            1 if the item was found outside
+::------------------------------------------------------------------------------
 :itemStoreBought
-exit /b
+set /a "was_bought=%~1 & %config.identification.id_store_bought%"
+exit /b !was_bought!
 
+::------------------------------------------------------------------------------
+:: Items which don't have a color are always known so that they're listed
+:: correctly in the inventory
+::
+:: Arguments: %1 - The category ID of the item
+::            %2 - The subcategory ID of the item
+::            %3 - The identification flag value of the item
+:: Returns:   0 if the object is known
+::            1 otherwise
+::------------------------------------------------------------------------------
 :itemSetColorlessAsIdentified
-exit /b
+call :objectPositionOffset "%~1" "%~2"
+set "id=!errorlevel!"
 
+if !id! LSS 0 (
+    REM Pretty sure this is a constant, but whatever
+    if not "%config.identification.od_known1%"=="0" (
+        exit /b 0
+    ) else (
+        exit /b 1
+    )
+
+    call :itemStoreBought "%~3"
+    if "!errorlevel!"=="0" (
+        exit /b 0
+    ) else (
+        exit /b 1
+    )
+)
+
+set /a "id<<=6"
+set /a "id+=(%~2 & (item_single_stack_min - 1))"
+
+call :isObjectKnown "!id!"
+exit /b !errorlevel!
+
+::------------------------------------------------------------------------------
+:: Mark a specified item as having been sampled
+::
+:: Arguments: %1 - The name of the item to process
+:: Returns:   None
+::------------------------------------------------------------------------------
 :itemSetAsTried
+call :objectPositionOffset "!%~1.category_id!" "!%~1.subcategory_id!"
+set "id=!errorlevel!"
+
+if !id! LSS 0 exit /b
+
+set /a "id<<=6"
+set /a "id+=(%~2 & (item_single_stack_min - 1))"
+call :setObjectTriedFlag "!id!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Identify a specified object
+::
+:: Arguments: %1 - The name of the item to identify
+::            %2 - A reference to the ID of the item
+:: Returns:   None
+::------------------------------------------------------------------------------
 :itemIdentify
+set "item_id=%~2"
+
+call inventory.cmd :inventoryItemIsCursed "%~1" && (
+    call :itemAppendToInscription "%~1" "%config.identification.id_damd%"
+)
+call :itemSetColorlessAsIdentified "!%~1.category_id!" "!%~1.sub_category_id!" "!%~1.identification!" && (
+    exit /b
+)
+
+call :itemSetAsIdentified "!%~1.category_id!" "!%~1.sub_category_id!"
+
+call inventory.cmd :inventoryItemSingleStackable "%~1" || (
+    exit /b
+)
+
+set /a max_counter=%py.pack.unique_items%-1
+set /a matching_cat=1, matching_sub_cat=1, total_items_count=0
+for /L %%A in (0,1,%max_counter%) do (
+    set "i=%%A"
+    if "!py.inventory[%%A].category_id!"=="!%~1.category_id!" set "matching_cat=0"
+    if "!py.inventory[%%A].sub_category_id!"=="!%~1.sub_category_id!" set "matching_sub_cat=0"
+    set /a total_items_count=!py.inventory[%%A].items_count!+!%~1.items_count!
+
+    REM I only hate this a lot, so it's fine
+    if "!matching_cat!"=="0" if "!matching_sub_cat!"=="0" if not "%%A"=="!%~2!" (
+        if !total_items_count! LSS 256 (
+            if !%~2! GTR %%A (
+                set "j=!%~2!"
+                set "%~2=!i!"
+                set "i=!j!"
+            )
+
+            call ui_io.cmd :printMessage "You combine similar objects from the shop and dungeon."
+
+            set /a py.inventory[!%~2!].items_count+=py.inventory[!i!].items_count
+            set /a py.pack.unique_items-=1
+
+            for /L %%B in (!i!,1,!max_counter!) do (
+                for /f "delims=" %%C in ('set /a %%B+1') do (
+                    call inventory.cmd :inventoryCopyItem "py.inventory[%%B]" "py.inventory[%%C]"
+                )
+            )
+        )
+    )
+)
+
 exit /b
 
+::------------------------------------------------------------------------------
+:: If an object has lost magical properties, remove the appropriate portion of
+:: its name
+::
+:: Arguments: %1 - The name of the item to process
+:: Returns:   None
+::------------------------------------------------------------------------------
 :itemRemoveMagicNaming
+set /a "%~1.special_name_id=%SpecialNameIds.sn_null%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Returns the amount of damage that a bow does based on its misc_use value
+::
+:: Arguments: %1 - The misc_use value of the bow
+:: Returns:   How much damage that bow does
+::------------------------------------------------------------------------------
 :bowDamageValue
-exit /b
+if "%~1"=="1" exit /b 2
+if "%~1"=="2" exit /b 2
+if "%~1"=="3" exit /b 3
+if "%~1"=="4" exit /b 4
+if "%~1"=="5" exit /b 3
+if "%~1"=="6" exit /b 4
+exit /b -1
 
+::------------------------------------------------------------------------------
+::
+::
+:: Arguments: 
+:: Returns:   
+::------------------------------------------------------------------------------
 :itemDescription
 exit /b
 
+::------------------------------------------------------------------------------
+::
+::
+:: Arguments: 
+:: Returns:   
+::------------------------------------------------------------------------------
 :itemChargesRemainingDescription
 exit /b
 
+::------------------------------------------------------------------------------
+::
+::
+:: Arguments: 
+:: Returns:   
+::------------------------------------------------------------------------------
 :itemTypeRemainingCountDescription
 exit /b
 
+::------------------------------------------------------------------------------
+::
+::
+:: Arguments: 
+:: Returns:   
+::------------------------------------------------------------------------------
 :itemInscribe
 exit /b
 
+::------------------------------------------------------------------------------
+::
+::
+:: Arguments: 
+:: Returns:   
+::------------------------------------------------------------------------------
 :itemAppendToInscription
 exit /b
 
+::------------------------------------------------------------------------------
+::
+::
+:: Arguments: 
+:: Returns:   
+::------------------------------------------------------------------------------
 :itemReplaceInscription
 exit /b
 
+::------------------------------------------------------------------------------
+::
+::
+:: Arguments: 
+:: Returns:   
+::------------------------------------------------------------------------------
 :objectBlockedByMonster
 exit /b

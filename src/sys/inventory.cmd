@@ -97,3 +97,18 @@ exit /b
 
 :damageAcid
 exit /b
+
+::------------------------------------------------------------------------------
+:: Copies one inventory item into another one
+::
+:: Arguments: %1 - The inventory item to copy values into
+::            %2 - The inventory item to copy values from
+:: Returns:   None
+::------------------------------------------------------------------------------
+:inventoryCopyItem
+for %%T in (id special_name_id inscription flags category_id sprite misc_use
+            cost sub_category_id items_count weight to_hit to_damage ac to_ac
+            damage.dice damage.sides depth_first_round identification) do (
+    set "%~1.%%T=!%~2.%%T"
+)
+exit /b
