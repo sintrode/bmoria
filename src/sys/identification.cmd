@@ -566,72 +566,72 @@ exit /b -1
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :itemDescription
-set /a "indexx=!%~1.sub_category_id! & (%item_single_stack_min% - 1)"
+set /a "indexx=!%~2.sub_category_id! & (%item_single_stack_min% - 1)"
 
-for /f "delims=" %%A in ("!%~1.id!") do (
+for /f "delims=" %%A in ("!%~2.id!") do (
     set "basenm=!game_objects[%%A].name!"
 )
 set "append_name=false"
-call :itemSetColorlessAsIdentified "!%~1.category_id!" "!%~1.sub_category_id!" "!%~1.identification!"
+call :itemSetColorlessAsIdentified "!%~2.category_id!" "!%~2.sub_category_id!" "!%~2.identification!"
 set "misc_type=%ItemMiscUse.Ignored%"
 
-if "!%~1.category_id!"=="%tv_misc%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_chest%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_spike%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_boots%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_gloves%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_cloak%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_helm%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_shield%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_hard_armor%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_soft_armor%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_flask%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_open_door%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_closed_door%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_secret_door%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_rubble%" goto :itemDescriptionAfterSwitch
-if "!%~1.category_id!"=="%tv_sling_ammo%" (
-    set "damstr= (!%~1.damage.dice!d!%~1.damage.sides!)"
+if "!%~2.category_id!"=="%tv_misc%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_chest%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_spike%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_boots%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_gloves%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_cloak%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_helm%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_shield%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_hard_armor%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_soft_armor%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_flask%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_open_door%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_closed_door%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_secret_door%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_rubble%" goto :itemDescriptionAfterSwitch
+if "!%~2.category_id!"=="%tv_sling_ammo%" (
+    set "damstr= (!%~2.damage.dice!d!%~2.damage.sides!)"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_bolt%" (
-    set "damstr= (!%~1.damage.dice!d!%~1.damage.sides!)"
+if "!%~2.category_id!"=="%tv_bolt%" (
+    set "damstr= (!%~2.damage.dice!d!%~2.damage.sides!)"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_arrow%" (
-    set "damstr= (!%~1.damage.dice!d!%~1.damage.sides!)"
+if "!%~2.category_id!"=="%tv_arrow%" (
+    set "damstr= (!%~2.damage.dice!d!%~2.damage.sides!)"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_light%" (
+if "!%~2.category_id!"=="%tv_light%" (
     set "misc_type=%ItemMiscUse.Light%"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_bow%" (
-    call :bowDamageValue "!%~1.misc_use!"
+if "!%~2.category_id!"=="%tv_bow%" (
+    call :bowDamageValue "!%~2.misc_use!"
     set "damstr= (x!errorlevel!)"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_hafted%" (
-    set "damstr= (!%~1.damage.dice!d!%~1.damage.sides!)"
+if "!%~2.category_id!"=="%tv_hafted%" (
+    set "damstr= (!%~2.damage.dice!d!%~2.damage.sides!)"
     set "misc_type=%ItemMiscUse.flags%"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_polearm%" (
-    set "damstr= (!%~1.damage.dice!d!%~1.damage.sides!)"
+if "!%~2.category_id!"=="%tv_polearm%" (
+    set "damstr= (!%~2.damage.dice!d!%~2.damage.sides!)"
     set "misc_type=%ItemMiscUse.flags%"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_sword%" (
-    set "damstr= (!%~1.damage.dice!d!%~1.damage.sides!)"
+if "!%~2.category_id!"=="%tv_sword%" (
+    set "damstr= (!%~2.damage.dice!d!%~2.damage.sides!)"
     set "misc_type=%ItemMiscUse.flags%"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_digging%" (
-    set "damstr= (!%~1.damage.dice!d!%~1.damage.sides!)"
+if "!%~2.category_id!"=="%tv_digging%" (
+    set "damstr= (!%~2.damage.dice!d!%~2.damage.sides!)"
     set "misc_type=%ItemMiscUse.zplusses%"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_amulet%" (
+if "!%~2.category_id!"=="%tv_amulet%" (
     if /I "%~3"=="true" (
         set "basenm=_ /s/ Amulet"
         set "modstr=!amulets[%indexx%]!"
@@ -642,7 +642,7 @@ if "!%~1.category_id!"=="%tv_amulet%" (
     set "misc_type=%ItemMiscUse.Plusses%"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_ring%" (
+if "!%~2.category_id!"=="%tv_ring%" (
     if /I "%~3"=="true" (
         set "basenm=_ /s/ Ring"
         set "modstr=!rocks[%indexx%]!"
@@ -653,7 +653,7 @@ if "!%~1.category_id!"=="%tv_ring%" (
     set "misc_type=%ItemMiscUse.Plusses%"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_staff%" (
+if "!%~2.category_id!"=="%tv_staff%" (
     if /I "%~3"=="true" (
         set "basenm=_ /s/ Staff"
         set "modstr=!woods[%indexx%]!"
@@ -664,7 +664,7 @@ if "!%~1.category_id!"=="%tv_staff%" (
     set "misc_type=%ItemMiscUse.Charges%"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_wand%" (
+if "!%~2.category_id!"=="%tv_wand%" (
     if /I "%~3"=="true" (
         set "basenm=_ /s/ Wand"
         set "modstr=!metals[%indexx%]!"
@@ -675,7 +675,7 @@ if "!%~1.category_id!"=="%tv_wand%" (
     set "misc_type=%ItemMiscUse.Charges%"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_scroll1%" (
+if "!%~2.category_id!"=="%tv_scroll1%" (
     if /I "%~3"=="true" (
         set "basenm=_ Scroll~ titled '/s/'"
         set "modstr=!magic_item_titles[%indexx%]!"
@@ -685,7 +685,7 @@ if "!%~1.category_id!"=="%tv_scroll1%" (
     )
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_scroll2%" (
+if "!%~2.category_id!"=="%tv_scroll2%" (
     if /I "%~3"=="true" (
         set "basenm=_ Scroll~ titled '/s/'"
         set "modstr=!magic_item_titles[%indexx%]!"
@@ -695,7 +695,7 @@ if "!%~1.category_id!"=="%tv_scroll2%" (
     )
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_potion1%" (
+if "!%~2.category_id!"=="%tv_potion1%" (
     if /I "%~3"=="true" (
         set "basenm=_ /s/ Potion~"
         set "modstr=!colors[%indexx%]!"
@@ -705,7 +705,7 @@ if "!%~1.category_id!"=="%tv_potion1%" (
     )
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_potion2%" (
+if "!%~2.category_id!"=="%tv_potion2%" (
     if /I "%~3"=="true" (
         set "basenm=_ /s/ Potion~"
         set "modstr=!colors[%indexx%]!"
@@ -715,7 +715,7 @@ if "!%~1.category_id!"=="%tv_potion2%" (
     )
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_food%" (
+if "!%~2.category_id!"=="%tv_food%" (
     if /I "%~3"=="true" (
         if %indexx% LEQ 15 (
             set "basenm=_ /s/ Mushroom~"
@@ -738,37 +738,37 @@ if "!%~1.category_id!"=="%tv_food%" (
     )
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_magic_book%" (
+if "!%~2.category_id!"=="%tv_magic_book%" (
     set "modstr=!basenm!"
     set "basenm=_ Book~ of Magic Spells /s/"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_prayer_book%" (
+if "!%~2.category_id!"=="%tv_prayer_book%" (
     set "modstr=!basenm!"
     set "basenm=_ Holy Book~ of Prayers /s/"
     goto :itemDescriptionAfterSwitch
 )
-if "!%~1.category_id!"=="%tv_gold%" (
+if "!%~2.category_id!"=="%tv_gold%" (
     set "description=!basenm!."
     exit /b
 )
-if "!%~1.category_id!"=="%tv_invis_trap%" (
+if "!%~2.category_id!"=="%tv_invis_trap%" (
     set "description=!basenm!."
     exit /b
 )
-if "!%~1.category_id!"=="%tv_vis_trap%" (
+if "!%~2.category_id!"=="%tv_vis_trap%" (
     set "description=!basenm!."
     exit /b
 )
-if "!%~1.category_id!"=="%tv_up_stair%" (
+if "!%~2.category_id!"=="%tv_up_stair%" (
     set "description=!basenm!."
     exit /b
 )
-if "!%~1.category_id!"=="%tv_down_stair%" (
+if "!%~2.category_id!"=="%tv_down_stair%" (
     set "description=!basenm!."
     exit /b
 )
-if "!%~1.category_id!"=="%tv_store_door%" (
+if "!%~2.category_id!"=="%tv_store_door%" (
     set "description=the entrance to the !basenm!."
     exit /b
 )
@@ -781,12 +781,12 @@ if "%modstr%"=="" (
     set "tmp_val=!basenm:/s/=%modstr%!"
 )
 if "%append_name%"=="true" (
-    for /f "delims=" %%A in ("!%~1.id!") do (
+    for /f "delims=" %%A in ("!%~2.id!") do (
         set "tmp_val=!tmp_val! of !game_objects[%%A].name!"
     )
 )
 
-if "!%~1.items_count!"=="1" (
+if "!%~2.items_count!"=="1" (
     call helpers.cmd :insertStringIntoString "~" "CNIL"
 ) else (
     call helpers.cmd :insertStringIntoString "ch~" "ches"
@@ -805,11 +805,11 @@ if "%~3"=="false" (
 )
 
 set "tmp_str="
-call :spellItemIdentified "%~1"
+call :spellItemIdentified "%~2"
 set "is_identified=!errorlevel!"
-if "!%~1.special_name_id!" NEQ "%specialNameIds.sn_null%" (
+if "!%~2.special_name_id!" NEQ "%specialNameIds.sn_null%" (
     if "!is_identified!"=="0" (
-        for /f "delims=" %%A in ("!%~1.special_name_id!") do (
+        for /f "delims=" %%A in ("!%~2.special_name_id!") do (
             set "tmp_val=!tmp_val! !special_item_names[%%~A]!"
         )
     )
@@ -820,31 +820,31 @@ if defined damstr set "tmp_val=!tmp_val!!damstr!"
 if "!is_identified!"=="0" (
     REM Get the absolute value to properly display a + or - in front of the value
     REM because positive values do not lead with a visible +
-    set "abs_to_hit=!%~1.to_hit!"
-    set "abs_to_damage=!%~1.to_damage!"
+    set "abs_to_hit=!%~2.to_hit!"
+    set "abs_to_damage=!%~2.to_damage!"
     if !abs_to_hit! LSS 0 set /a abs_to_hit*=-1
     if !abs_to_damage! LSS 0 set /a abs_to_damage*=-1
 
-    set /a "show_hit_damage=!%~1.identification! & %config.identification.id_show_hit_dam%"
+    set /a "show_hit_damage=!%~2.identification! & %config.identification.id_show_hit_dam%"
     if !show_hit_damage! NEQ 0 (
-        if !%~1.to_hit! LSS 0 (
+        if !%~2.to_hit! LSS 0 (
             set "tmp_str=(-!abs_to_hit!,"
         ) else (
             set "tmp_str=(+!abs_to_hit!,"
         )
-        if !%~1.to_damage! LSS 0 (
+        if !%~2.to_damage! LSS 0 (
             set "tmp_str=!tmp_str!-!abs_to_damage!)"
         ) else (
             set "tmp_str=!tmp_str!+!abs_to_damage!)"
         )
-    ) else if not "!%~1.to_hit!"=="0" (
-        if !%~1.to_hit! LSS 0 (
+    ) else if not "!%~2.to_hit!"=="0" (
+        if !%~2.to_hit! LSS 0 (
             set "tmp_str=(-!abs_to_hit!)"
         ) else (
             set "tmp_str=(+!abs_to_hit!)"
         )
-    ) else if not "!%~1.to damage!"=="0" (
-        if !%~1.to_hit! LSS 0 (
+    ) else if not "!%~2.to damage!"=="0" (
+        if !%~2.to_hit! LSS 0 (
             set "tmp_str=(-!abs_to_damage!)"
         ) else (
             set "tmp_str=(+!abs_to_damage!)"
@@ -855,15 +855,15 @@ if "!is_identified!"=="0" (
     set "tmp_val=!tmp_val!!tmp_str!"
 )
 
-set "abs_to_ac=!%~1.to_ac!"
+set "abs_to_ac=!%~2.to_ac!"
 if !abs_to_ac! LSS 0 set /a abs_to_ac*=-1
 set "is_crown=1"
-if not "!%~1.ac!"=="0" set "is_crown=0"
-if "!%~1.category_id!"=="%tv_helm%" set "is_crown=0"
+if not "!%~2.ac!"=="0" set "is_crown=0"
+if "!%~2.category_id!"=="%tv_helm%" set "is_crown=0"
 if "!is_crown!"=="0" (
-    set "tmp_val=!tmp_val! [!%~1.ac!"
+    set "tmp_val=!tmp_val! [!%~2.ac!"
     if "!is_identified!"=="0" (
-        if !%~1.to_ac! LSS 0 (
+        if !%~2.to_ac! LSS 0 (
             set "tmp_val=!tmp_val!-!abs_to_ac!"
         ) else (
             set "tmp_val=!tmp_val!+!abs_to_ac!"
@@ -872,47 +872,47 @@ if "!is_crown!"=="0" (
     set "tmp_val=!tmp_val!]"
 )
 
-set /a "has_no_show=!%~1.identification! & %config.identification.id_no_show_p1%"
-set /a "has_show=!%~1.identification! & %config.identification.id_show_p1%"
+set /a "has_no_show=!%~2.identification! & %config.identification.id_no_show_p1%"
+set /a "has_show=!%~2.identification! & %config.identification.id_show_p1%"
 if not "!has_no_show!"=="0" set "misc_type=%ItemMiscUse.ignored%"
 if not "!has_show!"=="0" set "misc_type=%ItemMiscUse.zplusses%"
 
 set "tmp_str="
 if "!misc_use!"=="%ItemMiscUse.ignored%" goto :parseUnderscore
 if "!misc_use!"=="%ItemMiscUse.light%" (
-    set "tmp_str= with !%~1.misc_use! turns of light"
+    set "tmp_str= with !%~2.misc_use! turns of light"
 ) else if "!is_identified!"=="0" (
-    set /a abs_misc_use=!%~1.misc_use!
+    set /a abs_misc_use=!%~2.misc_use!
     if !abs_misc_use! LSS 0 set /a abs_misc_use*=-1
 
     if "!misc_type!"=="%ItemMiscUse.zplusses%" (
-        if !%~1.misc_use! LSS 0 (
+        if !%~2.misc_use! LSS 0 (
             set "tmp_str= (-!abs_misc_use!)"
         ) else (
             set "tmp_str= (+!abs_misc_use!)"
         )
     ) else if "!misc_type!"=="%ItemMiscUse.charges%" (
-        set "tmp_str= (!%~1.misc_use! charges)"
-    ) else if not "!%~1.misc_use!"=="0" (
+        set "tmp_str= (!%~2.misc_use! charges)"
+    ) else if not "!%~2.misc_use!"=="0" (
         if "!misc_type!"=="%ItemMiscUse.plusses%" (
-            if !%~1.misc_use! LSS 0 (
+            if !%~2.misc_use! LSS 0 (
                 set "tmp_str= (-!abs_misc_use!)"
             ) else (
                 set "tmp_str= (+!abs_misc_use!)"
             )
         ) else if "!misc_type!"=="%ItemMiscUse.flags%" (
-            set /a "has_to_str=!%~1.flags! & %config.treasure.flags.tr_str%"
-            set /a "has_to_stealth=!%~1.flags! & %config.treasure.flags.tr_stealth%"
+            set /a "has_to_str=!%~2.flags! & %config.treasure.flags.tr_str%"
+            set /a "has_to_stealth=!%~2.flags! & %config.treasure.flags.tr_stealth%"
 
             if not "!has_to_str!"=="0" (
-                if !%~1.misc_use! LSS 0 (
+                if !%~2.misc_use! LSS 0 (
                     set "tmp_str= (-!abs_misc_use! to STR)"
                 ) else (
                     set "tmp_str= (+!abs_misc_use! to STR)"
                 )
             )
             if not "!has_to_stealth!"=="0" (
-                if !%~1.misc_use! LSS 0 (
+                if !%~2.misc_use! LSS 0 (
                     set "tmp_str= (-!abs_misc_use! to stealth)"
                 ) else (
                     set "tmp_str= (+!abs_misc_use! to stealth)"
@@ -928,16 +928,16 @@ call helpers.cmd :isVowel !tmp_val:~2,1!
 set "uses_an=!errorlevel!
 "
 if "!tmp_val:~0,1!"=="_" (
-    if !%~1.items_count! GTR 1 (
-        set "description=!%~1.items_count!!tmp_val:~1!"
-    ) else if !%~1.items_count! LSS 0 (
+    if !%~2.items_count! GTR 1 (
+        set "description=!%~2.items_count!!tmp_val:~1!"
+    ) else if !%~2.items_count! LSS 0 (
         set "description=no more!tmp_val:~1!"
     ) else if "!uses_an!"=="0" (
         set "description=an!tmp_val:~1!"
     ) else (
         set "description=a!tmp_val:~1!"
     )
-) else if !%~1.items_count! LSS 1 (
+) else if !%~2.items_count! LSS 1 (
     if "!tmp_val:~0,4!"=="some" (
         set "description=no more !tmp_val:~5!"
     ) else (
@@ -948,30 +948,30 @@ if "!tmp_val:~0,1!"=="_" (
 )
 
 set "tmp_str="
-call :objectPositionOffset "!%~1.category_id!" "!%~1.sub_category_id!"
+call :objectPositionOffset "!%~2.category_id!" "!%~2.sub_category_id!"
 set "indexx=!errorlevel!"
 if !indexx! GEQ 0 (
     set /a "indexx<<=6"
-    set /a "id+=(!%~1.sub_category_id! & (item_single_stack_min - 1))"
+    set /a "id+=(!%~2.sub_category_id! & (item_single_stack_min - 1))"
     for /f "delims=" %%A in ("!indexx!") do (
         set /a "is_tried=!objects_identified[%%~A]! & %config.identification.og_tried%"
     )
     if not "!is_tried!"=="0" (
-        call :itemStoreBought "!%~1.identification!" || (
+        call :itemStoreBought "!%~2.identification!" || (
             set "tmp_str=!tmp_str!tried "
         )
     )
 )
 
-set /a "is_magik=!%~1.identification! & %config.identification.id_magik%"
-set /a "is_empty=!%~1.identification! & %config.identification.id_empty%"
-set /a "is_damd=!%~1.identification! & %config.identification.id_damd%"
+set /a "is_magik=!%~2.identification! & %config.identification.id_magik%"
+set /a "is_empty=!%~2.identification! & %config.identification.id_empty%"
+set /a "is_damd=!%~2.identification! & %config.identification.id_damd%"
 if not "!is_magik!"=="0" set "tmp_str=!tmp_str!magik "
 if not "!is_empty!"=="0" set "tmp_str=!tmp_str!empty "
 if not "!is_damd!"=="0" set "tmp_str=!tmp_str!damned "
 
-if not "!%~1.inscription!"=="" (
-    set "tmp_str=!tmp_str!!%~1.inscription!"
+if not "!%~2.inscription!"=="" (
+    set "tmp_str=!tmp_str!!%~2.inscription!"
 ) else (
     call helpers.cmd :getLength "!tmp_str!" indexx
     if !indexx! GTR 0 set "tmp_str=!tmp_str:~0,-1!"
@@ -981,58 +981,106 @@ if not "!tmp_str:~0,1!"=="0" (
     set "description=!description! {!tmp_str!}"
 )
 set "description=!description!."
+set "%~1=!description!"
 exit /b
 
 ::------------------------------------------------------------------------------
+:: Lists the number of remaining charges
 ::
-::
-:: Arguments: 
-:: Returns:   
+:: Arguments: %1 - The index of the inventory that contains the described item
+:: Returns:   None
 ::------------------------------------------------------------------------------
 :itemChargesRemainingDescription
+call :spellItemIdentified "py.inventory.[%~1]" || exit /b
+
+call ui_io.cmd :printMessage "You have !py.inventory[%~1].misc_use! charges remaining."
 exit /b
 
 ::------------------------------------------------------------------------------
+:: Describe the amount of item remaining
 ::
-::
-:: Arguments: 
-:: Returns:   
+:: Arguments: %1 - The index of the inventory that contains the described item
+:: Returns:   None
 ::------------------------------------------------------------------------------
 :itemTypeRemainingCountDescription
+set /a py.inventory[%~1].items_count-=1
+call :itemDescription tmp_str "py.inventory[%~1]" "true"
+set /a py.inventory[%~1].items_count+=1
+
+:: The string already ends with a period
+call ui_io.cmd :printMessage "You have !tmp_str!"
 exit /b
 
 ::------------------------------------------------------------------------------
+:: Adds a comment to an item inscription
 ::
-::
-:: Arguments: 
-:: Returns:   
+:: Arguments: None
+:: Returns:   None
 ::------------------------------------------------------------------------------
 :itemInscribe
+if "%py.pack.unique_items%"=="0" (
+    if "%py.equipment_count%"=="0" (
+        call ui_io.cmd :printMessage "You are not carrying anything to inscribe."
+        exit /b
+    )
+)
+
+call ui_inventory.cmd :inventoryGetInputForItemId item_id "Which one? " 0 %player_inventory_size% CNIL CNIL || exit /b
+call :itemDescription msg "py.inventory[%item_id%]" "true"
+call ui_io.cmd :printMessage "Inscribing %msg%"
+
+if not "!py.inventory[%item_id%].inscription!"=="" (
+    set "inscription=Replace !py.inventory[%item_id%].inscription! New inscription:"
+) else (
+    set "inscription=Inscription: "
+)
+
+call helpers.cmd :getLength %msg% msg_len
+set /a msg_len=78-%msg_len%
+if %msg_len% GTR 12 set "msg_len=12"
+
+call ui_io.cmd :putStringClearToEOL "!inscription!" "0;0"
+call helpers.cmd :getLength "!inscription!" insc_len
+call ui_io.cmd :getStringInput "!inscription!" "0;!insc_len!" %msg_len% && (
+    call :itemReplaceInscription "py.inventory[%item_id%]" "!inscription!"
+)
 exit /b
 
 ::------------------------------------------------------------------------------
+:: Append an additional comment to an object description
 ::
-::
-:: Arguments: 
-:: Returns:   
+:: Arguments: %1 - The name of the item to inscribe
+::            %2 - The identification type of the object
+:: Returns:   None
 ::------------------------------------------------------------------------------
 :itemAppendToInscription
+set /a "%~1.identification|=%~2"
 exit /b
 
 ::------------------------------------------------------------------------------
+:: Replaces an existing comment in an object description with a new one
 ::
-::
-:: Arguments: 
-:: Returns:   
+:: Arguments: %1 - The name of the item to inscribe
+::            %2 - The inscription to add
+:: Returns:   None
 ::------------------------------------------------------------------------------
 :itemReplaceInscription
+set "%~1.inscription=%~2"
 exit /b
 
 ::------------------------------------------------------------------------------
+:: Prints a message if an object is blocked by a monster
 ::
-::
-:: Arguments: 
-:: Returns:   
+:: Arguments: %1 - The ID of the monster blocking the way
+:: Returns:   None
 ::------------------------------------------------------------------------------
 :objectBlockedByMonster
+set "c_id=!monsters[%~1].creature_id!"
+set "m_name=!creatures_list[%cid%].name!"
+
+if "!monsters[%~1].lit"=="true" (
+    call ui_io.cmd :printMessage "The %m_name% is in your way."
+) else (
+    call ui_io.cmd :printMessage "Something is in your way."
+)
 exit /b
