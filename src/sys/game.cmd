@@ -113,7 +113,10 @@ set /a sd=%~1+!offset!
 exit /b !sd!
 
 ::------------------------------------------------------------------------------
-:: Set or unset various boolean 
+:: Set or unset various boolean config.options.displays_counts
+::
+:: Arguments: None
+:: Returns:   None
 ::------------------------------------------------------------------------------
 :setGameOptions
 call ui_io.cmd :putStringClearToEOL "  Space when finished, y/n to set options, - to move cursor" "0;0"
@@ -193,7 +196,7 @@ exit /b !dir!
 ::------------------------------------------------------------------------------
 :getDirectionWithMemory
 if "%game.use_last_direction%"=="true" (
-    set "!%~2!=!py.prev_dir!"
+    set "%~2=!py.prev_dir!"
     exit /b 0
 )
 if "%~1"=="CNIL" (
@@ -211,7 +214,7 @@ if !command! GEQ 1 (
     if !command! LEQ 9 (
         if !command! NEQ 5 (
             set "py.prev_dir=!command!"
-            set "%~2%=!py.prev_dir!"
+            set "%~2=!py.prev_dir!"
             exit /b 0
         )
     )
