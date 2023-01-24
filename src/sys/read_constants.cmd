@@ -263,6 +263,33 @@ for %%A in (Plain TreasureVault Pillars Maze FourSmallRooms) do (
     set "InnerRoomTypes.%%A=!counter!"
 )
 
+::----- dungeon_los.cpp
+set "counter=0"
+for %%A in (0 1 0 0 -1) do (
+    set "los_dir_set_fxy[!counter!]=%%~A"
+    set /a counter+=1
+)
+
+set "counter=0"
+for %%A in (0 0 -1 1 0) do (
+    set "los_dir_set_fxx[!counter!]=%%~A"
+    set /a counter+=1
+)
+
+set "counter=0"
+for %%A in (0 0 1 -1 0) do (
+    set "los_dir_set_fyy[!counter!]=%%~A"
+    set /a counter+=1
+)
+
+set "counter=0"
+for %%A in (0 1 0 0 -1) do (
+    set "los_dir_set_fyx[!counter!]=%%~A"
+    set /a counter+=1
+)
+
+set "GRADF=10000"
+
 :: game.cpp
 set "counter=0"
 for %%A in (
