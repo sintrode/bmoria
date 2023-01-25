@@ -112,18 +112,126 @@ if "!errorlevel!"=="0" (
         if not "!stunnable!"=="0" (
             call dice.cmd :maxDiceRoll !creature.hit_die.dice! !creature.hit_die.sides!
             set "avg_max_hp=!errorlevel!"
+        ) else (
+            set /a "avg_max_hp=(!creature.hit_die.dice! * (!creature.hit_die.sides! + 1)) >> 1"
+        )
+
+        call rng.cmd :randomNumber 400
+        set "r1=!errorlevel!"
+        call rng.cmd :randomNumber 400
+        set "r2=!errorlevel!"
+        set /a is_stunned=100+!r1!+!r2!
+        set /a weak_monster=!monster.hp!+!avg_max_hp!
+        if !is_stunned! GTR !weak_monster! (
+            call rng.cmd :randomNumber 3
+            set /a monster.stunned_amount+=!errorlevel!+1
+            if !monster.stunned_amount! GTR 24 set "monster.stunned_amount=24"
+            call ui_io.cmd :printMessage "!name! appears stunned."
+        ) else (
+            call ui_io.cmd :printMessage "!name! ignores your bash."
         )
     )
 ) else (
     call ui_io.cmd :printMessage "You miss %name%."
 )
+
+call rng.cmd :randomNumber 150
+if !errorlevel! GTR !py.stats.used[%PlayerAttr.a_dex%]! (
+    call ui_io.cmd :printMessage "You are off balance."
+    call rng.cmd :randomNumber 2
+    set /a py.flags.paralysis=!errorlevel!+1
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determine if the player is in any position to be bashing things
+::
+:: Arguments: %1 - The coordinates of the thing being bashed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerBashPosition
+if %py.flags.afraid% GTR 0 (
+    call ui_io.cmd :printMessage "You are afraid."
+    exit /b
+)
+
+call :playerBashAttack "%~1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Smash a door open, if you can
+::
+:: Arguments: %1 - The coordinates of the door to bash
+::            %2 - The direction to bash in
+::            %3 - A reference to the tile that was previously a door
+::            %4 - A reference to the door item
+::------------------------------------------------------------------------------
 :playerBashClosedDoor
+call ui_io.cmd :printMessageNoCommandInterrupt "You smash into the door."
+
+set /a chance=!py.stats.used[%PlayerAttr.a_str%]! + %py.misc.weight% / 2
+set "abs_misc_use=!%~4.misc_use!"
+if %abs_misc_use% LSS 0 set /a abs_misc_use*=-1
+set /a odds_door_holds=!chance! * (20 + !abs_misc_use!)
+set /a odds_door_opens=10 * (!chance! - !abs_misc_use!)
+if !odds_door_holds! LSS !odds_door_opens! (
+    call ui_io.cmd :printMessage "The door crashes open."
+    call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_open_floor%" "game.treasure.list[!%~3.treasure_id!]"
+
+    REM 50 percent chance of breaking the door
+    call rng.cmd :randomNumber 2
+    set /a %~4.misc_use=1-!errorlevel!
+
+    set "%~3.feature_id=%tile_corr_floor%"
+
+    if "%py.flags.confused%"=="0" (
+        call player_move.cmd :playerMove "%~2" "false"
+    ) else (
+        call dungeon.c,d :dungeonLiteSpot "%~1"
+    )
+
+    exit /b
+)
+
+call rng.cmd :randomNumber 150
+if !errorlevel! GTR !py.stats.used[%PlayerAttr.a_dex%]! (
+    call ui_io.cmd :printMessage "You are off balance."
+    call rng.cmd :randomNumber 2
+    set /a py.flags.paralysis=!errorlevel!+1
+)
+
+if "%game.command_count%"=="0" (
+    call ui_io.cmd :printMessage "The door holds firm."
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: An unlocked chest has a 10 percent chance of being destroyed when bashed;
+:: a locked chest has a 10 percent chance of being opened when bashed.
+::
+:: Arguments: %1 - A reference to the chest being bashed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerBashClosedChest
+call rng.cmd :randomNumber 10
+if "!errorlevel!"=="1" (
+    call ui_io.cmd :printMessage "You have destroyed the chest."
+    call ui_io.cmd :printMessage "And its contents."
+
+    set "%~1.id=%config.dungeon.objects.obj_ruined_chest%"
+    set "%~1.flags=0"
+    exit /b
+)
+
+set /a "chest_is_locked=!%~1.flags! & %config.treasure.chests.ch_locked%"
+if not "!chest_is_locked!"=="0" (
+    call rng.cmd :randomNumber 10
+    if "!errorlevel!"=="1" (
+        call ui_io.cmd :printMessage "The lock breaks open."
+        set /a "%~1.flags&=~%config.treasure.chests.ch_locked%"
+        exit /b
+    )
+)
+
+call ui_io.cmd :printMessageNoCommandInterrupt "The chest holds firm."
 exit /b
