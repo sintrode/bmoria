@@ -1811,7 +1811,7 @@ set "coord.x=%py.pos.x%"
 set "coord.y=%py.pos.y%"
 
 call game.cmd "cnil" direction || exit /b
-call player.cmd :playerMovePosition "%direction%" "%coord.y%;%Coord.x%"
+call player.cmd :playerMovePosition "%direction%" "coord"
 
 for %%A in (creature_id treasure_id) do (
     set "tile.%%A=!dg.floor[%coord.y%][%coord.x%].%%A!"

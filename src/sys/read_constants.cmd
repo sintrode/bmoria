@@ -398,6 +398,19 @@ for %%A in (LoseExperience SaltWater Invulnerability Heroism SuperHeroism
     set "PotionSpellTypes.%%A=!counter!"
 )
 
+::----- player_run.cpp
+set "counter=0"
+for %%A in (1 2 3 6 9 8 7 4 1 2 3 6 9 8 7 4 1) do (
+    set "cycle[!counter!]=%%A"
+    set /a counter+=1
+)
+
+set "counter=0"
+for %%A in (-1 8 9 10 7 -1 11 6 5 4) do (
+    set "chrome[!counter!]=%%A"
+    set /a counter+=1
+)
+
 ::----- rng.cpp
 set "rng_m=2147483647"
 set "rng_a=16807"
