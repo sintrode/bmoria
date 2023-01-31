@@ -605,31 +605,507 @@ for /L %%A in (1,1,%limit%) do (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Places a secret door at random coordinates that are adjacent to specified
+:: coordinates
+::
+:: Arguments: %1 - The target coordinates of the secret door
+::            %2 - The bottom offset of the secret door
+::            %3 - The top offset of the secret door
+::            %4 - The left offset of the secret door
+::            %5 - The right offset of the secret door
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceRandomSecretDoor
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set "coord.y=%%~A"
+    set "coord.x=%%~B"
+)
+call rng.cmd :randomNumber 4
+if "!errorlevel!"=="1" (
+    set /a height_offset=%~3-1
+    call :dungeonPlaceSecretDoor "!height_offset!;!coord.x!"
+) else if "!errorlevel!"=="2" (
+    set /a depth_offset=%~2+1
+    call :dungeonPlaceSecretDoor "!depth_offset!;!coord.x!"
+) else if "!errorlevel!"=="3" (
+    set /a left_offset=%~4+1
+    call :dungeonPlaceSecretDoor "!coord.y!;!left_offset!"
+) else if "!errorlevel!"=="4" (
+    set /a right_offset=%~5+1
+    call :dungeonPlaceSecretDoor "!coord.y!;!right_offset!"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Places a vault in the dungeon at specified coordinates
+::
+:: Arguments: %1 - The coordinates to place the vault at
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceVault
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set /a coord.y_dec=%%~A-1
+    set /a coord.y_inc=%%~A+1
+    set /a coord.x_dec=%%~B-1
+    set /a coord.x_inc=%%~B+1
+
+    for /L %%Y in (!coord.y_dec!,1,!coord.y_inc!) do (
+        set "dg.floor[%%Y][!coord.x_dec!].feature_id=%TMP1_WALL%"
+        set "dg.floor[%%Y][!coord.x_inc!].feature_id=%TMP1_WALL%"
+    )
+    set "dg.floor[!coord.y_dec!][!coord.x!].feature_id=%TMP1_WALL%"
+    set "dg.floor[!coord.y_inc!][!coord.x!].feature_id=%TMP1_WALL%"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Create a secret door and a vault behind it
+::
+:: Arguments: %1 - The coordinates for the door and vault
+::            %2 - The bottom side of the vault
+::            %3 - The top side of the vault
+::            %4 - The left side of the vault
+::            %5 - The right side of the vault
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceTreasureVault
+call :dungeonPlaceRandomSecretDoor %*
+call :dungeonPlaceVault "%~1"
+
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set "coord.y=%%~A"
+    set "coord.x=%%~B"
+)
+call rng.cmd :randomNumber 4
+set "offset=!errorlevel!"
+if !offset! LSS 3 (
+    set /a "y_offset=!coord.y! - 3 + (!offset! << 1)"
+    call :dungeonPlaceLockedDoor "!y_offset!;!coord.x!"
+) else (
+    set /a "x_offset=!coord.x! - 7 + (!offset! << 1)"
+    call :dungeonPlaceLockedDoor "!coord.y!;!x_offset!"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Place pillars around specified coordinates
+::
+:: Arguments: %1 - The coordinates of the new pillars
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceInnerPillars
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set /a coord.y_dec=%%~A-1
+    set /a coord.y_inc=%%~A+1
+    set /a coord.x_dec=%%~B-1
+    set /a coord.x_inc=%%~B+1
+
+    for /L %%Y in (!coord.y_dec!,1,!coord.y_inc!) (
+        for /L %%X in (!coord.x_dec!,1,!coord.x_inc!) do (
+            set "dg.floor[%%Y][%%X].feature_id=%TMP1_WALL%"
+        )
+    )
+
+    call rng.cmd :randomNumber 2
+    if not "!errorlevel!"=="1" exit /b
+
+    call rng.cmd :randomNumber 2
+    set "offset=!errorlevel!"
+    set /a coord.x_3dec=%%~B - 3 - !offset!
+    set /a coord.x_3inc=%%~B + 3 + !offset!
+    set /a coord.x_5dec=%%~B - 5 - !offset!
+    set /a coord.x_5inc=%%~B + 5 + !offset!
+    for /L %%Y in (!coord.y_dec!,1,!coord.y_inc!) do (
+        for /L %%X in (!coord.x_5dec!,1,!coord.x_3_dec!) do (
+            set "dg.floor[%%Y][%%X].feature_id=%TMP1_WALL%"
+        )
+        for /L %%X in (!coord.x_3inc!,1,!coord.x_5inc!) do (
+            set "dg.floor[%%Y][%%X].feature_id=%TMP1_WALL%"
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Places a maze inside of a given range of dimensions
+::
+:: Arguments: %1 - The bottom of the maze
+::            %2 - The top of the maze
+::            %3 - The left side of the maze
+::            %4 - The right side of the maze
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceMazeInsideRoom
+for /L %%Y in (%~2,1,%~1) do (
+    for /L %%X in (%~3,1,%~4) do (
+        set /a "add_wall=(1 & (%%X + %%Y))"
+        if not "!add_wall!"=="0" (
+            set "dg.floor[%%Y][%%X].feature_id=%TMP1_WALL%"
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Creates a room with four smaller rooms inside of it
+::
+:: Arguments: %1 - The coordinates of the larger room
+::            %2 - The bottom of the larger room
+::            %3 - The top of the larger room
+::            %4 - The left side of the larger room
+::            %5 - The right side of the larger room
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceFourSmallRooms
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    for /L %%Y in (%~3,1,%~2) do (
+        set "dg.floor[%%Y][%%B].feature_id=%TMP1_WALL%"
+    )
+    for /L %%X in (%~4,1,%~5) do (
+        set "dg.floor[%%A][%%X].feature_id=%TMP1_WALL%"
+    )
+
+    call rng.cmd :randomNumber 2
+    if "!errorlevel!"=="1" (
+        call rng.cmd :randomNumber 10
+        set "offset=!errorlevel!"
+        set /a height_dec=%~3-1, depth_inc=%~2+1
+        set /a x_dec=%%B-!offset!, x_inc=%%B+!offset!
+
+        call :dungeonPlaceSecretDoor "!height_dec!;!x_dec!"
+        call :dungeonPlaceSecretDoor "!height_dec!;!x_inc!"
+        call :dungeonPlaceSecretDoor "!depth_inc!;!x_dec!"
+        call :dungeonPlaceSecretDoor "!depth_inc!;!x_inc!"
+    ) else (
+        call rng.cmd :randomNumber 10
+        set "offset=!errorlevel!"
+        set /a left_dec=%~4-1, right_inc=%~5+1
+        set /a y_dec=%%A-!offset!, y_inc=%%A+!offset!
+
+        call :dungeonPlaceSecretDoor "!y_inc!;!left_dec!"
+        call :dungeonPlaceSecretDoor "!y_dec!;!left_dec!"
+        call :dungeonPlaceSecretDoor "!y_inc!;!right_inc!"
+        call :dungeonPlaceSecretDoor "!y_dec!;!right_inc!"
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Builds an unusual room at specified coordinates
+::
+:: Arguments: %1 - The coordinates of the new room
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonBuildRoomWithInnerRooms
+call :dungeonFloorTileForLevel
+set "floor=!errorlevel!"
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set /a coord.y=%%A, coord.x=%%B
+    set /a height=%%A-4, depth=%%A+4, left=%%B-11, right=%%B+11
+)
+
+for /L %%Y in (!height!,1,!depth!) do (
+    for /L %%X in (!left!,1,!right!) do (
+        set "dg.floor[%%Y][%%X].feature_id=!floor!"
+        set "dg.floor[%%Y][%%X].perma_lit_room=true"
+    )
+)
+
+set /a height_dec=!height!-1, depth_inc=!depth!+1
+set /a left_dec=!left!-1, right_inc=!right!+1
+for /L %%Y in (!height_dec!,1,!depth_inc!) do (
+    set "dg.floor[%%Y][!left_dec!].feature_id=%tile_granite_wall%"
+    set "dg.floor[%%Y][!left_dec!].perma_lit_room=true"
+    set "dg.floor[%%Y][!right_inc!].feature_id=%tile_granite_wall%"
+    set "dg.floor[%%Y][!right_inc!].perma_lit_room=true"
+)
+for /L %%X in (!left!,1,!right!) do (
+    set "dg.floor[!height_dec!][%%X].feature_id=%tile_granite_wall%"
+    set "dg.floor[!height_dec!][%%X].perma_lit_room=true"
+    set "dg.floor[!depth_inc!][%%X].feature_id=%tile_granite_wall%"
+    set "dg.floor[!depth_inc!][%%X].perma_lit_room=true"
+)
+
+:: The inner room
+set /a height+=2, depth-=2, left+=2, right-=2
+set /a height_dec=!height!-1, depth_inc=!depth!+1
+set /a left_dec=!left!-1, right_inc=!right!+1
+for /L %%Y in (!height_dec!,1,!depth_inc!) do (
+    set "dg.floor[%%Y][!left_dec!].feature_id=%tmp1_wall%"
+    set "dg.floor[%%Y][!right_inc!].feature_id=%tmp1_wall%"
+)
+for /L %%X in (!left!,1,!right!) do (
+    set "dg.floor[!height_dec!][%%X].feature_id=%tmp1_wall%"
+    set "dg.floor[!depth_inc!][%%X].feature_id=%tmp1_wall%"
+)
+
+set /a coord.x_dec=!coord.x!-1, coord.x_inc=!coord.x!+1
+set /a coord.x_2dec=!coord.x!-2, coord.x_2inc=!coord.x!+2
+set /a coord.x_3dec=!coord.x!-3, coord.x_3inc=!coord.x!+3
+set /a coord.x_4dec=!coord.x!-4, coord.x_4inc=!coord.x!+4
+set /a coord.x_5dec=!coord.x!-5, coord.x_5inc=!coord.x!+5
+call rng.cmd :randomNumber 5
+set "inner_room_type=!errorlevel!"
+
+if "!inner_room_type!"=="%InnerRoomTypes.Plain%" (
+    call :dungeonPlaceRandomSecretDoor "%~1" !depth! !height! !left! !right!
+    call :dungeonPlaceVaultMonster "%~1" 1
+    exit /b
+)
+if "!inner_room_type!"=="%InnerRoomTypes.TreasureVault%" (
+    call :dungeonPlaceTreasureVault "%~1" !depth! !height! !left! !right!
+    call rng.cmd :randomNumber 3
+    set /a treasure_vault_monsters=!errorlevel!+2
+    call :dungeonPlaceVaultMonster "%~1" !treasure_vault_monsters!
+    call rng.cmd :randomNumber 3
+    set /a treasure_vault_traps=!errorlevel!+2
+    call :dungeonPlaceVaultTrap "%~1" "4;10" !treasure_vault_traps!
+    exit /b
+)
+if "!inner_room_type!"=="%InnerRoomTypes.Pillars%" (
+    call :dungeonPlaceRandomSecretDoor "%~1" !depth! !height! !left! !right!
+    call :dungeonPlaceInnerPillars "%~1"
+    call rng.cmd :randomNumber 3
+    if not "!errorlevel!"=="1" exit /b
+
+    for /L %%X in (!coord.x_5dec!,1,!coord.x_5inc!) do (
+        set "dg.floor[!coord.y_dec!][%%X].feature_id=%tmp1_wall%"
+        set "dg.floor[!coord.y_inc!][%%X].feature_id=%tmp1_wall%"
+    )
+    set "dg.floor[!coord.y!][!coord.x_5dec!].feature_id=%tmp1_wall%"
+    set "dg.floor[!coord.y!][!coord.x_5inc!].feature_id=%tmp1_wall%"
+
+    call rnd.cmd :randomNumber 2
+    set /a "y_secret=!coord.y! - 3 + (!errorlevel! << 1)"
+    call :dungeonPlaceSecretDoor "!y_secret!;!coord.x_3dec!"
+    call rnd.cmd :randomNumber 2
+    set /a "y_secret=!coord.y! - 3 + (!errorlevel! << 1)"
+    call :dungeonPlaceSecretDoor "!y_secret!;!coord.x_3inc!"
+
+    call rnd.cmd :randomNumber 3
+    if "!errorlevel!"=="1" (
+        set "rnd_obj_coord=!coord.y!;!coord.x_2dec!"
+        call dungeon.cmd :dungeonPlaceRandomObjectAt "rnd_obj_coord" "false"
+    )
+    call rnd.cmd :randomNumber 3
+    if "!errorlevel!"=="1" (
+        set "rnd_obj_coord=!coord.y!;!coord.x_2inc!"
+        call dungeon.cmd :dungeonPlaceRandomObjectAt "rnd_obj_coord" "false"
+    )
+
+    call rng.cmd :randomNumber 2
+    call :dungeonPlaceVaultMonster "!coord.y!;!coord.x_2dec!" !errorlevel!
+    call rng.cmd :randomNumber 2
+    call :dungeonPlaceVaultMonster "!coord.y!;!coord.x_2inc!" !errorlevel!
+    exit /b
+)
+if "!inner_room_type!"=="%InnerRoomTypes.Maze%" (
+    call :dungeonPlaceRandomSecretDoor "%~1" !depth! !height! !left! !right!
+    call :dungeonPlaceMazeInsideRoomcall !depth! !height! !left! !right!
+
+    call rng.cmd :randomNumber 3
+    call :dungeonPlaceVaultMonster "!coord.y!;!coord.x_5dec!" !errorlevel!
+    call rng.cmd :randomNumber 3
+    call :dungeonPlaceVaultMonster "!coord.y!;!coord.x_5inc!" !errorlevel!
+
+    call rng.cmd :randomNumber 3
+    call :dungeonPlaceVaultTrap "!coord.y!;!coord.x_3dec!" "2;8" !errorlevel!
+    call rng.cmd :randomNumber 3
+    call :dungeonPlaceVaultTrap "!coord.y!;!coord.x_3inc!" "2;8" !errorlevel!
+
+    for /L %%A in (0,1,2) do (
+        call dungeon.cmd :dungeonPlaceRandomObjectNear "!coord.y!;!coord.x!" 1
+    )
+    exit /b
+)
+if "!inner_room_type!"=="%InnerRoomTypes.FourSmallRooms%" (
+    call :dungeonPlaceFourSmallRooms "%~1" !depth! !height! !left! !right!
+
+    call rng.cmd :randomNumber 2
+    set /a treasure_tries=!errorlevel!+2
+    call dungeon.cmd :dungeonPlaceRandomObjectNear "!coord.y!;!coord.x!" !treasure_tries!
+
+    call rng.cmd :randomNumber 2
+    call :dungeonPlaceVaultMonster "!coord.y_2inc!;!coord.x_4dec!" !errorlevel!
+    call rng.cmd :randomNumber 2
+    call :dungeonPlaceVaultMonster "!coord.y_2inc!;!coord.x_4inc!" !errorlevel!
+    call rng.cmd :randomNumber 2
+    call :dungeonPlaceVaultMonster "!coord.y_2dec!;!coord.x_4dec!" !errorlevel!
+    call rng.cmd :randomNumber 2
+    call :dungeonPlaceVaultMonster "!coord.y_2dec!;!coord.x_4inc!" !errorlevel!
+    exit /b
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Place a large pillar in the middle of the room
+::
+:: Arguments: %1 - The coordinates of the pillar
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceLargeMiddlePillar
+for /f "tokens=1-2 delims=;" %%A in ("%~1") do (
+    set /a coord.y_dec=%%A-1, coord.y_inc=%%A+1
+    set /a coord.x_dec=%%B-1, coord.x_inc=%%B+1
+
+    for /L %%Y in (!coord.y_dec!,1,!coord.y_inc!) do (
+        for /L %%X in (!coord.x_dec!,1,!coord.x_inc!) do (
+            set "dg.floor[%%Y][%%X].feature_id=%tmp1_wall%"
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Builds a cross-shaped room at specified coordinates
+::
+:: Arguments: %1 - The desired location of the new room
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonBuildRoomCrossShaped
+call :dungeonFloorTileForLevel
+set "floor=!errorlevel!"
+
+call rng.cmd :randomNumber 2
+set /a random_offset=!errorlevel!+2
+
+for /f "tokens=1-2 delims=;" %%A in ("%~1") do (
+    set "coord.y=%%A"
+    set "coord.x=%%B"
+)
+set /a height=!coord.y!-!random_offset!
+set /a depth=!coord.y!+!random_offset!
+set /a left=!coord.x!-1
+set /a right=!coord.x!+1
+
+for /L %%Y in (!height!,1,!depth!) do (
+    for /L %%X in (!left!,1,!right!) do (
+        set "dg.floor[%%Y][%%X].feature_id=!floor!"
+        set "dg.floor[%%Y][%%X].perma_lit_room=true"
+    )
+)
+set /a height_dec=!height!-1, depth_inc=!depth!+1
+set /a left_dec=!left!-1, right_inc=!right!+1
+for /L %%Y in (!height_dec!,1,!depth_inc!) do (
+    set "dg.floor[%%Y][%left_dec%].feature_id=%tile_granite_wall%"
+    set "dg.floor[%%Y][%left_dec%].perma_lit_room=true"
+    set "dg.floor[%%Y][%right_inc%].feature_id=%tile_granite_wall%"
+    set "dg.floor[%%Y][%right_inc%].perma_lit_room=true"
+)
+for /L %%X in (!left!,1,!right!) do (
+    set "dg.floor[%height_dec%][%%X].feature_id=%tile_granite_wall%"
+    set "dg.floor[%height_dec%][%%X].perma_lit_room=true"
+    set "dg.floor[%depth_inc%][%%X].feature_id=%tile_granite_wall%"
+    set "dg.floor[%depth_inc%][%%X].perma_lit_room=true"
+)
+
+call rng.cmd :randomNumber 9
+set /a random_offset=!errorlevel!+2
+set /a height=!coord.y!-1
+set /a depth=!coord.y!+1
+set /a left=!coord.x!-!random_offset!
+set /a right=!coord.x!+!random_offset!
+
+for /L %%Y in (!height!,1,!depth!) do (
+    for /L %%X in (!left!,1,!right!) do (
+        set "dg.floor[%%Y][%%X].feature_id=!floor!"
+        set "dg.floor[%%Y][%%X].perma_lit_room=true"
+    )
+)
+set /a height_dec=!height!-1, depth_inc=!depth!+1
+set /a left_dec=!left!-1, right_inc=!right!+1
+for /L %%Y in (!height_dec!,1,!depth_inc!) do (
+    if not "!dg.floor[%%Y][%left_dec%].feature_id!"=="!floor!" (
+        set "dg.floor[%%Y][%left_dec%].feature_id=%tile_granite_wall%"
+        set "dg.floor[%%Y][%left_dec%].perma_lit_room=true"
+    )
+    if not "!dg.floor[%%Y][%right_inc%].feature_id!"=="!floor!" (
+        set "dg.floor[%%Y][%right_inc%].feature_id=%tile_granite_wall%"
+        set "dg.floor[%%Y][%right_inc%].perma_lit_room=true"
+    )
+)
+for /L %%X in (!left!,1,!right!) do (
+    if not "!dg.floor[%height_dec%][%%X].feature_id!"=="!floor!" (
+        set "dg.floor[%height_dec%][%%X].feature_id=%tile_granite_wall%"
+        set "dg.floor[%height_dec%][%%X].perma_lit_room=true"
+    )
+    if not "!dg.floor[%depth_inc%][%%X].feature_id!"=="!floor!" (
+        set "dg.floor[%depth_inc%][%%X].feature_id=%tile_granite_wall%"
+        set "dg.floor[%depth_inc%][%%X].perma_lit_room=true"
+    )
+)
+
+call rng.cmd :randomNumber 4
+set "special_feature=!errorlevel!"
+
+if "!special_feature!"=="1" (
+    call :dungeonPlaceLargeMiddlePillar "%~1"
+    exit /b
+) else if "!special_feature!"=="2" (
+    call :dungeonPlaceVault "%~1"
+
+    call rng.cmd :randomNumber 4
+    set "random_offset=!errorlevel!"
+    if !random_offset! LSS 3 (
+        set /a "y_offset=!coord.y! - 3 + (!random_offset! << 1)"
+        call :dungeonPlaceSecretDoor "!y_offset!;!coord.x!"
+    ) else (
+        set /a "x_offset=!coord.x! - 7 + (!random_offset! << 1)"
+        call :dungeonPlaceSecretDoor "!coord.y!;!x_offset!"
+    )
+
+    call dungeon.cmd :dungeonPlaceRandomObjectAt "coord" "false"
+    
+    call rng.cmd :randomNumber 2
+    set /a treasure_vault_monsters=!errorlevel!+2
+    call :dungeonPlaceVaultMonster "%~1" !treasure_vault_monsters!
+
+    call rng.cmd :randomNumber 3
+    set /a treasure_vault_traps=!errorlevel!+1
+    call :dungeonPlaceVaultTrap "%~1" "4;4" !treasure_vault_traps!
+    exit /b
+) else if "!special_feature!"=="3" (
+    set /a coord.y_dec=!coord.y!-1, coord.y_inc=!coord.y!+1
+    set /a coord.y_2dec=!coord.y!-2, coord.y_2inc=!coord.y!+2
+    set /a coord.x_dec=!coord.x!-1, coord.x_inc=!coord.x!+1
+    set /a coord.x_2dec=!coord.x!-2, coord.x_2inc=!coord.x!+2
+
+    call rng.cmd :randomNumber 3
+    if "!errorlevel!"=="1" (
+        set "dg.floor[!coord.y_dec!][!coord.x_2dec!].feature_id=%tmp1_wall%"
+        set "dg.floor[!coord.y_inc!][!coord.x_2dec!].feature_id=%tmp1_wall%"
+        set "dg.floor[!coord.y_dec!][!coord.x_2inc!].feature_id=%tmp1_wall%"
+        set "dg.floor[!coord.y_inc!][!coord.x_2inc!].feature_id=%tmp1_wall%"
+        set "dg.floor[!coord.y_2dec!][!coord.x_inc!].feature_id=%tmp1_wall%"
+        set "dg.floor[!coord.y_2dec!][!coord.x_dec!].feature_id=%tmp1_wall%"
+        set "dg.floor[!coord.y_2inc!][!coord.x_inc!].feature_id=%tmp1_wall%"
+        set "dg.floor[!coord.y_2inc!][!coord.x_dec!].feature_id=%tmp1_wall%"
+
+        call rng.cmd :randomNumber 3
+        if "!errorlevel!"=="1" (
+            call :dungeonPlaceSecretDoor "!coord.y!;!coord.x_2dec!"
+            call :dungeonPlaceSecretDoor "!coord.y!;!coord.x_2inc!"
+            call :dungeonPlaceSecretDoor "!coord.y_2dec!;!coord.x!"
+            call :dungeonPlaceSecretDoor "!coord.y_2inc!;!coord.x!"
+        )
+    ) else (
+        call rng.cmd :randomNumber 3
+        if "!errorlevel!"=="1" (
+            set "dg.floor[!coord.y!][!coord.x!].feature_id=%tmp1_wall%"
+            set "dg.floor[!coord.y_dec!][!coord.x!].feature_id=%tmp1_wall%"
+            set "dg.floor[!coord.y_inc!][!coord.x!].feature_id=%tmp1_wall%"
+            set "dg.floor[!coord.y!][!coord.x_dec!].feature_id=%tmp1_wall%"
+            set "dg.floor[!coord.y!][!coord.x_inc!].feature_id=%tmp1_wall%"
+        ) else (
+            call rng.cmd :randomNumber 3
+            if "!errorlevel!"=="1" (
+                set "dg.floor[!coord.y!][!coord.x!].feature_id=%tmp1_wall%"
+            )
+        )
+    )
+    exit /b
+)
 exit /b
 
 :dungeonBuildTunnel
