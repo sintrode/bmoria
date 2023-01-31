@@ -1108,50 +1108,628 @@ if "!special_feature!"=="1" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Constructs a tunnel between two points
+::
+:: Arguments: %1 - The coordinates of the start point
+::            %2 - The coordinates of the end point
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonBuildTunnel
+set "door_flag=false"
+set "stop_flag=false"
+set "main_loop_count=0"
+set "tunnel_index=0"
+set "wall_index=0"
+for /f "tokens=1-4 delims=; " %%A in ("%~1 %~2") do (
+    set "start.y=%%~A"
+    set "start.x=%%~B"
+    set "end.y=%%~C"
+    set "end.x=%%~D"
+)
+set "start_row=!start.y!"
+set "start_col=!start.x!"
+
+call :pickCorrectDirection "y_direction" "x_direction" "%~1" "%~2"
+
+:dungeonBuildTunnelDoLoop
+set /a main_loop_count+=1
+if !main_loop_count! GTR 2000 set "stop_flag=true"
+
+call rng.cmd :randomNumber 100
+if !errorlevel! GTR %config.dungeon.dun_dir_change% (
+    call rng.cmd randomNumber %config.dungeon.dun_random_dir%
+    if "!errorlevel!"=="1" (
+        call :chanceOfRandomDirection "y_direction" "x_direction"
+    ) else (
+        call :pickCorrectDirection "y_direction" "x_direction" "%~1" "%~2"
+    )
+)
+set /a tmp_row=!start.y! + !y_direction!
+set /a tmp_col=!start.x! + !x_direction!
+
+:dungeonBuildTunnelWhileLoop
+set "tmp_coord=!tmp_row!;!tmp_col!"
+call dungeon.cmd :coordInBounds "tmp_coord" && goto :dungeonBuildTunnelAfterWhile
+call rng.cmd :randomNumber %config.dungeon.dun_random_dir%
+if "!errorlevel!"=="1" (
+    call :chanceOfRandomDirection "y_direction" "x_direction"
+) else (
+    call :pickCorrectDirection "y_direction" "x_direction" "%~1" "%~2"
+)
+set /a tmp_row=!start.y! + !y_direction!
+set /a tmp_col=!start.x! + !x_direction!
+:dungeonBuildTunnelAfterWhile
+
+if "!dg.floor[%tmp_row%][%tmp_col%].feature_id!"=="%tile_null_wall%" (
+    set "start.y=!tmp_row!"
+    set "start.x=!tmp_col!"
+    if !tunnel_index! LSS 1000 (
+        set "tunnels_tk[!tunnel_index!].y=!start.y!"
+        set "tunnels_tk[!tunnel_index!].x=!start.x!"
+        set /a tunnel_index+=1
+    )
+    set "door_flag=false"
+    goto :dungeonBuildTunnelAfterSwitch
+) else if "!dg.floor[%tmp_row%][%tmp_col%].feature_id!"=="%tmp2_wall%" (
+    goto :dungeonBuildTunnelAfterSwitch
+) else if "!dg.floor[%tmp_row%][%tmp_col%].feature_id!"=="%tile_granite_wall%" (
+    set "start.y=!tmp_row!"
+    set "start.x=!tmp_col!"
+
+    if !wall_index! LSS 1000 (
+        set "walls_tk[!wall_index!].y=!start.y!"
+        set "walls_tk[!wall_index!].x=!start.x!"
+        set /a wall_index+=1
+    )
+
+    set /a start.y_dec=!start.y!-1, start.y_inc=!start.y!+1
+    set /a start.x_dec=!start.x!-1, start.x_inc=!start.x!+1
+    for /L %%Y in (!start.y_dec!,1,!start.y_inc!) do (
+        for /L %%X in (!start.x_dec!,1,!start.x_inc!) do (
+            set "tmp_coord=%%Y;%%X"
+            call dungeon.cmd :coordInBounds "tmp_coord" && (
+                if "!dg.floor[%%Y][%%X].feature_id!"=="%tile_granite_wall%" (
+                    set "dg.floor[%%Y][%%X].feature_id=%tmp2_wall%"
+                )
+            )
+        )
+    )
+    goto :dungeonBuildTunnelAfterSwitch
+) else if !dg.floor[%tmp_row%][%tmp_col%].feature_id! GEQ %tile_corr_floor% (
+    if !dg.floor[%tmp_row%][%tmp_col%].feature_id! LEQ %tile_blocked_floor% (
+        set "start.y=!tmp_row!"
+        set "start.x=!tmp_col!"
+
+        if "!door_flag!"=="false" (
+            if !door_index! LSS 100 (
+                set "doors_tk[!door_index!].y=!start.y!"
+                set "doors_tk[!door_index!].x=!start.x!"
+                set /a door_index+=1
+            )
+            set "door_flag=true"
+        )
+
+        call rng.cmd :randomNumber 100
+        if !errorlevel! GTR %config.dungeon.dun_tunneling% (
+            set /a tmp_row=!start.y! - !start_row!
+            if !tmp_row! LSS 0 set "tmp_row=-!tmp_row!"
+            
+            set /a tmp_col=!start.x! - !start_col!
+            if !tmp_col! LSS 0 set "tmp_col=-!tmp_col!"
+
+            if !tmp_row! GTR 10 set "stop_flag=true"
+            if !tmp_col! GTR 10 set "stop_flag=true"
+        )
+        goto :dungeonBuildTunnelAfterSwitch
+    )
+) else (
+    set "start.y=!tmp_row!"
+    set "start.x=!tmp_col!"
+)
+
+:dungeonBuildTunnelAfterSwitch
+if "!stop_flag!"=="false" (
+    if not "!start.y!"=="!end.y!" goto :dungeonBuildTunnelDoLoop
+    if not "!start.x!"=="!end.x!" goto :dungeonBuildTunnelDoLoop
+)
+
+set /a tunnel_index-=1
+for /L %%A in (0,1,!tunnel_index!) do (
+    set "dg.floor[!tunnels_tk[%%A].y!][!tunnels_tk[%%A].x!].feature_id=%tile_corr_floor%"
+)
+
+set /a wall_index-=1
+for /L %%A in (0,1,!wall_index!) do (
+    set "tile=dg.floor[!walls_tk[%%A].y!][!walls_tk[%%A].x!]"
+    for /f "delims=" %%B in ("!tile!") do (
+        if "!%%A.feature_id!"=="%tmp2_wall%" (
+            call rng.cmd :randomNumber 100
+            if !errorlevel! LSS %config.dungeon.dun_room_doors% (
+                call :dungeonPlaceDoor "!walls_tk[%%A].y!;!walls_tk[%%A].x!"
+            ) else (
+                set "!tile!.feature_id=%tile_corr_floor%"
+            )
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determine if specified coordinates are next to two walls
+::
+:: Arguments: %1 - The coordinates to check
+:: Returns:   0 if coord is next to two walls
+::            1 if coord is not next to two walls
+::------------------------------------------------------------------------------
 :dungeonIsNextTo
-exit /b
+for /F "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set /a coord.y==%%~A, coord.x=%%~B
+    set /a coord.y_dec=!coord.y!-1, coord.y_inc=!coord.y!+1
+    set /a coord.x_dec=!coord.x!-1, coord.x_inc=!coord.x!+1
+)
 
+set "coord=%~1"
+call dungeon.cmd :coordCorridorWallsNextTo "coord"
+if !errorlevel! GTR 2 (
+    if !dg.floor[%coord.y_dec%][%coord.x%].feature_id! GEQ %min_cave_wall% (
+        if !dg.floor[%coord.y_inc%][%coord.x%].feature_id! GEQ %min_cave_wall% (
+            exit /b 0
+        )
+    )
+    if !dg.floor[%coord.y%][%coord.x_dec%].feature_id! GEQ %min_cave_wall% (
+        if !dg.floor[%coord.y%][%coord.x_inc%].feature_id! GEQ %min_cave_wall% (
+            exit /b 0
+        )
+    )
+)
+exit /b 1
+
+::------------------------------------------------------------------------------
+:: Places a door at the given coordinates if at least two walls are found
+::
+:: Arguments: %1 - The coordinates to place the door at
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceDoorIfNextToTwoWalls
+for /F "tokens=1,2 delims=;" %%A in ("%~1") do (
+    if "!dg.floor[%%A][%%B].feature_id!"=="%tile_corr_floor%" (
+        call rng.cmd :randomNumber 100
+        if !errorlevel! GTR %config.dungeon.dun_tunnel_doors% (
+            call :dungeonIsNextTo "%~1" && (
+                call :dungeonPlaceDoor "%~1"
+            )
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Return random coordinates
+::
+:: Arguments: %1 - The name of the variable to store the new coordinates in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonNewSpot
+set /a height_offset=%dg.height%-2, width_offset=%dg.width%-2
+call rng.cmd :randomNumber %height_offset%
+set "position.y=!errorlevel!"
+call rng.cmd :randomNumber %width_offset%
+set "position.x=!errorlevel!"
+if !dg.floor[%position.y%][%position.x%].feature_id! GEQ %min_closed_space% goto :dungeonNewSpot
+if !dg.floor[%position.y%][%position.x%].creature_id! NEQ 0 goto :dungeonNewSpot
+if !dg.floor[%position.y%][%position.x%].treasure_id! NEQ 0 goto :dungeonNewSpot
+
+set "%~1.y=!position.y!"
+set "%~1.x=!position.x!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determines if a specified tile is a room floor tile
+::
+:: Arguments: %1 - The ID of the tile to check
+:: Returns:   0 if the tile is a dark_floor tile or a light_floor tile
+::            1 if the tile is neither a dark_floor tile nor a light_floor tile
+::------------------------------------------------------------------------------
 :setRooms
-exit /b
+if "%~1"=="%tile_dark_floor%" exit /b 0
+if "%~1"=="%tile_light_floor%" exit /b 0
+exit /b 1
 
+::------------------------------------------------------------------------------
+:: Determines if a specified tile is a hallway floor tile
+::
+:: Arguments: %1 - The ID of the tile to check
+:: Returns:   0 if the tile is a coor_floor tile or a blocked_floor tile
+::            1 if the tile is neither a coor_floor nor a blocked_floor tile
+::------------------------------------------------------------------------------
 :setCorridors
-exit /b
+if "%~1"=="%tile_coor_floor%" exit /b 0
+if "%~1"=="%tile_blocked_floor%" exit /b 0
+exit /b 1
 
+::------------------------------------------------------------------------------
+:: Determines if a specified tile is a valid floor tile
+::
+:: Arguments: %1 - The ID of the tile to check
+:: Returns:   0 if the tile ID is under the max_cave_floor threshold
+::            1 if the tile is not a valid floor tile
+::------------------------------------------------------------------------------
 :setFloors
-exit /b
+if %~1 LEQ %max_cave_floor% exit /b 0
+exit /b 1
 
+::------------------------------------------------------------------------------
+:: Wrapper subroutine for generating a new dungeon
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonGenerate
+set /a "row_rooms=2 * (%dg.height% / %screen_height%)"
+set /a "col_rooms=2 * (%dg.width% / %screen_width%)"
+set /a row_rooms_dec=!row_rooms!-1, col_rooms_dec=!col_rooms!-1
+
+for /L %%Y in (0,1,!row_rooms_dec!) do (
+    for /L %%X in (0,1,!col_rooms_dec!) do (
+        set "room_map[%%Y][%%X]=false"
+    )
+)
+
+call game.cmd :randomNumberNormalDistribution %config.dungeon.dun_rooms_mean% 2
+set /a random_room_count=!errorlevel! - 1
+for /L %%A in (0,1,!random_room_count!) do (
+    call rng.cmd :randomNumber !row_rooms!
+    set /a rnd_row=!errorlevel!-1
+    call rng.cmd :randomNumber !col_rooms!
+    set /a rnd_col=!errorlevel!-1
+
+    set "room_map[!rnd_row!][!rnd_col!]=true"
+)
+
+:: Build rooms
+set "location_id=0"
+for /L %%Y in (0,1,!row_rooms_dec!) do (
+    for /L %%X in (0,1,!col_rooms_dec!) do (
+        if "!room_map[%%Y][%%X]!"=="true" (
+            set /a "locations[!location_id!].y=%%Y * (%screen_height% >> 1) + %quart_height%"
+            set /a "locations[!location_id!].x=%%X * (%screen_width% >> 1) + %quart_width%"
+
+            for /f "delims=" %%A in ("!location_id!") do (
+                set "loc_coord=!locations[%%A].y!;!locations[%%A].x!"
+            )
+            call rng.cmd :randomNumber %config.dungeon.dun_unusual_rooms%
+            if %dg.current_level% GTR !errorlevel! (
+                call rng.cmd :randomNumber 3
+                set "room_type=!errorlevel!"
+
+                if "!room_type!"=="1" (
+                    call :dungeonBuildRoomOverlappingRectangles "!loc_coord!"
+                ) else if "!room_type!"=="2" (
+                    call :dungeonBuildRoomWithInnerRooms "!loc_coord!"
+                ) else (
+                    call :dungeonBuildRoomCrossShaped "!loc_coord!"
+                )
+            ) else (
+                call :dungeonBuildRoom "!loc_coord!"
+            )
+            set /a location_id+=1
+        )
+    )
+)
+
+for /L %%A in (1,1,!location_id!) do (
+    call rng.cmd :randomNumber !location_id!
+    set /a pick1=!errorlevel!-1
+    call rng.cmd :randomNumber !location_id!
+    set /a pick2=!errorlevel!-1
+
+    for /f "tokens=1,2" %%B in ("!pick1! !pick2!") do (
+        set "y=!locations[%%B].y!"
+        set "x=!locations[%%B].x!"
+        set "locations[%%B].y=!locations[%%C].y!"
+        set "locations[%%B].x=!locations[%%C].x!"
+        set "locations[%%C].y=!y!"
+        set "locations[%%C].x=!x!"
+    )
+)
+set "door_index=0"
+
+set "locations[!location_id!].y=!locations[0].y!"
+set "locations[!location_id!].x=!locations[0].x!"
+
+for /L %%A in (1,1,!location_id!) do (
+    set /a location_id_dec=%%A-1
+    set "start_loc=!locations[%%A].y!;!locations[%%A].x!"
+    for /f "delims=" %%B in ("!location_id_dec!") do (
+        set "end_loc=!locations[%%B].y!;!locations[%%B].x!"
+    )
+    call :dungeonBuildTunnel "!start_loc!" "!end_loc!"
+)
+
+:: Generate walls and streamers
+call :dungeonFillEmptyTilesWith "%tile_granite_wall%"
+for /L %%A in (1,1,%config.dungeon.dun_magma_streamer%) do (
+    call :dungeonPlaceStreamerRock %tile_magma_wall% %config.dungeon.dun_magma_treasure%
+)
+for /L %%A in (1,1,%config.dungeon.dun_quartz_streamer%) do (
+    call :dungeonPlaceStreamerRock %tile_quartz_wall% %config.dungeon.dun_quartz_treasure%
+)
+call :dungeonPlaceBoundaryWalls
+
+:: Place intersection doors
+set /a door_index-=1
+for /L %%A in (0,1,!door_index!) do (
+    set /a x_dec=!doors_tk[%%A].x!-1, x_inc=!doors_tk[%%A].x!+1
+    set /a y_dec=!doors_tk[%%A].y!-1, y_inc=!doors_tk[%%A].y!+1
+
+    call :dungeonPlaceDoorIfNextToTwoWalls "!doors_tk[%%A].y!;!x_dec!"
+    call :dungeonPlaceDoorIfNextToTwoWalls "!doors_tk[%%A].y!;!x_inc!"
+    call :dungeonPlaceDoorIfNextToTwoWalls "!y_dec!;!doors_tk[%%A].x!"
+    call :dungeonPlaceDoorIfNextToTwoWalls "!y_inc!;!doors_tk[%%A].x!"
+)
+set /a door_index+=1
+
+set /a alloc_level=%dg.current_level%/3
+if %alloc_level% LSS 2 (
+    set "alloc_level=2"
+) else if %alloc_level% GTR 10 (
+    set "alloc_level=10"
+)
+
+call rng.cmd :randomNumber 2
+set /a down_stair_count=!errorlevel!+2
+call :dungeonPlaceStairs 2 !down_stair_count! 3
+call rng.cmd :randomNumber 2
+call :dungeonPlaceStairs 1 !errorlevel! 3
+
+:: Set up character coordinates for placing monsters
+call :dungeonNewSpot "coord"
+set "py.pos.y=!coord.y!"
+set "py.pos.x=!coord.x!"
+
+call rng.cmd :randomNumber 8
+set /a monster_count=!errorlevel! + %config.monsters.mon_min_per_level% + %alloc_level%
+call monster_manager.cmd :monsterPlaceNewWithinDistance !monster_count! 0 "true"
+
+call rng.cmd :randomNumber %alloc_level%
+call dungeon.cmd :dungeonAllocateAndPlaceObject "dungeon_generate.cmd :setCorridors" 3 !errorlevel!
+call game.cmd :randomNumberNormalDistribution "%config.dungeon.objects.level_objects_per_room%" 3
+call dungeon.cmd :dungeonAllocateAndPlaceObject "dungeon_generate.cmd :setRooms" 5 !errorlevel!
+call game.cmd :randomNumberNormalDistribution "%config.dungeon.objects.level_objects_per_corridor%" 3
+call dungeon.cmd :dungeonAllocateAndPlaceObject "dungeon_generate.cmd :setFloors" 5 !errorlevel!
+call game.cmd :randomNumberNormalDistribution "%config.dungeon.objects.level_total_gold_and_gems%" 3
+call dungeon.cmd :dungeonAllocateAndPlaceObject "dungeon_generate.cmd :setFloors" 4 !errorlevel!
+call rng.cmd :randomNumber %alloc_level%
+call dungeon.cmd :dungeonAllocateAndPlaceObject "dungeon_generate.cmd :setFloors" 1 !errorlevel!
+
+if %dg.current_level% GEQ %config.monsters.mon_endgame_level% call monster_manager.cmd :monsterPlaceWinning
 exit /b
 
+::------------------------------------------------------------------------------
+:: Builds a store at specified coordinates
+::
+:: Arguments: %1 - The type of store to build
+::            %2 - The desired location of the new store
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonBuildStore
+for /f "tokens=1,2 delims=;" %%A in ("%~2") do (
+    set /a y_val=%%A * 10 + 5
+    set /a x_val=%%A * 16 + 16
+)
+call rng.cmd :randomNumber 3
+set /a height=!y_val! - !errorlevel!
+call rng.cmd :randomNumber 4
+set /a depth=!y_val! + !errorlevel!
+call rng.cmd :randomNumber 6
+set /a left=!x_val! - !errorlevel!
+call rng.cmd :randomNumber 6
+set /a right=!x_val! + !errorlevel!
+
+for /L %%Y in (!height!,1,!depth!) do (
+    for /L %%X in (!left!,1,!right!) do (
+        set "dg.floor[%%Y][%%X].feature_id=%tile_boundary_wall%"
+    )
+)
+
+call rng.cmd :randomNumber 4
+set "tmp_val=!errorlevel!"
+if !tmp_val! LSS 3 (
+    set /a y_diff=!depth! - !height!
+    call rng.cmd :randomNumber !y_diff!
+    set /a y=!errorlevel! + !height! - 1
+
+    if "!tmp_val!"=="1" (
+        set "x=!left!"
+    ) else (
+        set "x=!right!"
+    )
+) else (
+    set /a x_diff=!right! - !left!
+    call rng.cmd :randomNumber !x_diff!
+    set /a x=!errorlevel! + !left! - 1
+
+    if "!tmp_val!"=="3" (
+        set "y=!depth!"
+    ) else (
+        set "y=!height!"
+    )
+)
+
+set "dg.floor[!y!][!x!].feature_id=%tile_corr_floor%"
+call game_objects.cmd :popt
+set "cur_pos=!errorlevel!"
+set "dg.floor[!y!][!x!].treasure_id=%cur_pos%"
+
+set /a store_door=%config.dungeon.objects.obj_store_door% + %~1
+call inventory.cmd :inventoryItemCopyTo !store_door! "game.treasure.list[%cur_pos%]"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Link all free space in treasure list together
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :treasureLinker
+for /L %%A in (0,1,174) do (
+    call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_nothing%" "game.treasure.list[%%~A]"
+)
+set "game.treasure.current_id=%config.treasure.min_treasure_list_id%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Link all free space in monster list together
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterLinker
+for /L %%A in (0,1,124) do (
+    set "monsters[%%A].hp=0"
+    set "monsters[%%A].sleep_count=0"
+    set "monsters[%%A].speed=0"
+    set "monsters[%%A].creature_id=0"
+    set "monsters[%%A].pos=0;0"
+    set "monsters[%%A].distance_from_player=0"
+    set "monsters[%%A].lit=false"
+    set "monsters[%%A].stunned_amount=0"
+    set "monsters[%%A].confused_amount=0"
+)
+set "next_free_monster_id=%config.monsters.mon_min_index_id%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Place the six stores on the town map
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceTownStores
+for /L %%A in (0,1,5) do set "rooms[%%A]=%%A"
+set "rooms_count=6"
+
+for /L %%Y in (0,1,1) do (
+    for /L %%X in (0,1,2) do (
+        call rng.cmd :randomNumber !rooms_count!
+        set /a room_id=!errorlevel!-1
+
+        for /f "delims=" %%A in ("!room_id!") do (
+            call :dungeonBuildRoom !rooms[%%A]! "%%Y;%%X"
+        )
+
+        set /a rooms_count_dec=!rooms_count!-2
+        for /L %%A in (!room_id!,1,!rooms_dec_count!) do (
+            set /a a_inc=%%A+1
+            for /f "delims=" %%B in ("!a_inc!") do (
+                set "rooms[%%A]=!rooms[%%B]!"
+            )
+        )
+
+        set /a rooms_count-=1
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Every 5000 turns, the town toggles between day and night
+::
+:: Arguments: None
+:: Returns:   0 if it is currently nighttime
+::            1 if it is currently daytime
+::------------------------------------------------------------------------------
 :isNighTime
-exit /b
+set /a "is_night=1 & (%dg.game_turn% / 5000)"
+if "!is_night!"=="0" exit /b 1
+exit /b 0
 
+::------------------------------------------------------------------------------
+:: Lights the town based on the current time of day
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :lightTown
+set /a height_dec=%dg.height%-1, width_dec=%dg.width%-1
+call :isNighTime
+if "!errorlevel!"=="0" (
+    for /L %%Y in (0,1,%height_dec%) do (
+        for /L %%X in (0,1,%width_dec%) do (
+            if not "!dg.floor[%%Y][%%X].feature_id!"=="%tile_dark_floor%" (
+                set "dg.floor[%%Y][%%X].permanent_light=true"
+            )
+        )
+    )
+    call monster_manager.cmd :monsterPlaceNewWithinDistance %config.monsters.mon_min_townsfolk_night% 3 "true"
+) else (
+    for /L %%Y in (0,1,%height_dec%) do (
+        for /L %%X in (0,1,%width_dec%) do (
+            set "dg.floor[%%Y][%%X].permanent_light=true"
+        )
+    )
+    call monster_manager.cmd :monsterPlaceNewWithinDistance %config.monsters.mon_min_townsfolk_day% 3 "true"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Wrapper subroutine for generating a town level
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :townGeneration
+call game.cmd :seedSet %game.town_seed%
+call :dungeonPlaceTownStores
+call :dungeonFillEmptyTilesWith %tile_dark_floor%
+call :dungeonPlaceBoundaryWalls
+call :dungeonPlaceStairs 2 1 0
+call game.cmd :seedResetToOldSeed
+
+call :dungeonNewSpot "coord"
+set "py.pos.y=!coord.y!"
+set "py.pos.x=!coord.x!"
+
+call :lightTown
+call store_inventory.cmd :storeMaintenance
 exit /b
 
+::------------------------------------------------------------------------------
+:: Generates a random dungeon level
+::
+:: Arguments: None
+:: Returnss:  None
+::------------------------------------------------------------------------------
 :generateCave
+set "dg.panel.top=0"
+set "dg.panel.bottom=0"
+set "dg.panel.left=0"
+set "dg.panel.right=0"
+
+set "py.pos.y=-1"
+set "py.pos.x=-1"
+
+call :treasureLinker
+call :monsterLinker
+call :dungeonBlankEntireCave
+
+set "dg.height=%max_height%"
+set "dg.width=%max_width%"
+
+if "%dg.current_level%"=="0" (
+    set "dg.height=%screen_height%"
+    set "dg.width=%screen_width%"
+)
+
+set /a "dg.panel.max_rows=(%dg.height% / %screen_height%) * 2 - 2"
+set /a "dg.panel.max_cols=(%dg.width% / %screen_width%) * 2 - 2"
+
+set "dg.panel.row=%dg.panel.max_rows%"
+set "dg.panel.col=%dg.panel.max_cols%"
+
+if "%dg.current_level%"=="0" (
+    call :townGeneration
+) else (
+    call :dungeonGenerate
+)
 exit /b
