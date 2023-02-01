@@ -127,3 +127,19 @@ for %%N in (4096 2048 1024 512 256 128 64 32 16 8 4 2 1) do (
 )
 endlocal&if "%~2" neq "" (set %~2=%len%) else echo %len%
 exit /b
+
+::------------------------------------------------------------------------------
+:: Expands coordinate variable names into their X and Y parts, as well as
+:: incremented and decremented variations, which is generally useful for
+:: dungeon.cmd subroutines
+::
+:: Arguments: %1 - The name of the variable to expand
+:: Returns:   None
+::------------------------------------------------------------------------------
+:expandCoordName
+for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
+    set /a %~1.y=%%A, %~1.x=%%B
+    set /a %~1.y_dec=%%A-1, %~1.x_dec=%%B-1
+    set /a %~1.y_inc=%%A+1, %~1.x_inc=%%B+1
+)
+exit /b

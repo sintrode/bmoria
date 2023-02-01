@@ -290,7 +290,14 @@ for %%A in (0 1 0 0 -1) do (
 
 set "GRADF=10000"
 
-:: game.cpp
+::----- dungeon.cpp
+set "dg.height=0"
+set "dg.width=0"
+set "dg.game_turn=-1"
+set "dg.current_level=0"
+set "dg.generate_new_level=true"
+
+::----- game.cpp
 set "counter=0"
 for %%A in (
     "Running: cut known corners`config.options.run_cut_corners"
