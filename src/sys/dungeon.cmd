@@ -264,28 +264,226 @@ for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Places a particular trap at specified coordinates
+::
+:: Arguments: %1 - The name of the variable containing trap coordinates
+::            %2 - The type of trap to place
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonSetTrap
+call game_objects.cmd :popt
+set "free_treasure_id=%errorlevel%"
+for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
+    set "dg.floor[%%A][%%B].treasure_id=%free_treasure_id%"
+)
+set /a trap_value=%config.dungeon.objects.obj_trap_list% + %~2
+call inventory.cmd :inventoryItemCopyTo %trap_value% "game.treasure.list[%free_treasure_id%]"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Change a trap (or secret door) from invisible to visible
+::
+:: Arguments: %1 - The name of the variable containing trap coordinates
+:: Returns:   None
+::------------------------------------------------------------------------------
 :trapChangeVisibility
+for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
+    set "treasure_id=!dg.floor[%%A][%%B].treasure_id!"
+)
+set "item=game.treasure.list[%treasure_id%]"
+if "!%item%.category_id!"=="%tv_invis_trap%" (
+    set "%item%.category_id=%tv_vis_trap%"
+    call :dungeonLiteSpot %1
+    exit /b
+)
+
+if "!%item%.category_id!"=="%tv_secret_door%" (
+    set "%item%.id=%config.dungeon.objects.obj_closed_door%"
+    set "%item%.category_id=!game_objects[%config.dungeon.objects.obj_closed_door%].category_id!"
+    set "%item%.sprite=!game_objects[%config.dungeon.objects.obj_closed_door%].sprite!"
+    call :dungeonLiteSpot %1
+    exit /b
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Place rubble at specified coordinates
+::
+:: Arguments: %1 - The name of the variable containing rubble coordinates
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceRubble
+call game_objects.cmd :popt
+set "free_treasure_id=%errorlevel%"
+
+for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
+    set "dg.floor[%%B][%%A].treasure_id=%free_treasure_id%"
+    set "dg.floor[%%B][%%A].feature_id=%tile_blocked_floor%"
+)
+
+call inventory.cmd :inventoryItemCopyTo %config.dungeon.objects.obj_rubble% "game.treasure.list[%free_treasure_id%]"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Place a treasure at specified coordinates
+::
+:: Arguments: %1 - The name of the variable containing treasure coordinates
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceGold
+call game_objects.cmd :popt
+set "free_treasure_id=%errorlevel%"
+
+set /a level_2inc=%dg.current_level%+2
+call rng.cmd :randomNumber %level_2inc%
+set /a gold_type_id=((!errorlevel! + 2) / 2) - 1
+set "level_2inc="
+
+call rng.cmd :randomNumber %config.treasure.treasure_chance_of_great_item%
+if "!errorlevel!"=="1" (
+    set /a level_inc=%dg.current_level%+1
+    call rng.cmd :randomNumber !level_inc!
+    set /a gold_type_id+=!errorlevel!
+    set "level_inc="
+)
+
+if %gold_type_id% GEQ %config.dungeon.objects.max_gold_types% (
+    set /a gold_type_id=%config.dungeon.objects.max_gold_types%-1
+)
+
+for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
+    set "dg.floor[%%A][%%B].treasure_id=%free_treasure_id%"
+    set /a gold_value=%config.dungeon.objects.obj_gold_list%+%gold_type_id%
+    call inventory.cmd :inventoryItemCopyTo !gold_value! "game.treasure.list[%free_treasure_id%]"
+    if "!dg.floor[%%A][%%B].creature_id!"=="1" (
+        call ui_io.cmd :printMessage "You feel something roll beneath your feet."
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Places an object at specified coordinates
+::
+:: Arguments: %1 - The name of the variable containing coordinates
+::            %2 - "true" if the object must be small, "false" otherwise
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceRandomObjectAt
+call game_objects.cmd :popt
+set "free_treasure_id=%errorlevel%"
+
+for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
+    set "dg.floor[%%A][%%B].treasure_id=%free_treasure_id%"
+)
+call game_objects.cmd :itemGetRandomObjectId %dg.current_level% "%~2"
+set "object_id=!errorlevel!"
+call inventory.cmd :inventoryItemCopyTo !sorted_objects[%object_id%]! "game.treasure.list[%free_treasure_id%]"
+call treasure.cmd :magicTreasureMagicalAbility %free_treasure_id% %dg.current_level%
+
+for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
+    if "!dg.floor[%%A][%%B].creature_id!"=="1" (
+        call ui_io.cmd :printMessage "You feel something roll beneath your feet."
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Allocates an object for tunnels and rooms
+::
+:: Arguments: %1 - The name of the function to call
+::            %2 - The type of object to place
+::            %3 - The number of objects to allocate
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonAllocateAndPlaceObject
+for /L %%A in (1,1,%~3) do (
+    call :dungeonAllocateAndPlaceObjectSetCoordinates "%~1" "%~2"
+
+    if "%~2"=="1" (
+        call rng.cmd :randomNumber %config.dungeon.objects.max_traps%
+        set /a trap_value=!errorlevel!-1
+        call :dungeonSetTrap %1 !trap_value!
+    ) else if "%~2"=="3" (
+        call :dungeonPlaceRubble %1
+    ) else if "%~2"=="4" (
+        call :dungeonPlaceGold %1
+    ) else if "%~2"=="5" (
+        call :dungeonPlaceRandomObjectAt %1 "false"
+    )
+)
 exit /b
 
+:dungeonAllocateAndPlaceObjectSetCoordinates
+call rng.cmd :randomNumber %dg.height%
+set /a coord.y=!errorlevel!-1
+call rng.cmd :randomNumber %dg.width%
+set /a coord.x=!errorlevel!-1
+
+call %~1 !dg.floor[%coord.y%][%coord.x%].feature_id! || goto :dungeonAllocateAndPlaceObjectSetCoordinates
+if not "!dg.floor[%coord.y%][%coord.x%].treasure_id!"=="0" goto :dungeonAllocateAndPlaceObjectSetCoordinates
+if "%coord.y%"=="%py.pos.y%" if "%coord.x%"=="%py.pos.x%" goto :dungeonAllocateAndPlaceObjectSetCoordinates
+exit /b
+
+::------------------------------------------------------------------------------
+:: Creates objects near the coordinates given
+::
+:: Arguments: %1 - The coordinates to place the item near
+::            %2 - The number of tries before the subroutine gives up
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonPlaceRandomObjectNear
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set "coord.y=%%A"
+    set "coord.x=%%B"
+)
+set "tries=%~2"
+
+:dungeonPlaceRandomObjectNearDoLoop
+for /L %%A in (0,1,10) do (
+    call rng.cmd :randomNumber 5
+    set /a at_coord.y=%coord.y%-3+!errorlevel!
+    call rng.cmd :randomNumber 7
+    set /a at_coord.x=%coord.x%-4+!errorlevel!
+    set "at_coord=!at_coord.y!;!at_coord.x!"
+
+    for /f "tokens=1,2" %%X in ("!at.x! !at.y!") do (
+        call :coordInBounds !at_coord!
+        if "!errorlevel!"=="0" (
+            if !dg.floor[%%Y][%%X].feature_id! LEQ %max_cave_floor% (
+                if "!dg.floor[%%Y][%%X].treasure_id!"=="0" (
+                    call rng.cmd :randomNumber 100
+                    if !errorlevel! LSS 75 (
+                        call :dungeonPlaceRandomObjectAt "!at_coord!" "false"
+                    ) else (
+                        call :dungeonPlaceGold "!at_coord!"
+                    )
+                    goto :dungeonPlaceRandomObjectNearBreakFor
+                )
+            )
+        )
+    )
+)
+:dungeonPlaceRandomObjectNearBreakFor
+set /a tries-=1
+if not "!tries!"=="0" goto :dungeonPlaceRandomObjectNearDoLoop
 exit /b
 
+::------------------------------------------------------------------------------
+:: Teleports a creature to another tile
+::
+:: Arguments: %1 - The name of the variable containing the original location
+::            %2 - The name of the variable containing the new location
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonMoveCreatureRecord
+for /f "tokens=1-4 delims=; " %%A in ("!%~1! !%~2!") do (
+    set /a "from.y=%%A", "from.x=%%B", "to.y=%%C", "to.x=%%D"
+)
+
+set "id=!dg.floor[%from.y%][%from.x%].creature_id!"
+set "dg.floor[%from.y%][%from.x%].creature_id=0"
+set "dg.floor[%to.y%][%to.x%].creature_id=!id!"
 exit /b
 
 :dungeonLightRoom
