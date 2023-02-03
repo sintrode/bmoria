@@ -84,16 +84,16 @@ exit /b 1
 :: Returns the number of seconds since Jan 1 1970 at midnight
 :: https://stackoverflow.com/a/11385908
 ::
-:: Arguments: None
+:: Arguments: %1 - The variable to store the value in
 :: Returns:   A standard UNIX timestamp
 ::------------------------------------------------------------------------------
 :getCurrentUnixTime
-setlocal
 for /f %%x in ('wmic path win32_utctime get /format:list ^| findstr "="') do set "%%~x"
 set /a z=(14-100%Month%%%100)/12, y=10000%Year%%%10000-z
 set /a ut=y*365+y/4-y/100+y/400+(153*(100%Month%%%100+12*z-3)+2)/5+Day-719469
 set /a ut=ut*86400+100%Hour%%%100*3600+100%Minute%%%100*60+100%Second%%%100
-endlocal & exit /b !ut!
+set "%~1=!ut!"
+exit /b
 
 ::------------------------------------------------------------------------------
 :: Prints a date in the ISO standard format
