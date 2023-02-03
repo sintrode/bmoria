@@ -486,32 +486,360 @@ set "dg.floor[%from.y%][%from.x%].creature_id=0"
 set "dg.floor[%to.y%][%to.x%].creature_id=!id!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Lights up a room to make it appear
+::
+:: Arguments: %1 - The name of the variable containing the coordinates to light
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonLightRoom
+set /a height_middle=%screen_height% / 2
+set /a width_middle=%screen_width% / 2
+for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
+    set /a top=(%%A / %height_middle%) * %height_middle%
+    set /a left=(%%B / %width_middle%) * %width_middle%
+    set /a bottom=!top!+%height_middle%-1
+    set /a right=!left!+%width_middle%-1
+)
+
+for /L %%Y in (!top!,1,!bottom!) do (
+    for /L %%X in (!left!,1,!right!) do (
+        if "!dg.floor[%%Y][%%X].perma_lit_room!"=="true" (
+            if "!dg.floor[%%Y][%%X].permanent_light!"=="false" (
+                set "dg.floor[%%Y][%%X].permanent_light=true"
+
+                if "!dg.floor[%%Y][%%X].feature_id!"=="%tile_dark_floor%" (
+                    set "dg.floor[%%Y][%%X].feature_id=%tile_light_floor%"
+                )
+                if "!dg.floor[%%Y][%%X].field_mark!"=="false" (
+                    if not "!dg.floor[%%Y][%%X].treasure_id!"=="0" (
+                        for /f "delims=" %%A in ("!dg.floor[%%Y][%%X].treasure_id!") do (
+                            set "treasure_id=!game.treasure.list[%%A].category_id!"
+                        )
+                        if !treasure_id! GEQ %tv_min_visible% (
+                            if !treasure_id! LEQ %tv_max_visible% (
+                                set "dg.floor[%%Y][%%X].field_mark=true"
+                            )
+                        )
+                    )
+                )
+
+                set "location=%%Y;%%X"
+                call :caveGetTileSymbol "location" c
+                call ui_io.cmd :panelPutTile "!c!" "!location!"
+            )
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Lights up a given location
+::
+:: Arguments: %1 - The name of the variable containing the coordinates to light
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonLiteSpot
+call ui.cmd :coordInsidePanel "!%~1!" || exit /b
+
+call :caveGetTileSymbol %1 c
+call ui_io.cmd :panelPutTile "!c!" %1
 exit /b
 
+::------------------------------------------------------------------------------
+:: When FIND_FLAG is set, only light permanent features
+::
+:: Arguments: %1 - The name of the variable containing the start coordinates
+::            %2 - The name of the variable containing the end coordinates
+:: Returns:   None
+::------------------------------------------------------------------------------
 :sub1MoveLight
+call helpers.cmd :expandCoordName "%~1"
+call helpers.cmd :expandCoordName "%~2"
+if "%py.temporary_light_only%"=="true" (
+    for /L %%Y in (!%~1.y_dec!,1,!%~1.y_inc!) do (
+        for /L %%X in (!%~1.x_dec!,1,!%~1.x_inc!) do (
+            set "dg.floor[%%Y][%%X].temporary_light=false"
+        )
+    )
+    if not "%py.running_tracker%"=="0" (
+        if "%config.options.run_print_self%"=="false" (
+            set "py.temporary_light_only=false"
+        )
+    )
+) else (
+    if "%py.running_tracker%"=="0" set "py.temporary_light_only=true"
+    if "%config.options.run_print_self%"=="true" set "py.temporary_light_only=true"
+)
+
+for /L %%Y in (!%~2.y_dec!,1,!%~2.y_inc!) do (
+    for /L %%X in (!%~2.x_dec!,1,!%~2.x_inc!) do (
+        if "%py.temporary_light_only%"=="true" (
+            set "dg.floor[%%Y][%%X].temporary_light=true"
+        )
+
+        if !dg.floor[%%Y][%%X].feature_id! GEQ %min_cave_wall% (
+            set "dg.floor[%%Y][%%X].permanent_light=true"
+        ) else (
+            if "!dg.floor[%%Y][%%X].field_mark!"=="false" (
+                if not "!dg.floor[%%Y][%%X].treasure_id!"=="0" (
+                    for /f "delims=" %%A in ("!dg.floor[%%Y][%%X].treasure_id!") do (
+                        set "tval=!game.treasure.list[%%A].category_id!"
+                    )
+
+                    if !tval! GEQ %tv_min_visible% (
+                        if !tval! LEQ %tv_max_visible% (
+                            set "dg.floor[%%Y][%%X].field_mark=true"
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+
+if !%~1.y! LSS !%~2.y! (
+    set "top=!%~1.y_dec!"
+    set "bottom=!%~1.y_inc!"
+) else (
+    set "top=!%~2.y_dec!"
+    set "bottom=!%~2.y_inc!"
+)
+if !%~1.x! LSS !%~2.x! (
+    set "left=!%~1.x_dec!"
+    set "right=!%~1.x_inc!"
+) else (
+    set "left=!%~2.x_dec!"
+    set "right=!%~2.x_inc!"
+)
+
+for /L %%Y in (!top!,1,!bottom!) do (
+    for /L %%X in (!left!,1,!right!) do (
+        set "coord=%%Y;%%X"
+        call :caveGetTileSymbol "coord" c
+        call ui_io.cmd :panelPutTile "!c!" "!coord!"
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: When blinded, only move the player symbol
+::
+:: Arguments: %1 - The name of the variable containing the start coordinates
+::            %2 - The name of the variable containing the end coordinates
+:: Returns:   None
+::------------------------------------------------------------------------------
 :sub3MoveLight
+call helpers.cmd :expandCoordName "%~1"
+call helpers.cmd :expandCoordName "%~2"
+if "%py.temporary_light_only%"=="true" (
+    for /L %%Y in (!%~1.y_dec!,1,!%~1.y_inc!) do (
+        for /L %%X in (!%~1.x_dec!,1,!%~1.x_inc!) do (
+            set "dg.floor[%%Y][%%X].temporary_light=false"
+            set "coord=%%Y;%%X"
+            call :caveGetTileSymbol "coord" c
+            call ui_io.cmd :panelPutTile "!c!" "!coord!"
+        )
+    )
+    set "py.temporary_light_only=false"
+) else (
+    if "%py.running_tracker%"=="0" (
+        call :caveGetTileSymbol "%~1" c
+        call ui_io.cmd :panelPutTile "!c!" "!%~1!"
+    )
+    if "%config.options.run_print_self%"=="true" (
+        call :caveGetTileSymbol "%~1" c
+        call ui_io.cmd :panelPutTile "!c!" "!%~1!"
+    )
+)
+if "%py.running_tracker%"=="0" (
+    call ui_io.cmd :panelPutTile "@" "!%~2!"
+)
+if "%config.options.run_print_self%"=="true" (
+    call ui_io.cmd :panelPutTile "@" "!%~2!"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Wrapper for moving the character's light around the screen
+::
+:: Arguments: %1 - The name of the variable containing the start coordinates
+::            %2 - The name of the variable containing the end coordinates
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonMoveCharacterLight
+if %py.flags.blind% GTR 0 (
+    call :sub3MoveLight %*
+) else if "%py.carrying_light%"=="false" (
+    call :sub3MoveLight %*
+) else (
+    call :sub1MoveLight %*
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Deletes a monster entry from the level
+::
+:: Arguments: %1 - The ID of the monster to remove
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonDeleteMonster
+call :dungeonRemoveMonsterFromLevel "%~1"
+call :dungeonDeleteMonsterRecord "%~1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Ensure that the monster has no HP before removing its ID from the level
+::
+:: Arguments: %1 - the ID of the monster to remove
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonRemoveMonsterFromLevel
+set "monster=monsters[%~1]"
+
+set "%monster%.hp=-1"
+for %%X in ("!%monster%.pos.x! !%monster%.pos.y!") do (
+    set "dg.floor[%%Y][%%X].creature_id=0"
+
+    if "!%monster%.lit!"=="true" (
+        set "monster_coord=%%Y;%%X"
+        call :dungeonLiteSpot "monster_coord"
+    )
+
+    if !monster_multiply_total! GTR 0 (
+        set /a monster_multiply_total-=1
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Deletes the monster record from the monsters list
+::
+:: Arguments: %1 - The ID of the monster to remove
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonDeleteMonsterRecord
+set /a last_id=!next_free_monster_id!-1
+set "monster.pos.x=!monsters[%last_id%].pos.x!"
+set "monster.pos.y=!monsters[%last_id%].pos.y!"
+
+if "%~1"=="%last_id%" (
+    set "dg.floor[%monster.pos.y%][%monster.pos.x%].creature_id=%~1"
+    
+    for %%A in (hp sleep_count speed creature_id "pos.y" "pos.x" distance_from_player lit stunned_amount confused_amount) do (
+        set "monsters[%~1].%%A=!monsters[%last_id%].%%~A!"
+    )
+)
+
+:: This is faster than making a blank_monster object and copying everything over
+set "monsters[%last_id%].hp=0"
+set "monsters[%last_id%].sleep_count=0"
+set "monsters[%last_id%].speed=0"
+set "monsters[%last_id%].creature_id=0"
+set "monsters[%last_id%].pos.x=0"
+set "monsters[%last_id%].pos.y=0"
+set "monsters[%last_id%].distance_from_player=0"
+set "monsters[%last_id%].lit=false"
+set "monsters[%last_id%].stunned_amount=0"
+set "monsters[%last_id%].confused_amount=0"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Creates an object or objects near the specified coordinates
+::
+:: Arguments: %1 - The coordinates to put the item
+::            %2 - The amount of items to place
+::            %3 - The type of object to place
+:: Returns:   The object_id of the placed item
+::------------------------------------------------------------------------------
 :dungeonSummonObject
-exit /b
+set "real_type=256"
+if "%~3"=="1" set "real_type=1"
+if "%~3"=="5" set "real_type=1"
 
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set "coord.y=%%A"
+    set "coord.x=%%B"
+)
+set "amount=%~2"
+set "result=0"
+
+:: We're simulating a do loop because the original C code has us directly
+:: manipulating the for loop counter to break out of an inner loop while
+:: staying within the outer loop for some reason.
+:dungeonSummonObjectDoLoop
+for /L %%B in (0,1,20) do (
+    call rng.cmd :randomNumber 5
+    set /a at_coord.y=%coord.y% - 3 + !errorlevel!
+    call rng.cmd :randomNumber 5
+    set /a at_coord.x=%coord.x% - 3 + !errorlevel!
+    set "at_coord=!at_coord.y!;!at_coord.x!"
+
+    call :coordInBounds "at_coord"
+    if "!errorlevel!"=="0" (
+        call dungeon_los.cmd :los "%~1" "!at_coord!"
+        if "!errorlevel!"=="0" (
+            for /f "tokens=1,2" %%X in ("!at_coord.x! !at_coord.y!") do (
+                if !dg.floor[%%Y][%%X].feature_id! LEQ %max_open_space% (
+                    if "!dg.floor[%%Y][%%X].treasure_id!"=="0" (
+                        set is_type=0
+                        if "%~3"=="3" set "is_type=1"
+                        if "%~3"=="7" set "is_type=1"
+
+                        if "!is_type!"=="1" (
+                            call rng.cmd :randomNumber 100
+                            if !errorlevel! LSS 50 (
+                                set "real_type=1"
+                            ) else (
+                                set "real_type=256"
+                            )
+                        )
+
+                        if "!real_type!"=="1" (
+                            set "small_object=false"
+                            if %~3 GEQ 4 set "small_object=true"
+                            call :dungeonPlaceRandomObjectAt "at_coord" "!small_object!"
+                        ) else (
+                            call :dungeonPlaceGold "at_coord"
+                        )
+
+                        call :dungeonLiteSpot "at_coord"
+
+                        call :caveTileVisible "at_coord"
+                        if "!errorlevel!"=="0" (
+                            set /a result+=!real_type!
+                        )
+
+                        goto dungeonSummonObjectAfterForLoop
+                    )
+                )
+            )
+        )
+    )
+)
+:dungeonSummonObjectAfterForLoop
+set /a amount-=1
+if not "%amount%"=="0" goto :dungeonSummonObjectDoLoop
+exit /b !result!
+
+::------------------------------------------------------------------------------
+:: Deletes an object from a specified location
+::
+:: Arguments: %1 - The name of the variable containing the desired coordinates
+:: Returns:   0 if the tile is lit after being cleared
+::            1 if the tile is unlit after being cleared
+::------------------------------------------------------------------------------
 :dungeonDeleteObject
-exit /b
+for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do set "tile=dg.floor[%%A][%%B]"
+if "!%tile%.feature_id!"=="%tile_blocked_floor%" (
+    set "%tile%.feature_id=%tile_corr_floor%"
+)
+
+call game_objects.cmd :pusht !%tile%.treasure_id!
+
+set "%tile%.treasure_id=0"
+set "%tile%.field_mark=false"
+
+call :dungeonLiteSpot %1
+call :caveTileVisible %1
+exit /b !errorlevel!
