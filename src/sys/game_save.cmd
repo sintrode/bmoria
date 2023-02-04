@@ -300,15 +300,15 @@ for /L %%Y in (0,1,65) do (
         set /a "char_tmp|=(!dg.floor[%%Y][%%X].permanent_light! << 6)"
         set /a "char_tmp|=(!dg.floor[%%Y][%%X].temporary_light! << 7)"
 
-        if not "!char_temp!"=="!prev_char!" (
+        if not "!char_tmp!"=="!prev_char!" (
             call :wrByte "!count!"
             call :wrByte "!prev_char!"
-            set "prev_char=!char_temp!"
+            set "prev_char=!char_tmp!"
             set "count=1"
         ) else if "!count!"=="255" (
             call :wrByte "!count!"
             call :wrByte "!prev_char!"
-            set "prev_char=!char_temp!"
+            set "prev_char=!char_tmp!"
             set "count=1"
         ) else (
             set /a count+=1
@@ -376,8 +376,476 @@ set "game.character_saved=true"
 set "dg.game_turn=-1"
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Load the file into memory
+::
+:: Arguments: %1 - The name of a variable that stores whether a new dungeon
+::                 needs to be generated or not
+:: Returns:   0 if the file was loaded correctly
+::            1 if there was some error reading in the file
+::------------------------------------------------------------------------------
 :loadGame
+set "time_saved=0"
+set "version_maj=0"
+set "version_min=0"
+set "patch_level=0"
+
+set "%~1=true"
+set "total_count=0"
+
+if not exist "%config.files.save_game%" (
+    call ui_io.cmd :printMessage "Save file does not exist."
+    exit /b 1
+)
+
+if exist "%config.files.save_game%.hex" del "%config.files.save_game%.hex"
+certutil -encodehex "%config.files.save_game%" "%config.files.save_game%.hex" >nul 2>&1
+call :countBytesInSaveFile
+set "current_byte=1"
+
+call ui_io.cmd :clearScreen
+call ui_io.cmd :putString "Save file '%config.files.save_game%' present. Attempting to restore." "23;0"
+
+if %dg.game_turn% GEQ 0 (
+    set "continue_from_main_else=false"
+    call ui_io.cmd :printMessage "[ERROR] Attempt to restore while still alive."
+) else (
+    set "continue_from_main_else=true"
+    set "dg.game_turn=-1"
+    set "ok=true"
+
+    call ui_io.cmd :putStringClearToEOL "Restoring Memory..." "0;0"
+    call ui_io.cmd :putQIO
+
+    set "xor_byte=0"
+    call :rdByte & set "version_maj=!errorlevel!"
+    set "xor_byte=0"
+    call :rdByte & set "version_min=!errorlevel!"
+    set "xor_byte=0"
+    call :rdByte & set "patch_level=!errorlevel!"
+    call :rdByte & set "xor_byte=!errorlevel!"
+
+    call game.cmd :validGameVersion !version_maj! !version_min! !patch_level! || (
+        call ui_io.cmd :putStringClearToEOL "Sorry. This save file is from a different version of Moria." "2;0"
+        goto :error
+    )
+
+    call :rdShort & set "uint_16_t_tmp=!errorlevel!"
+    call :loadCreatures || goto :error
+
+    call :rdLong & set "l=!errorlevel!"
+    call :andOffsetExists "config.options.run_cut_corners" "0x1"
+    call :andOffsetExists "config.options.run_examine_corners" "0x2"
+    call :andOffsetExists "config.options.run_print_self" "0x4"
+    call :andOffsetExists "config.options.find_bound" "0x8"
+    call :andOffsetExists "config.options.prompt_to_pickup" "0x10"
+    call :andOffsetExists "config.options.use_roguelike_keys" "0x20"
+    call :andOffsetExists "config.options.show_inventory_weights" "0x40"
+    call :andOffsetExists "config.options.highlight_seams" "0x80"
+    call :andOffsetExists "config.options.run_ignore_doors" "0x100"
+    call :andOffsetExists "config.options.error_beep_sound" "0x200"
+    call :andOffsetExists "config.options.display_counts" "0x400"
+
+    REM Don't allow resurrection of game.total_winner characters because
+    REM the character level is greater than the maximum allowed level.
+    set /a "beat_game=!l! & 0x40000000"
+    set /a "dead_character=!l! & 0x80000000"
+    if "%game.to_be_wizard%"=="true" (
+        if not "!beat_game!"=="0" (
+            call ui_io.cmd :printMessage "Sorry, this character is retired from Moria."
+            call ui_io.cmd :printMessage "You cannot resurrect a retired character."
+        )
+
+        if not "!dead_character!"=="0" (
+            call ui_io.cmd :getInputConfirmation "Resurrect a dead character?" && (
+                set /a "l&=~0x80000000"
+            )
+        )
+    )
+
+    if "!dead_character!"=="0" (
+        call :rdString "py.misc.name"
+        call :rdBool & set "py.misc.gender=!errorlevel!"
+        call :rdLong & set "py.misc.au=!errorlevel!"
+        call :rdLong & set "py.misc.max_exp=!errorlevel!"
+        call :rdLong & set "py.misc.exp=!errorlevel!"
+        call :rdShort & set "py.misc.exp_fraction=!errorlevel!"
+        call :rdShort & set "py.misc.age=!errorlevel!"
+        call :rdShort & set "py.misc.height=!errorlevel!"
+        call :rdShort & set "py.misc.weight=!errorlevel!"
+        call :rdShort & set "py.misc.level=!errorlevel!"
+        call :rdShort & set "py.misc.max_dungeon_depth=!errorlevel!"
+        call :rdShort & set "py.misc.chance_in_search=!errorlevel!"
+        call :rdShort & set "py.misc.fos=!errorlevel!"
+        call :rdShort & set "py.misc.bth=!errorlevel!"
+        call :rdShort & set "py.misc.bth_with_bows=!errorlevel!"
+        call :rdShort & set "py.misc.mana=!errorlevel!"
+        call :rdShort & set "py.misc.max_hp=!errorlevel!"
+        call :rdShort & set "py.misc.plusses_to_hit=!errorlevel!"
+        call :rdShort & set "py.misc.plusses_to_damage=!errorlevel!"
+        call :rdShort & set "py.misc.ac=!errorlevel!"
+        call :rdShort & set "py.misc.magical_ac=!errorlevel!"
+        call :rdShort & set "py.misc.display_to_hit=!errorlevel!"
+        call :rdShort & set "py.misc.display_to_damage=!errorlevel!"
+        call :rdShort & set "py.misc.display_ac=!errorlevel!"
+        call :rdShort & set "py.misc.display_to_ac=!errorlevel!"
+        call :rdShort & set "py.misc.disarm=!errorlevel!"
+        call :rdShort & set "py.misc.saving_throw=!errorlevel!"
+        call :rdShort & set "py.misc.social_class=!errorlevel!"
+        call :rdShort & set "py.misc.stealth_factor=!errorlevel!"
+        call :rdByte & set "py.misc.class_id=!errorlevel!"
+        call :rdByte & set "py.misc.race_id=!errorlevel!"
+        call :rdByte & set "py.misc.hit_die=!errorlevel!"
+        call :rdByte & set "py.misc.experience_factor=!errorlevel!"
+        call :rdShort & set "py.misc.current_mana=!errorlevel!"
+        call :rdShort & set "py.misc.current_mana_fraction=!errorlevel!"
+        call :rdShort & set "py.misc.current_hp=!errorlevel!"
+        call :rdShort & set "py.misc.current_hp_fraction=!errorlevel!"
+        for /L %%A in (0,1,3) do (
+            call :rdString "py.misc.history[%%A]"
+        )
+
+        call :rdBytes "py.stats.max" 6
+        call :rdBytes "py.stats.current" 6
+        call :rdShorts "py.stats.modified" 6
+        call :rdBytes "py.stats.used" 6
+
+        call :rdLong & set "py.flags.status=!errorlevel!"
+        call :rdShort & set "py.flags.rest=!errorlevel!"
+        call :rdShort & set "py.flags.blind=!errorlevel!"
+        call :rdShort & set "py.flags.paralysis=!errorlevel!"
+        call :rdShort & set "py.flags.confused=!errorlevel!"
+        call :rdShort & set "py.flags.food=!errorlevel!"
+        call :rdShort & set "py.flags.food_digested=!errorlevel!"
+        call :rdShort & set "py.flags.protection=!errorlevel!"
+        call :rdShort & set "py.flags.speed=!errorlevel!"
+        call :rdShort & set "py.flags.fast=!errorlevel!"
+        call :rdShort & set "py.flags.slow=!errorlevel!"
+        call :rdShort & set "py.flags.afraid=!errorlevel!"
+        call :rdShort & set "py.flags.poisoned=!errorlevel!"
+        call :rdShort & set "py.flags.image=!errorlevel!"
+        call :rdShort & set "py.flags.protect_evil=!errorlevel!"
+        call :rdShort & set "py.flags.invulnerability=!errorlevel!"
+        call :rdShort & set "py.flags.heroism=!errorlevel!"
+        call :rdShort & set "py.flags.super_heroism=!errorlevel!"
+        call :rdShort & set "py.flags.blessed=!errorlevel!"
+        call :rdShort & set "py.flags.heat_resistance=!errorlevel!"
+        call :rdShort & set "py.flags.cold_resistance=!errorlevel!"
+        call :rdShort & set "py.flags.detect_invisible=!errorlevel!"
+        call :rdShort & set "py.flags.word_of_recall=!errorlevel!"
+        call :rdShort & set "py.flags.see_infra=!errorlevel!"
+        call :rdShort & set "py.flags.timed_infra=!errorlevel!"
+        call :rdBool & set "py.flags.see_invisible=!errorlevel!"
+        call :rdBool & set "py.flags.teleport=!errorlevel!"
+        call :rdBool & set "py.flags.free_action=!errorlevel!"
+        call :rdBool & set "py.flags.slow_digest=!errorlevel!"
+        call :rdBool & set "py.flags.aggravate=!errorlevel!"
+        call :rdBool & set "py.flags.resistant_to_fire=!errorlevel!"
+        call :rdBool & set "py.flags.resistant_to_cold=!errorlevel!"
+        call :rdBool & set "py.flags.resistant_to_acid=!errorlevel!"
+        call :rdBool & set "py.flags.regenerate_hp=!errorlevel!"
+        call :rdBool & set "py.flags.resistant_to_light=!errorlevel!"
+        call :rdBool & set "py.flags.free_fall=!errorlevel!"
+        call :rdBool & set "py.flags.sustain_str=!errorlevel!"
+        call :rdBool & set "py.flags.sustain_int=!errorlevel!"
+        call :rdBool & set "py.flags.sustain_wis=!errorlevel!"
+        call :rdBool & set "py.flags.sustain_con=!errorlevel!"
+        call :rdBool & set "py.flags.sustain_dex=!errorlevel!"
+        call :rdBool & set "py.flags.sustain_chr=!errorlevel!"
+        call :rdBool & set "py.flags.confuse_monster=!errorlevel!"
+        call :rdByte & set "py.flags.new_spells_to_learn=!errorlevel!"
+
+        call :rdShort & set "missiles_counter=!errorlevel!"
+        call :rdLong & set "dg.game_turn=!errorlevel!"
+        call :rdShort & set "py.pack.unique_items=!errorlevel!"
+        if !py.pack.unique_items! GTR %PlayerEquipment.Wield% (
+            goto :error
+        )
+        set /a counter_dec=!py.pack.unique_items!-1
+        for /L %%A in (0,1,!counter_dec!) do (
+            call :rdItem "py.inventory[%%A]"
+        )
+        set /a counter_dec=%PLAYER_INVENTORY_SIZE%-1
+        for /L %%A in (%PlayerEquipment.Wield%,1,!counter_dec!) do (
+            call :rdItem "py.inventory[%%A]"
+        )
+        call :rdShort & set "py.pack.weight=!errorlevel!"
+        call :rdShort & set "py.equipment_count=!errorlevel!"
+        call :rdLong & set "py.flags.spells_learnt=!errorlevel!"
+        call :rdLong & set "py.flags.spells_worked=!errorlevel!"
+        call :rdLong & set "py.flags.spells_forgotten=!errorlevel!"
+        call :rdBytes "py.flags.spells_learned_order" 32
+        call :rdBytes "objects_identified" %object_ident_size%
+        call :rdLong & set "game.magic_seed=!errorlevel!"
+        call :rdLong & set "game.town_seed=!errorlevel!"
+        call :rdShort & set "last_message_id=!errorlevel!"
+        for /L %%A in (0,1,21) do call :rdString !messages[%%A]!
+
+        call :rdShort & set "panic_save_short=!errorlevel!"
+        call :rdShort & set "total_winner_short=!errorlevel!"
+        if "!panic_save_short!"=="0" (
+            set "panic_save=false"
+        ) else (
+            set "panic_save=true"
+        )
+        if "!total_winner_short!"=="0" (
+            set "game.total_winner=false"
+        ) else (
+            set "game.total_winner=true"
+        )
+        
+        call :rdShort & set "game.noscore=!errorlevel!"
+        call :rdShorts "py.base_hp_levels" %player_max_level%
+
+        for /L %%A in (0,1,5) do (
+            call :rdLong & set "stores[%%A].turns_left_before_closing=!errorlevel!"
+            call :rdShort & set "stores[%%A].insults_counter=!errorlevel!"
+            call :rdByte & set "stores[%%A].owner_id=!errorlevel!"
+            call :rdByte & set "stores[%%A].unique_items_counter=!errorlevel!"
+            call :rdShort & set "stores[%%A].good_purchases=!errorlevel!"
+            call :rdShort & set "stores[%%A].bad_purchases=!errorlevel!"
+
+            if !stores[%%A].unique_items_counter! GTR %store_max_discrete_items% (
+                goto :error
+            )
+            set /a counter_dec=!stores[%%A].unique_items_counter!-1
+            for /L %%B in (0,1,!counter_dec!) do (
+                call :rdLong & set "stores[%%A].inventory[%%B].cost=!errorlevel!"
+                call :rdItem "stores[%%A].inventory[%%B].item"
+            )
+        )
+
+        call :rdLong & set "time_saved=!errorlevel!"
+        call :rdString "game.character_died_from"
+        call :rdLong & set "py.max_score=!errorlevel!"
+        call :rdLong & set "py.misc.date_of_birth=!errorlevel!"
+    )
+
+    REM Dead characters don't have data beyond this point
+    set /a "is_dead_bit=!l! & 0x800000000"
+    set "try_res=0"
+    if "!current_byte!"=="!total_bytes!" set "try_res=1"
+    if not "!is_dead_bit!"=="0" set "try_res=1"
+
+    if "!try_res!"=="1"(
+        if "!is_dead_bit!"=="0" (
+            if "%game.to_be_wizard%"=="false" goto :error
+            if %dg.game_turn% LSS 0 goto :error
+
+            call ui_io.cmd :putStringClearToEOL "Attempting a resurrection..." "0;0"
+            if !py.misc.current_hp! LSS 0 (
+                set "py.misc.current_hp=0"
+                set "py.misc.current_hp_fraction=0"
+            )
+
+            if !py.flags.food! LSS 0 set "py.flags.food=0"
+            if !py.flags.poisoned! LSS 0 set "py.flags.poisoned=0"
+            set "dg.current_level=0"
+            set "game.character_generated=true"
+            set "game.to_be_wizard=false"
+            set /a "game.noscore|=0x1"
+        ) else (
+            call ui_io.cmd :printMessage :Restoring Memory of a departed spirit...
+            set "dg.game_turn=-1"
+        )
+        call ui_io.cmd :putQIO
+        goto :closefiles
+    )
+
+
+    call ui_io.cmd :putStringClearToEOL "Restoring Character..." "0;0"
+    call ui_io.cmd :putQIO
+
+    call :rdShort & set "dg.current_level=!errorlevel!"
+    call :rdShort & set "py.pos.y=!errorlevel!"
+    call :rdShort & set "py.pos.x=!errorlevel!"
+    call :rdShort & set "monster_multiply_total=!errorlevel!"
+    call :rdShort & set "dg.height=!errorlevel!"
+    call :rdShort & set "dg.weight=!errorlevel!"
+    call :rdShort & set "dg.panel.max_rows=!errorlevel!"
+    call :rdShort & set "dg.panel.max_cols=!errorlevel!"
+
+    call :rdByte & set "char_tmp=!errorlevel!"
+    call :readCreatures || goto :error
+    call :rdByte & set "char_tmp=!errorlevel!"
+    call :readTreasures || goto :error
+
+    set /a "tile_count=0", "total_count=0"
+    set /a full_dimensions=%max_height%*%max_width%
+    call :readDungeon || goto :error
+
+    call :rdShort & set "game.treasure.current_id=!errorlevel!"
+    if !game.treasure.current_id! GTR !level_max_objects! goto :error
+    set /a counter_dec=!game.treasure.current_id!-1
+    for /L %%A in (%config.treasure.min_treasure_list_id%,1,!counter_dec!) do (
+        call :rdItem "game.treasure.list[%%A]"
+    )
+    call :rdShort & set "next_free_monster_id=!errorlevel!"
+    if !next_free_monster_id! GTR %mon_total_allocations% goto :error
+    set /a counter_dec=!next_free_monster_id!-1
+    for /L %%A in (%config.monsters.mon_min_index_id%,1,!counter_dec!) do (
+        call :rdMonster "monsters[%%A]"
+    )
+
+    set "generate=false"
+    if !dg.game_turn! LSS 0 (
+        goto :error
+    ) else (
+        if !py.misc.current_hp! GEQ 0 (
+            set "game.character_died_from=(alive and well)"
+        )
+        set "game.character_generated=true"
+    )
+)
+
+:error
+set "ok=false"
+
+:closefiles
+if "!ok!"=="false" (
+    call ui_io.cmd :printMessage "Error during reading of file."
+) else (
+    set "from_save_file=1"
+
+    if "!panic_save!"=="true" (
+        call :ui_io.cmd :printMessage "This game is from a panic save. Score will not be added to scoreboard."
+    ) else (
+        REM Batch's logical negation doesn't seem to be working for numbers other than 0
+        REM so we'll just see if the number is less than 4 to see if the 0x4 bit is unset
+        if !game.noscore! LSS 4 (
+            call ui_io.cmd :printMessage "This character is already on the scoreboard. It will not be scored again."
+            set /a "game.noscore|=0x4"
+        )
+    )
+
+    if !dg.game_turn! GEQ 0 (
+        set "py.weapon_is_heavy=false"
+        set "py.pack.heaviness=0"
+        call player.cmd :playerStrength
+
+        call helpers.getCurrentUnixTime
+        set "start_time=!errorlevel!"
+
+        if !start_time! LSS !time_saved! (
+            set "age=0"
+        ) else (
+            set /a age=!start_time!-!time_saved!
+        )
+
+        set /a "age=(!age! + 43200) / 86400"
+        if !age! GTR 10 set "age=10"
+
+        for /L %%A in (1,1,!age!) do (
+            call store_inventory.cmd :storeMaintenance
+        )
+    )
+
+    if not "!game.noscore!"=="0" (
+        call ui_io.cmd :printMessage "This save file cannot be used to get on to the score board."
+    )
+    call game.cmd :validGameVersion !version_maj! !version_min! !patch_level!
+    if "!errorlevel!"=="0" (
+        call game.cmd :isCurrentGameVersion !version_maj! !version_min! !patch_level!
+        if "!errorlevel!"=="1" (
+            call ui_io.cmd :printMessage "Save file version !version_maj!.!version_min!.!patch_level! accepted by game version %current_version_major%.%current_version_minor%."
+        )
+    )
+
+    if !dg.game_turn! GEQ 0 exit /b 0
+    exit /b 1
+)
+set "dg.game_turn=-1"
+call ui_io.cmd :putStringClearToEOL "Please try again without that save file." "1;0"
+call ui_io.cmd :printMessage "CNIL"
+call game.cmd :exitProgram
+exit /b 1
+
+:countBytesInSaveFile
+set "total_bytes=0"
+for /f "usebackq delims=" %%A in ("%config.files.save_game%.hex") do (
+	set "line=%%A"
+	set "line=!line:~5,48!"
+	for /f "tokens=1-16" %%B in ("!line!") do (
+		if not "%%~Q"=="" (
+			set /a total_bytes+=16
+		) else (
+            REM This is incredibly inelegant
+			for %%A in (%%B %%C %%D %%E %%F %%G %%H %%I %%J %%K %%L %%M %%N %%O %%P) do (
+				set /a total_bytes+=1
+			)
+		)
+	)
+)
 exit /b
+
+:loadCreatures
+if "!uint_16_t_tmp!"=="65535" exit /b 0
+if !uint_16_t_tmp! GEQ %mon_max_creatures% exit /b 1
+call :rdLong & set "creature_recall[!uint_16_t_tmp!].movement=!errorlevel!"
+call :rdLong & set "creature_recall[!uint_16_t_tmp!].spells=!errorlevel!"
+call :rdShort & set "creature_recall[!uint_16_t_tmp!].kills=!errorlevel!"
+call :rdShort & set "creature_recall[!uint_16_t_tmp!].deaths=!errorlevel!"
+call :rdShort & set "creature_recall[!uint_16_t_tmp!].defenses=!errorlevel!"
+call :rdByte & set "creature_recall[!uint_16_t_tmp!].wake=!errorlevel!"
+call :rdByte & set "creature_recall[!uint_16_t_tmp!].ignore=!errorlevel!"
+call :rdBytes "creature[!uint_16_t_tmp!].attacks" %mon_max_attacks%
+call :rdShort & set "uint_16_t_tmp=!errorlevel!"
+goto :loadCreatures
+
+:andOffsetExists
+set /a "has_value=(!l! & %~2)"
+if "!has_value!"=="0" (
+    set "%~1=false"
+) else (
+    set "%~1=true"
+)
+exit /b
+
+:readCreatures
+if "!char_tmp!"=="255" exit /b 0
+set "ychar=!char_tmp!"
+call :rdByte & set "xchar=!errorlevel!"
+call :rdByte & set "char_tmp=!errorlevel!"
+if !xchar! GTR %max_width% exit /b 1
+if !ychar! GTR %max_height% exit /b 1
+set "dg.floor[!ychar!][!xchar!].creature_id=!char_tmp!"
+call :rdByte & set "char_tmp=!errorlevel!"
+goto :readCreatures
+
+:readTreasures
+if "!char_tmp!"=="255" exit /b 0
+set "ychar=!char_tmp!"
+call :rdByte & set "xchar=!errorlevel!"
+call :rdByte & set "char_tmp=!errorlevel!"
+if !xchar! GTR %max_width% exit /b 1
+if !ychar! GTR %max_height% exit /b 1
+set "dg.floor[!ychar!][!xchar!].creature_id=!char_tmp!"
+call :rdByte & set "char_tmp=!errorlevel!"
+goto :readTreasures
+
+:readDungeon
+set "bool[0]=false"
+set "bool[1]=true"
+if "!total_count!"=="!full_dimensions!" exit /b 0
+call :rdByte & set "count=!errorlevel!"
+call :rdByte & set "char_tmp=!errorlevel!"
+for /L %%A in (!count!,-1,1) do (
+    REM If reading in !count! somehow blew past !full_dimensions!, abort.
+    REM Also, this is weird because SOMEONE decided to use pointers in the C code.
+    if !tile_count! GTR !full_dimensions! exit /b 1
+    
+    set /a tile_y=!tile_count!/198
+    set /a tile_x=!tile_count!%%198
+    set /a "dg.floor[!tile_y!][!tile_x!].feature_id=!char_tmp! & 0xF"
+
+    for /f "delims=" %%B in ('set /a "(!char_tmp! >> 4) & 0x1"') do set "dg.floor[!tile_y!][!tile_x!].perma_lit_room=!bool[%%B]!"
+    for /f "delims=" %%B in ('set /a "(!char_tmp! >> 5) & 0x1"') do set "dg.floor[!tile_y!][!tile_x!].field_mark=!bool[%%B]!"
+    for /f "delims=" %%B in ('set /a "(!char_tmp! >> 6) & 0x1"') do set "dg.floor[!tile_y!][!tile_x!].permanent_light=!bool[%%B]!"
+    for /f "delims=" %%B in ('set /a "(!char_tmp! >> 7) & 0x1"') do set "dg.floor[!tile_y!][!tile_x!].temporary_light=!bool[%%B]!"
+    set /a tile_count+=1
+)
+set /a total_count+=!count!
+goto :readDungeon
 
 :wrBool
 exit /b
