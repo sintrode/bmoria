@@ -3,9 +3,7 @@
 :: files, there are significant changes from the original code. However, the
 :: choice to write encrypted bytes to the file instead of writing values
 :: directly has been emulated as closely as possible in order to be able to
-:: load in save files from the original game. Since everything in batch is
-:: either a string or a signed 32-bit integer, everything that's not :wrString
-:: or :wrLong is probably gonna look weird.
+:: load in save files from the original game.
 ::------------------------------------------------------------------------------
 @echo off
 call %*
@@ -75,7 +73,10 @@ for /L %%A in (0,1,%mon_count%) do (
         call :wrShort !creature_recall[%%A].defenses!
         call :wrByte !creature_recall[%%A].wake!
         call :wrByte !creature_recall[%%A].ignore!
-        call :wrBytes !creature_recall[%%A].attacks! %mon_max_attacks%
+        call :wrByte !creature_recall[%%A].attacks[0]! %mon_max_attacks%
+        call :wrByte !creature_recall[%%A].attacks[1]! %mon_max_attacks%
+        call :wrByte !creature_recall[%%A].attacks[2]! %mon_max_attacks%
+        call :wrByte !creature_recall[%%A].attacks[3]! %mon_max_attacks%
     )
 )
 :: Sentinel to indicate no more monster info
@@ -125,9 +126,9 @@ for /L %%A in (0,1,3) do (
     )
 )
 
-call :wrBytes "%py.stats.max%" 6
-call :wrBytes "%py.stats.currrent%" 6
-call :wrShorts "%py.stats.modified%" 6
+call :wrBytes "py.stats.max" 6
+call :wrBytes "py.stats.currrent" 6
+call :wrShorts "py.stats.modified" 6
 call :wrBytes "py.stats.used" 6
 
 call :wrLong "%py.flags.status%"
@@ -423,7 +424,7 @@ if %dg.game_turn% GEQ 0 (
     call :rdByte & set "version_min=!errorlevel!"
     set "xor_byte=0"
     call :rdByte & set "patch_level=!errorlevel!"
-    call :rdByte & set "xor_byte=!errorlevel!"
+    call :getByte & set "xor_byte=!errorlevel!"
 
     call game.cmd :validGameVersion !version_maj! !version_min! !patch_level! || (
         call ui_io.cmd :putStringClearToEOL "Sorry. This save file is from a different version of Moria." "2;0"
@@ -847,31 +848,167 @@ for /L %%A in (!count!,-1,1) do (
 set /a total_count+=!count!
 goto :readDungeon
 
+::------------------------------------------------------------------------------
+:: Writes a boolean value to the save file
+::
+:: Arguments: %1 - The value to put into the file
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wrBool
+call :wrByte %1
 exit /b
 
+::------------------------------------------------------------------------------
+:: Writes a byte value to the save file as hexadecimal
+::
+:: Arguments: %1 - The value to put into the file
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wrByte
+set /a "xor_byte^=%~1"
+call :toHex !xor_byte!
+<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Writes two bytes to the save file as hexadecimal
+::
+:: Arguments: %1 - The value to put into the file
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wrShort
+set /a "xor_byte^=%~1"
+call :toHex !xor_byte!
+<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+
+set /a "xor_byte^=(%~1 >> 8) & 0xFF"
+call :toHex !xor_byte!
+<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Writes your bytes to the save file as hexadecimal
+::
+:: Arguments: %1 - The value to put into the file
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wrLong
+set /a "xor_byte^=%~1"
+call :toHex !xor_byte!
+<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+
+set /a "xor_byte^=(%~1 >> 8) & 0xFF"
+call :toHex !xor_byte!
+<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+
+set /a "xor_byte^=(%~1 >> 16) & 0xFF"
+call :toHex !xor_byte!
+<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+
+set /a "xor_byte^=(%~1 >> 24) & 0xFF"
+call :toHex !xor_byte!
+<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Writes a series of bytes to the save file
+::
+:: Arguments: %1 - The name of the array to write from
+::            %2 - The number of elements in the array
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wrBytes
+set /a loop_counter=%~2-1
+for /L %%A in (0,1,!loop_counter!) do (
+    call :wrByte "!%~1[%%A]!"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Writes a string to the save file one character at a time
+::
+:: Arguments: %1 - The string to write into the save file
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wrString
+set "tmp_string=%~1"
+
+:wrStringLoop
+if "!tmp_string!"=="" goto :wrStringAfterLoop
+set "next_char=!tmp_string:~0,1!"
+set "tmp_string=!tmp_string:~1!"
+
+call :charToDec "!next_char!"
+set /a "xor_byte^=!dec!"
+<nul set /p ".=!xor_byte!" >>"%config.files.save_game%.hex"
+goto :wrStringLoop
+
+:wrStringAfterLoop
+:: Batch strings aren't null-terminated, but C strings are so if we don't do this
+:: then umoria save files won't be compatible due to off-by-one errors
+set /a "xor_byte^=0"
+<nul set /p ".=!xor_byte!" >>"%config.files.save_game%.hex"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Writes a series of shorts to the save file
+::
+:: Arguments: %1 - The name of the array to write from
+::            %2 - The number of elements in the array
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wrShorts
+set /a loop_counter=%~2-1
+for /L %%A in (0,1,!loop_counter!) do (
+    call :wrShort "!%~1[%%A]!"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Writes an item's properties to the save file
+::
+:: Arguments: %1 - The name of the variable containing the item object
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wrItem
+call :wrShort "!%~1.id!"
+call :wrByte "!%~1.special_name_id!"
+call :wrString "!%~1.inscription!"
+call :wrLong "!%~1.flags!"
+call :wrByte "!%~1.category_id!"
+call :wrByte "!%~1.sprite!"
+call :wrShort "!%~1.misc_use!"
+call :wrLong "!%~1.cost!"
+call :wrByte "!%~1.sub_category_id!"
+call :wrByte "!%~1.items_count!"
+call :wrShort "!%~1.weight!"
+call :wrShort "!%~1.to_hit!"
+call :wrShort "!%~1.to_damage!"
+call :wrShort "!%~1.ac!"
+call :wrShort "!%~1.to_ac!"
+call :wrByte "!%~1.damage.dice!"
+call :wrByte "!%~1.damage.sides!"
+call :wrByte "!%~1.depth_first_found!"
+call :wrByte "!%~1.identification!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Writes a monster's properties to the save file
+::
+:: Arguments: %1 - The name of the variable containing the monster object
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wrMonster
+call :wrShort "!%~1.hp!"
+call :wrShort "!%~1.sleep_count!"
+call :wrShort "!%~1.speed!"
+call :wrShort "!%~1.creature_id!"
+call :wrByte "!%~1.pos.y!"
+call :wrByte "!%~1.pos.x!"
+call :wrByte "!%~1.distance_from_player!"
+call :wrBool "!%~1.lit!"
+call :wrByte "!%~1.stunned_amount!"
+call :wrByte "!%~1.confused_amount!"
 exit /b
 
 :getByte
@@ -911,4 +1048,43 @@ exit /b
 exit /b
 
 :readHighScore
+exit /b
+
+::------------------------------------------------------------------------------
+:: Converts an integer to a two-digit hexadecimal value
+:: Heavily based on https://www.dostips.com/DtCodeCmdLib.php#toHex
+::
+:: Arguments: %1 - The decimal value to convert
+:: Returns:   None
+::------------------------------------------------------------------------------
+:toHex
+set /a dec=%~1
+set "hex="
+set "map=0123456789ABCDEF"
+for /L %%N in (1,1,8) do (
+    set /a "d=dec&15,dec>>=4"
+    for %%D in (!d!) do set "hex=!map:~%%D,1!!hex!"
+)
+set "hex=!hex:~-2!"
+exit /b
+
+::------------------------------------------------------------------------------
+:: Converts a string character to its decimal ASCII value
+:: From https://www.dostips.com/forum/viewtopic.php?p=45405#p45405
+::
+:: Arguments: %1 - The character to convert
+:: Returns:   None
+::------------------------------------------------------------------------------
+:charToDec
+<nul set /p ".=%~1" >"%~1.tmp"
+
+for %%a in (%1) do fsutil file createnew zero.tmp %%~Za > NUL
+set "hex="
+set "dec="
+for /F "skip=1 tokens=2" %%a in ('fc /B %1 zero.tmp') do (
+   set /A "d=0x%%a"
+   set "dec=!dec!!d!"
+)
+del zero.tmp "%~1.tmp"
+
 exit /b
