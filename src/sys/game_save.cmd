@@ -347,6 +347,7 @@ if exist "%config.files.save_game%" (
 :saveChar
 if "%game.character_saved%"=="true" exit /b 0
 
+set "fileptr=%~1.hex"
 call ui_io.cmd :putQIO
 call player.cmd :playerDisturb 1 0
 call player.cmd :playerChangeSpeed -%py.pack.heaviness%
@@ -368,10 +369,13 @@ call :wrByte %char_tmp%
 call :svWrite
 set "ok=!errorlevel!"
 
+certutil -f -decodehex "!fileptr!" "%config.files.save_game%" >nul 2>&1
 if not exist "%~1" (
     call ui_io.cmd :printMessage "Error writing to file '%~1'."
     exit /b 1
 )
+
+del "!fileptr!"
 
 set "game.character_saved=true"
 set "dg.game_turn=-1"
@@ -386,6 +390,7 @@ exit /b 0
 ::            1 if there was some error reading in the file
 ::------------------------------------------------------------------------------
 :loadGame
+set "fileptr=%config.files.save_game%.hex"
 set "time_saved=0"
 set "version_maj=0"
 set "version_min=0"
@@ -399,8 +404,7 @@ if not exist "%config.files.save_game%" (
     exit /b 1
 )
 
-if exist "%config.files.save_game%.hex" del "%config.files.save_game%.hex"
-certutil -encodehex "%config.files.save_game%" "%config.files.save_game%.hex" >nul 2>&1
+certutil -f -encodehex "%config.files.save_game%" "!fileptr!" >nul 2>&1
 call :countBytesInSaveFile
 set "current_byte=1"
 
@@ -703,6 +707,7 @@ if %dg.game_turn% GEQ 0 (
 set "ok=false"
 
 :closefiles
+del /q "!fileptr!" >nul
 if "!ok!"=="false" (
     call ui_io.cmd :printMessage "Error during reading of file."
 ) else (
@@ -751,7 +756,6 @@ if "!ok!"=="false" (
             call ui_io.cmd :printMessage "Save file version !version_maj!.!version_min!.!patch_level! accepted by game version %current_version_major%.%current_version_minor%."
         )
     )
-
     if !dg.game_turn! GEQ 0 exit /b 0
     exit /b 1
 )
@@ -763,7 +767,7 @@ exit /b 1
 
 :countBytesInSaveFile
 set "total_bytes=0"
-for /f "usebackq delims=" %%A in ("%config.files.save_game%.hex") do (
+for /f "usebackq delims=" %%A in ("!fileptr!") do (
 	set "line=%%A"
 	set "line=!line:~5,48!"
 	for /f "tokens=1-16" %%B in ("!line!") do (
@@ -867,7 +871,7 @@ exit /b
 :wrByte
 set /a "xor_byte^=%~1"
 call :toHex !xor_byte!
-<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+<nul set /p ".=!hex!" >>"!fileptr!"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -879,11 +883,11 @@ exit /b
 :wrShort
 set /a "xor_byte^=%~1"
 call :toHex !xor_byte!
-<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+<nul set /p ".=!hex!" >>"!fileptr!"
 
 set /a "xor_byte^=(%~1 >> 8) & 0xFF"
 call :toHex !xor_byte!
-<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+<nul set /p ".=!hex!" >>"!fileptr!"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -895,19 +899,19 @@ exit /b
 :wrLong
 set /a "xor_byte^=%~1"
 call :toHex !xor_byte!
-<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+<nul set /p ".=!hex!" >>"!fileptr!"
 
 set /a "xor_byte^=(%~1 >> 8) & 0xFF"
 call :toHex !xor_byte!
-<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+<nul set /p ".=!hex!" >>"!fileptr!"
 
 set /a "xor_byte^=(%~1 >> 16) & 0xFF"
 call :toHex !xor_byte!
-<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+<nul set /p ".=!hex!" >>"!fileptr!"
 
 set /a "xor_byte^=(%~1 >> 24) & 0xFF"
 call :toHex !xor_byte!
-<nul set /p ".=!hex!" >>"%config.files.save_game%.hex"
+<nul set /p ".=!hex!" >>"!fileptr!"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -940,14 +944,14 @@ set "tmp_string=!tmp_string:~1!"
 
 call :charToDec "!next_char!"
 set /a "xor_byte^=!dec!"
-<nul set /p ".=!xor_byte!" >>"%config.files.save_game%.hex"
+<nul set /p ".=!xor_byte!" >>"!fileptr!"
 goto :wrStringLoop
 
 :wrStringAfterLoop
 :: Batch strings aren't null-terminated, but C strings are so if we don't do this
 :: then umoria save files won't be compatible due to off-by-one errors
 set /a "xor_byte^=0"
-<nul set /p ".=!xor_byte!" >>"%config.files.save_game%.hex"
+<nul set /p ".=!xor_byte!" >>"!fileptr!"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1011,43 +1015,243 @@ call :wrByte "!%~1.stunned_amount!"
 call :wrByte "!%~1.confused_amount!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Pulls a single byte from the file, without any xor_byte encryption
+::
+:: Arguments: None
+:: Returns:   The value of the byte at the specified index
+::------------------------------------------------------------------------------
 :getByte
-exit /b
+:: col gets incremented by 1 to offset the leftmost column, which is just line labels
+set /a fileptr_row=!current_byte! /  16
+set /a fileptr_col=!current_byte! %% 16 + 1
 
+for /f "delims=" %%A in ('setx /F "!fileptr!" dummyvar /A !fileptr_row!,!fileptr_col! 2^>nul') do (
+    set "next_byte=%%A"
+    goto :getByteAfterLoop
+)
+
+:getByteAfterLoop
+set /a current_byte
+set /a byte_value=0x!next_byte!&0xFF
+exit /b !byte_value!
+
+::------------------------------------------------------------------------------
+:: Reads a boolean value from the save file
+:: Note that it made more sense for this subroutine to exist in the C code,
+:: where type casting is a thing
+::
+:: Arguments: None
+:: Returns:   either a 0 or a 1
+::------------------------------------------------------------------------------
 :rdBool
-exit /b
+call :rdByte
+exit /b !errorlevel!
 
+::------------------------------------------------------------------------------
+:: Reads one byte of data from the save file
+::
+:: Arguments: None
+:: Returns:   A number between 0 and 255
+::------------------------------------------------------------------------------
 :rdByte
-exit /b
+call :getByte
+set "c=!errorlevel!"
+set /a "decoded_byte=!c! ^ !xor_byte!"
+set "xor_byte=!c!"
+exit /b !decoded_byte!
 
+::------------------------------------------------------------------------------
+:: Return two bytes of data from the save file
+::
+:: Arguments: None
+:: Returns:   A number between 0 and 65535
+::------------------------------------------------------------------------------
 :rdShort
-exit /b
+call :getByte
+set "c=!errorlevel!"
+set /a "decoded_byte=!c! ^ !xor_byte!"
 
+call :getByte
+set "xor_byte=!errorlevel!"
+set /a "decoded_int|=(!c! ^ !xor_byte!) << 8"
+exit /b !decoded_int!
+
+::------------------------------------------------------------------------------
+:: Returns four bytes of data from the save file
+::
+:: Arguments: None
+:: Returns:   A number between -2147483648 and 2147483647
+:: It should have been 0 and 4294967295 but batch insisted on signed ints
+::------------------------------------------------------------------------------
 :rdLong
-exit /b
+call :getByte
+set "c=!errorlevel!"
+set /a "decoded_long=!c! ^ !xor_byte!"
 
+call :getByte
+set "xor_byte=!errorlevel!"
+set /a "decoded_long|=(!c! ^ !xor_byte!) << 8"
+
+call :getByte
+set "xor_byte=!errorlevel!"
+set /a "decoded_long|=(!c! ^ !xor_byte!) << 16"
+
+call :getByte
+set "xor_byte=!errorlevel!"
+set /a "decoded_long|=(!c! ^ !xor_byte!) << 24"
+exit /b !decoded_long!
+
+::------------------------------------------------------------------------------
+:: Reads in a number of bytes and stores them in a specified array
+::
+:: Arguments: %1 - The name of the array to store the values in
+::            %2 - The number of bytes to read in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :rdBytes
+set /a loop_counter=%~2-1
+for /L %%A in (0,1,!loop_counter!) do (
+    call :rdByte
+    set "%~1[%%A]=!errorlevel!"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Reads in a string from the save file
+::
+:: Arguments: %1 - the variable to store the string in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :rdString
-exit /b
+call :getByte
+set "c=!errorlevel!"
+set /a "str=!c! ^ !xor_byte!"
+set "xor_byte=!c!"
+if "!str!"=="0" exit /b
+cmd /c exit /b !str!
+set "%~1=!%~1!!=ExitCodeAscii!"
+goto :rdString
 
+::------------------------------------------------------------------------------
+:: Reads in a number of shorts and stores them in a specified array
+::
+:: Arguments: %1 - The name of the array to store the values in
+::            %2 - The number of bytes to read in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :rdShorts
+set /a loop_counter=%~2-1
+for /L %%A in (0,1,!loop_counter!) do (
+    call :rdShort
+    set "%~1[%%A]=!errorlevel!"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Read in the properties of an item
+::
+:: Arguments: %1 - The name of the item whose properties are being read in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :rdItem
+call :rdShort & set "%~1.id=!errorlevel!"
+call :rdByte & set "%~1.special_name_id=!errorlevel!"
+call :rdString "%1.inscription"
+call :rdLong & set "%~1.flags=!errorlevel!"
+call :rdByte & set "%~1.category_id=!errorlevel!"
+call :rdByte & set "%~1.sprite=!errorlevel!"
+call :rdShort & set "%~1.misc.use=!errorlevel!"
+call :rdLong & set "%~1.cost=!errorlevel!"
+call :rdByte & set "%~1.sub_category_id=!errorlevel!"
+call :rdByte & set "%~1.items_count=!errorlevel!"
+call :rdShort & set "%~1.weight=!errorlevel!"
+call :rdShort & set "%~1.to_hit=!errorlevel!"
+call :rdShort & set "%~1.to_damage=!errorlevel!"
+call :rdShort & set "%~1.ac=!errorlevel!"
+call :rdShort & set "%~1.to_ac=!errorlevel!"
+call :rdByte & set "%~1.damage.dice=!errorlevel!"
+call :rdByte & set "%~1.damage.sides=!errorlevel!"
+call :rdByte & set "%~1.depth_first_found=!errorlevel!"
+call :rdByte & set "%~1.identification=!errorlevel!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Reads in the properties of a monster
+::
+:: Arguments: %1 - The name of the monster whose properties are being read in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :rdMonster
+call :rdShort & set "%~1.hp=!errorlevel!"
+call :rdShort & set "%~1.sleep_count=!errorlevel!"
+call :rdShort & set "%~1.speed=!errorlevel!"
+call :rdShort & set "%~1.creature_id=!errorlevel!"
+call :rdByte & set "%~1.pos.y=!errorlevel!"
+call :rdByte & set "%~1.pos.x=!errorlevel!"
+call :rdByte & set "%~1.distance_from_player=!errorlevel!"
+call :rdBool & set "%~1.lit=!errorlevel!"
+call :rdByte & set "%~1.stunned_amount=!errorlevel!"
+call :rdByte & set "%~1.confused_amount=!errorlevel!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Sets the local filepointer to the score file filepointer
+:: Used by death.cmd to implement the score file
+::
+:: Arguments: %1 - The new filename to use for I/O operations
+:: Returns:   None
+::------------------------------------------------------------------------------
 :setFileptr
+set "fileptr=%1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Writes a high score to the High Score file
+::
+:: Arguments: %1 - The name of the HighScore object
+:: Returns:   None
+::------------------------------------------------------------------------------
 :saveHighScore
+call :wrByte "!xor_byte!"
+
+call :wrLong "!%~1.points!"
+call :wrLong "!%~1.birth_date!"
+call :wrShort "!%~1.uid!"
+call :wrShort "!%~1.mhp!"
+call :wrShort "!%~1.chp!"
+call :wrByte "!%~1.dungeon_depth!"
+call :wrByte "!%~1.level!"
+call :wrByte "!%~1.deepest_dungeon_depth!"
+call :wrByte "!%~1.gender!"
+call :wrByte "!%~1.race!"
+call :wrByte "!%~1.character_class!"
+call :wrBytes "!%~1.name!" %player_name_size%
+call :wrBytes "!%~1.died_from!" 25
 exit /b
 
+::------------------------------------------------------------------------------
+:: Reads a high score from the High Score file
+::
+:: Arguments: %1 - The name of the HighScore object
+:: Returns:   None
+::------------------------------------------------------------------------------
 :readHighScore
+call :getByte & set "xor_byte=!errorlevel!"
+
+call :rdLong & set "%~1.points=!errorlevel!"
+call :rdLong & set "%~1.birth_date=!errorlevel!"
+call :rdShort & set "%~1.uid=!errorlevel!"
+call :rdShort & set "%~1.mhp=!errorlevel!"
+call :rdShort & set "%~1.chp=!errorlevel!"
+call :rdByte & set "%~1.dungeon_depth=!errorlevel!"
+call :rdByte & set "%~1.level=!errorlevel!"
+call :rdByte & set "%~1.deepest_dungeon_depth=!errorlevel!"
+call :rdByte & set "%~1.gender=!errorlevel!"
+call :rdByte & set "%~1.race=!errorlevel!"
+call :rdByte & set "%~1.character_class=!errorlevel!"
+call :rdBytes "%~1.name" %player_name_size%
+call :rdBytes "%~1.died_from" 25
 exit /b
 
 ::------------------------------------------------------------------------------
