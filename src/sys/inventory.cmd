@@ -493,78 +493,327 @@ exit /b 0
 set /a "%~1.flags&=~%config.treasure.flags.tr_cursed%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Reduces the AC of a random equipped item
+::
+:: Arguments: %1 - The type of damage resistance to reduce
+:: Returns:   0 if a random item's AC has been reduced
+::            1 if there was no AC to reduce
+::------------------------------------------------------------------------------
 :damageMinusAC
-exit /b
+set "items_count=0"
+if not "!py.inventory[%PlayerEquipment.Body%].category_id!"=="%TV_NOTHING%" (
+    set "items[!items_count!]=%PlayerEquipment.Body%"
+    set /a items_count+=1
+)
+if not "!py.inventory[%PlayerEquipment.Arm%].category_id!"=="%TV_NOTHING%" (
+    set "items[!items_count!]=%PlayerEquipment.Arm%"
+    set /a items_count+=1
+)
+if not "!py.inventory[%PlayerEquipment.Outer%].category_id!"=="%TV_NOTHING%" (
+    set "items[!items_count!]=%PlayerEquipment.Outer%"
+    set /a items_count+=1
+)
+if not "!py.inventory[%PlayerEquipment.Hands%].category_id!"=="%TV_NOTHING%" (
+    set "items[!items_count!]=%PlayerEquipment.Hands%"
+    set /a items_count+=1
+)
+if not "!py.inventory[%PlayerEquipment.Head%].category_id!"=="%TV_NOTHING%" (
+    set "items[!items_count!]=%PlayerEquipment.Head%"
+    set /a items_count+=1
+)
+if not "!py.inventory[%PlayerEquipment.Feet%].category_id!"=="%TV_NOTHING%" (
+    set "items[!items_count!]=%PlayerEquipment.Feet%"
+    set /a items_count+=1
+)
 
+set "minus=1"
+if "!items_count!"=="0" exit /b 1
+
+call rng.cmd :randomNumber !items_count!
+set /a counter_dec=!errorlevel!-1
+set "item_id=!items[%counter_dec%]!"
+set "description="
+
+set /a "correct_damage_type=!py.inventory[%item_id%].flags!&%~1"
+set /a total_ac=!py.inventory[%item_id%].ac!+!py.inventory[%item_id%].to_ac!
+
+if !correct_damage_type! NEQ 0 (
+    set "minus=0"
+    call identification.cmd :itemDescription description "py.inventory[%item_id%]" "false"
+    call ui_io.cmd :printMessage "Your !description! resists damage."
+) else if !total_ac! GTR 0 (
+    set "minus=0"
+    call identification.cmd :itemDescription description "py.inventory[%item_id%]" "false"
+    call ui_io.cmd :printMessage "Your !description! is damaged."
+    set /a py.inventory[%item_id%].to_ac-=1
+    call player.cmd :playerRecalculateBonuses
+)
+exit /b !minus!
+
+::------------------------------------------------------------------------------
+:: This function exists to emulate the original Pascal code and will be removed
+:: during the second pass rewrite.
+:: TODO: Remove references to this subroutine in spells.cmd
+::
+:: Arguments: %1 - Ignored
+:: Returns:   1
+::------------------------------------------------------------------------------
 :setNull
-exit /b
+exit /b 1
 
+::------------------------------------------------------------------------------
+:: Determines which items can be damaged by corroding gas
+::
+:: Arguments: %1 - A reference to the item to check
+:: Returns:   0 if the item can be damaged by corroding gas
+::            1 if the item is uncorrodable
+::------------------------------------------------------------------------------
 :setCorrodableItems
-exit /b
+set "is_weak=1"
+if "!%~1.category_id!"=="%tv_sword%"      set "is_weak=0"
+if "!%~1.category_id!"=="%tv_helm%"       set "is_weak=0"
+if "!%~1.category_id!"=="%tv_shield%"     set "is_weak=0"
+if "!%~1.category_id!"=="%tv_hard_armor%" set "is_weak=0"
+if "!%~1.category_id!"=="%tv_wand%"       set "is_weak=0"
+exit /b %is_weak%
 
+::------------------------------------------------------------------------------
+:: Determines which items are flammable
+::
+:: Arguments: %1 - A reference to the item to check
+:: Returns:   0 if the item can be damaged by flame
+::            1 if the item is fireproof
+::------------------------------------------------------------------------------
 :setFlammableItems
-exit /b
+set "is_weak=1"
+set /a "resists=!%~1.flags! & %config.treasure.flags.tr_res_fire%"
+
+if "!%~1.category_id!"=="%tv_arrow%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%tv_bow%"        set "is_weak=%resists%"
+if "!%~1.category_id!"=="%tv_hafted%"     set "is_weak=%resists%"
+if "!%~1.category_id!"=="%tv_polearm%"    set "is_weak=%resists%"
+if "!%~1.category_id!"=="%tv_boots%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%tv_gloves%"     set "is_weak=%resists%"
+if "!%~1.category_id!"=="%tv_cloak%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%tv_soft_armor%" set "is_weak=%resists%"
+
+if "!%~1.category_id!"=="%tv_staff%"      set "is_weak=0"
+if "!%~1.category_id!"=="%tv_scroll1%"    set "is_weak=0"
+if "!%~1.category_id!"=="%tv_scroll2%"    set "is_weak=0"
+exit /b %is_weak%
 
 ::------------------------------------------------------------------------------
 :: Determines if an item can be destroyed by acid
 ::
-:: Arguments: %1 - The name of the item to check for dissolvability
+:: Arguments: %1 - A reference to the item to check for dissolvability
 :: Returns:   0 if the item can be dissolved by acid
 ::            1 if the item is resistant to being dissolved
 ::------------------------------------------------------------------------------
 :setAcidAffectedItems
-if "!%~1.category_id!"=="%TV_MISC%" exit /b 0
-if "!%~1.category_id!"=="%TV_CHEST%" exit /b 0
+set "is_weak=1"
+set /a "resists=!%~1.flags! & %config.treasure.flags.tr_res_acid%"
 
-set "check_resist=0"
-if "!%~1.category_id!"=="%TV_CHEST%" set "check_resist=1"
-if "!%~1.category_id!"=="%TV_BOLT%" set "check_resist=1"
-if "!%~1.category_id!"=="%TV_ARROW%" set "check_resist=1"
-if "!%~1.category_id!"=="%TV_BOW%" set "check_resist=1"
-if "!%~1.category_id!"=="%TV_HAFTED%" set "check_resist=1"
-if "!%~1.category_id!"=="%TV_POLEARM%" set "check_resist=1"
-if "!%~1.category_id!"=="%TV_BOOTS%" set "check_resist=1"
-if "!%~1.category_id!"=="%TV_GLOVES%" set "check_resist=1"
-if "!%~1.category_id!"=="%TV_CLOAK%" set "check_resist=1"
-if "!%~1.category_id!"=="%TV_SOFT_ARMOR%" set "check_resist=1"
-if "%check_resist%"=="1" (
-    set /a "is_resist=!%~1.flags! & %config.treasure.flags.tr_res_acid%"
-    exit /b !is_resist!
-)
-exit /b 1
+if "!%~1.category_id!"=="%TV_BOLT%"       set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_ARROW%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_BOW%"        set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_HAFTED%"     set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_POLEARM%"    set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_BOOTS%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_GLOVES%"     set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_CLOAK%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_SOFT_ARMOR%" set "is_weak=%resists%"
 
+if "!%~1.category_id!"=="%TV_MISC%"       set "is_weak=0"
+if "!%~1.category_id!"=="%TV_CHEST%"      set "is_weak=0"
+exit /b %is_weak%
+
+::------------------------------------------------------------------------------
+:: Determines if an item on the ground can be destroyed by frost
+::
+:: Arguments: %1 - A reference to the item to check for shatterability
+:: Returns:   0 for potions and flasks
+::            1 if the item is not made of glass
+::------------------------------------------------------------------------------
 :setFrostDestroyableItems
-exit /b
+set "is_weak=1"
+if "!%~1.category_id!"=="%TV_POTION1%"    set "is_weak=0"
+if "!%~1.category_id!"=="%TV_POTION2%"    set "is_weak=0"
+if "!%~1.category_id!"=="%TV_FLASK%"      set "is_weak=0"
+exit /b %is_weak%
 
+::------------------------------------------------------------------------------
+:: Determines if an item on the ground can be destroyed by lightning
+:: No idea why swords, armor, and shields are unaffected by this
+::
+:: Arguments: %1 - A reference to the item to check for conductivity
+:: Returns:   0 for rings, wands, and spikes
+::            1 if the item is not made of magic metal
+::------------------------------------------------------------------------------
 :setLightningDestroyableItems
-exit /b
+set "is_weak=1"
+if "!%~1.category_id!"=="%TV_RING%"       set "is_weak=0"
+if "!%~1.category_id!"=="%TV_WAND%"       set "is_weak=0"
+if "!%~1.category_id!"=="%TV_SPIKE%"      set "is_weak=0"
+exit /b %is_weak%
 
+::------------------------------------------------------------------------------
+:: Determines if an item on the ground can be destroyed by acid
+::
+:: Arguments: %1 - A reference to the item to check for dissolvability
+:: Returns:   0 if the item can be dissolved in acid
+::            1 if the item will not dissolve
+::------------------------------------------------------------------------------
 :setAcidDestroyableItems
-exit /b
+set "is_weak=1"
+set /a "resists=!%~1.flags! & %config.treasure.flags.tr_res_acid%"
 
+if "!%~1.category_id!"=="%TV_ARROW%"       set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_BOW%"         set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_HAFTED%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_POLEARM%"     set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_BOOTS%"       set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_GLOVES%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_CLOAK%"       set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_HELM%"        set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_SHIELD%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_HARD_ARMOR%"  set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_SOFT_ARMOR%"  set "is_weak=%resists%"
+
+if "!%~1.category_id!"=="%TV_STAFF%"       set "is_weak=0"
+if "!%~1.category_id!"=="%TV_SCROLL1%"     set "is_weak=0"
+if "!%~1.category_id!"=="%TV_SCROLL2%"     set "is_weak=0"
+if "!%~1.category_id!"=="%TV_FOOD%"        set "is_weak=0"
+if "!%~1.category_id!"=="%TV_OPEN_DOOR%"   set "is_weak=0"
+if "!%~1.category_id!"=="%TV_CLOSED_DOOR%" set "is_weak=0"
+exit /b %is_weak%
+
+::------------------------------------------------------------------------------
+:: Determines if an item on the ground can be destroyed by fire
+::
+:: Arguments: %1 - A reference to the item to check for flammability
+:: Returns:   0 if the item can be burned
+::            1 if the item is fireproof
+::------------------------------------------------------------------------------
 :setFireDestroyableItems
-exit /b
+set "is_weak=1"
+set /a "resists=!%~1.flags! & %config.treasure.flags.tr_res_fire%"
 
+if "!%~1.category_id!"=="%TV_ARROW%"       set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_BOW%"         set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_HAFTED%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_POLEARM%"     set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_BOOTS%"       set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_GLOVES%"      set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_CLOAK%"       set "is_weak=%resists%"
+if "!%~1.category_id!"=="%TV_SOFT_ARMOR%"  set "is_weak=%resists%"
+
+if "!%~1.category_id!"=="%TV_STAFF%"       set "is_weak=0"
+if "!%~1.category_id!"=="%TV_SCROLL1%"     set "is_weak=0"
+if "!%~1.category_id!"=="%TV_SCROLL2%"     set "is_weak=0"
+if "!%~1.category_id!"=="%TV_POTION1%"     set "is_weak=0"
+if "!%~1.category_id!"=="%TV_POTION2%"     set "is_weak=0"
+if "!%~1.category_id!"=="%TV_FLASK%"       set "is_weak=0"
+if "!%~1.category_id!"=="%TV_FOOD%"        set "is_weak=0"
+if "!%~1.category_id!"=="%TV_OPEN_DOOR%"   set "is_weak=0"
+if "!%~1.category_id!"=="%TV_CLOSED_DOOR%" set "is_weak=0"
+exit /b %is_weak%
+
+::------------------------------------------------------------------------------
+:: Blows corroding gas onto the player - not to be confused with poison gas
+::
+:: Arguments: %1 - The creature doing the damage
+:: Returns:   None
+::------------------------------------------------------------------------------
 :damageCorrodingGas
+call :damageMinusAC %config.treasure.flags.tr_res_acid% || (
+    call rng.cmd :randomNumber 8
+    call player.cmd :playerTakesHit !errorlevel! "%~1"
+)
+
+call :inventoryDamageItem "setCorrodableItems" 5
+if !errorlevel! GTR 0 (
+    call ui_io.cmd :printMessage "There is an acrid smell coming from your pack."
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Blows poison gas onto the player - not to be confused with corroding gas
+::
+:: Arguments: %1 - The amount of damage done to the player
+::            %2 - The creature doing the damage
+:: Returns:   None
+::------------------------------------------------------------------------------
 :damagePoisonedGas
+call player.cmd :playerTakesHit %*
+call rng.cmd :randomNumber %~1
+set /a py.flags.poisoned+=12+!errorlevel!
 exit /b
 
+::------------------------------------------------------------------------------
+:: Hits the player with fire
+::
+:: Arguments: %1 - The amount of damage done to the player
+::            %2 - The creature doing the damage
+:: Returns:   None
+::------------------------------------------------------------------------------
 :damageFire
+set "damage=%~1"
+if "%py.flags.resistant_to_fire%"=="true" set /a damage/=3
+if %py.flags.heat_resistance% GTR 0 set /a damage/=3
+
+call player.cmd :playerTakesHit !damage! "%~2"
+
+call :inventoryDamageItem "setFlammableItems" 3
+if !errorlevel! GTR 0 (
+    call ui_io.cmd :printMessage "There is smoke coming from your pack."
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Hits the player with frost
+::
+:: Arguments: %1 - The amount of damage done to the player
+::            %2 - The creature doing the damage
+:: Returns:   None
+::------------------------------------------------------------------------------
 :damageCold
+set "damage=%~1"
+if "%py.flags.resistant_to_cold%"=="true" set /a damage/=3
+if %py.flags.cold_resistance% GTR 0 set /a damage/=3
+
+call player.cmd :playerTakesHit !damage! "%~2"
+
+call :inventoryDamageItem "setFrostDestroyableItems" 3
+if !errorlevel! GTR 0 (
+    call ui_io.cmd :printMessage "Something shatters inside your pack."
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Hits the player with a lightning bolt
+::
+:: Arguments: %1 - The amount of damage done to the player
+::            %2 - The creature doing the damage
+:: Returns:   None
+::------------------------------------------------------------------------------
 :damageLightningBolt
+set "damage=%~1"
+if "%py.flags.resistant_to_light%"=="true" set /a damage/=3
+
+call player.cmd :playerTakesHit !damage! "%~2"
+
+call :inventoryDamageItem "setLightningDestroyableItems" 3
+if !errorlevel! GTR 0 (
+    call ui_io.cmd :printMessage "There are sparks coming from your pack."
+)
 exit /b
 
 ::------------------------------------------------------------------------------
 :: Throws acid on the player, either via monster or trap
 ::
 :: Arguments: %1 - The amount of base damage to do to the player
-::            %2 - The name of the creature doing the damage
+::            %2 - The creature doing the damage
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :damageAcid
