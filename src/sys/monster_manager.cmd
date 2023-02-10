@@ -207,14 +207,119 @@ if !errorlevel! LEQ %~1 set "replace_monster=1"
 if "!replace_monster!"=="1" goto :newRandomPosition
 exit /b
 
+::------------------------------------------------------------------------------
+:: Place a monsters next to specified coordinates
+::
+:: Arguments: %1 - The ID of the monster to place
+::            %2 - A reference to the coordinates of the placement center
+::            %3 - Indicates if the monster is spawned in while asleep
+:: Returns:   0 if the monster was successfully placed
+::            1 if there was an issue placing the monster
+::------------------------------------------------------------------------------
 :placeMonsterAdjacentTo
-exit /b
+set "placed=1"
+call helpers.cmd :expandCoordName %2
+for /L %%A in (0,1,9) do (
+    call rng.cmd :randomNumber 3
+    set /a position.y=!%~2.y! - 2 + !errorlevel!
+    call rng.cmd :randomNumber 3
+    set /a position.x=!%~2.x! - 2 + !errorlevel!
+    set "position=!position.y!;!position.x!"
 
+    call dungeon.cmd :coordInBounds "position"
+    for %%X in ("!position.x! !position.y!") do (
+        if !dg.floor[%%Y][%%X].feature_id! LEQ %max_open_space% (
+            if "!dg.floor[%%Y][%%X].creature_id!"=="0" (
+                call :monsterPlaceNew "!position!" "%~1" "%~3"
+                if "!errorlevel!"=="1" exit /b 1
+
+                set "%~2.y=!position.y!"
+                set "%~2.x=!position.x!"
+                exit /b 0
+            )
+        )
+    )
+)
+exit /b !placed!
+
+::------------------------------------------------------------------------------
+:: A wrapper for :placeMonsterAdjacentTo
+::
+:: Arguments: %1 - A reference to the coordinates to place the monster near
+::            %2 - Indicates if the monster is spawned in while asleep
+:: Returns:   0 if the monster was successfully placed
+::            1 if there was an issue placing the monster
+::------------------------------------------------------------------------------
 :monsterSummon
-exit /b
+set /a tmp_max_level=%dg.current_level%+%config.monsters.mon_summoned_level_adjust%
+call :monsterGetOneSuitableForLevel %tmp_max_level%
+call :placeMonsterAdjacentTo !errorlevel! %*
+exit /b !errorlevel!
 
+::------------------------------------------------------------------------------
+:: Places undead adjacent to a specified location
+::
+:: Arguments: %1 - A reference to the coordinates to place the undear near
+:: Returns:   0 if the monster was successfully placed
+::            1 if there was an issue placing the monster
+::------------------------------------------------------------------------------
 :monsterSummonUndead
-exit /b
+set "max_levels=!monster_levels[%mon_max_levels%]!"
 
+:monsterSummonUndeadDoLoop
+call rng.cmd :randomNumber %max_levels%
+set /a monster_id=!errorlevel!-1
+for /L %%A in (0,1,19) do (
+    for /F "delims=" %%B in ("!monster_id!") do (
+        set /a "is_undead=!creatures_list[%%B].defenses! & %config.monsters.defense.cd_undead%"
+    )
+    if not "!is_undead!"=="0" (
+        set "max_levels=20"
+        goto :monsterSummonUndeadAfterForLoop
+    ) else (
+        set /a monster_id+=1
+        if !monster_id! GTR !max_levels! goto :monsterSummonUndeadAfterForLoop
+    )
+)
+:monsterSummonUndeadAfterForLoop
+if not "!max_levels!"=="0" goto :monsterSummonUndeadDoLoop
+call :placeMonsterAdjacentTo !monster_id! %1 "false"
+exit /b !errorlevel!
+
+::------------------------------------------------------------------------------
+:: Remove any unnecessary monsters
+::
+:: Arguments: None
+:: Returns:   0 if any monsters were deleted
+::            1 if no monsters could be deleted
+::------------------------------------------------------------------------------
 :compactMonsters
-exit /b
+call ui_io.cmd :printMessage "Compacting monsters..."
+set "cur_dis=66"
+set "delete_any=false"
+
+:compactMonstersWhileLoop
+if "!delete_any!"=="true" exit /b 0
+set /a counter_dec=!next_free_monster_id!-1
+for /L %%A in (!counter_dec!,-1,%config.monsters.mon_min_index_id%) do (
+    for /f "delims=" %%M in ("!monsters[%%A],creature_id!") do (
+        set /a "is_winning_creature=!creatures_list[%%M].movement! & %config.monsters.move.cm_win%"
+    )
+    REM Never compact away the Balrog
+    if "!is_winning_creature!"=="0" (
+        if !hack_monptr! LSS %%A (
+            REM TODO: Rewrite this, apparently. The original C code is also ashamed of it.
+            call dungeon.cmd :dungeonDeleteMonster %%A
+            set "delete_any=true"
+        ) else (
+            call dungeon.cmd :dungeonRemoveMonsterFromLevel %%A
+        )
+    )
+
+    if "!delete_any!"=="false" (
+        set /a cur_dis-=6
+
+        if !cur_dis! LSS 0 exit /b 1
+    )
+)
+goto :compactMonstersWhileLoop
