@@ -209,32 +209,299 @@ if !py.stats.used[%PlayerAttr.a_con%]! LSS 7 (
 )
 exit /b 4
 
+::------------------------------------------------------------------------------
+:: Tweaks the player's stats by a specified amount
+::
+:: Arguments: %1 - The stat to update
+::            %2 - The amount to update the stat by
+:: Returns:   The new value of the stat
+::------------------------------------------------------------------------------
 :playerModifyStat
-exit /b
+set "new_stat=!py.stats.current[%~1]!"
+set "loop=%~2"
+if %loop% LSS 0 set /a loop*=-1
+for /L %%A in (1,1,!loop!) do (
+    if %~2 GTR 0 (
+        if !new_stat! LSS 18 (
+            set /a new_stat+=1
+        ) else if !new_stat! LSS 108 (
+            set /a new_stat+=10
+        ) else (
+            set "new_stat=118"
+        )
+    ) else (
+        if !new_stat! GTR 27 (
+            set /a new_stat-=10
+        ) else if !new_stat! GTR 18 (
+            set "new_stat=18"
+        ) else if !new_stat! GTR 3 (
+            set /a new_stat-=1
+        )
+    )
+)
+exit /b !new_stat!
 
+::------------------------------------------------------------------------------
+:: Sets the value of the stat which is actually used
+::
+:: Arguments: %1 - The stat to update
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerSetAndUseStat
+call :playerModifyStat %~1 !py.stats.modified[%~1]!
+set "py.stats.used[%~1]=!errorlevel!"
+
+if "%~1"=="%PlayerAttr.a_str%" (
+    set /a "py.flags.status|=%config.player.status.py.str_wgt%"
+    call player.cmd :playerRecalculateBonuses
+) else if "%~1"=="%PlayerAttr.a_dex%" (
+    call player.cmd :playerRecalculateBonuses
+) else if "%~1"=="%PlayerAttr.a_int%"  (
+    if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.spell_type_mage%" (
+        call player.cmd :playerCalculateAllowedSpellsCount %PlayerAttr.a_int%
+        call player.cmd :playerGainMana %PlayerAttr.a_int%
+    )
+) else if "%~1"=="%PlayerAttr.a_wis%" (
+    if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.spell_type_priest%" (
+        call player.cmd :playerCalculateAllowedSpellsCount %PlayerAttr.a_wis%
+        call player.cmd :playerGainMana %PlayerAttr.a_wis%
+    )
+) else if "%~1"=="%PlayerAttr.a_con%" (
+    call :playerCalculateHitPoints
+)
+:: And none for the CHA stat
 exit /b
 
+::------------------------------------------------------------------------------
+:: Increases a specified stat by a random level
+::
+:: Arguments: %1 - The stat to increase
+:: Returns:   0 if the stat could be increased
+::            1 if the stat is already at the max value of 118
+::------------------------------------------------------------------------------
 :playerStatRandomIncrease
-exit /b
+set "new_stat=!py.stats.current[%~1]!"
+if !new_stat! GEQ 118 exit /b 1
 
+if !new_stat! GEQ 18 (
+    if !new_stat! LSS 116 (
+        set /a "gain=((118 - !new_stat!) / 3 + 1) >> 1"
+        call rng.cmd :randomNumber !gain!
+        set /a new_stat+=!errorlevel!+!gain!
+    )
+) else (
+    set /a new_stat+=1
+)
+
+set "py.stats.current[%~1]=!new_stat!"
+if !new_stat! GTR !py.stats.max[%~1]! (
+    set "py.stats.max[%~1]=!new_stat!"
+)
+
+call :playerSetAndUseStat %1
+call ui.cmd :displayCharacterStats %1
+exit /b 0
+
+::------------------------------------------------------------------------------
+:: Decreases a specified stat by a random level
+::
+:: Arguments: %1 - The stat to decrease
+:: Returns:   0 if the stat could be decreased
+::            1 if the stat is already at the min value of 3
+::------------------------------------------------------------------------------
 :playerStatRandomDecrease
-exit /b
+set "new_stat=!py.stats.current[%~1]!"
+if !new_stat! LEQ 3 exit /b 1
 
+if !new_stat! GEQ 19 (
+    if !new_stat! LSS 117 (
+        set /a "loss=(((118 - !new_stat!) >> 1) + 1) >> 1"
+        call rng.cmd :randomNumber !loss!
+        set /a new_stat+=!errorlevel!+!loss!
+    )
+) else (
+    set /a new_stat+=1
+)
+
+set "py.stats.current[%~1]=!new_stat!"
+if !new_stat! GTR !py.stats.max[%~1]! (
+    set "py.stats.max[%~1]=!new_stat!"
+)
+
+call :playerSetAndUseStat %1
+call ui.cmd :displayCharacterStats %1
+exit /b 0
+
+::------------------------------------------------------------------------------
+:: Restore a stat
+::
+:: Arguments: %1 - The stat to restore
+:: Returns:   0 if the stat value is updated
+::            1 if the stat is already at its max value
+::------------------------------------------------------------------------------
 :playerStatRestore
-exit /b
+set /a new_stat=!py.stats.max[%~1]!-!py.stats.current[%~1]!
+if "!new_stat!"=="0" exit /b 1
 
+set /a py.stats.current[%~1]+=!new_stat!
+call :playerSetAndUseStat %1
+call ui.cmd :displayCharacterStats %1
+exit /b 0
+
+::------------------------------------------------------------------------------
+:: Artificially boost a stat by wearing something, but don't display the change
+:: in case we're in a store or something
+::
+:: Arguments: %1 - The stat to boost
+::            %2 - The amount to boost the stat by
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerStatBoost
+set /a py.stats.modified[%~1]+=%~2
+set /a "py.flags.status|=(%config.player.status.py_str% << %~1)"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Adjusts a player's to-hit stat
+::
+:: Arguments: None
+:: Returns:   The amount to adjust by
+::------------------------------------------------------------------------------
 :playerToHitAdjustment
-exit /b
+set "dexterity=!py.stats.used[%PlayerAttr.a_dex%]!"
+if !dexterity! LSS 4 (
+    set "total=-3"
+) else if !dexterity! LSS 6 (
+    set "total=-2"
+) else if !dexterity! LSS 8 (
+    set "total=-1"
+) else if !dexterity! LSS 16 (
+    set "total=0"
+) else if !dexterity! LSS 17 (
+    set "total=1"
+) else if !dexterity! LSS 18 (
+    set "total=2"
+) else if !dexterity! LSS 69 (
+    set "total=3"
+) else if !dexterity! LSS 118 (
+    set "total=4"
+) else (
+    set "total=5"
+)
+set "dexterity="
 
+set "strength=!py.stats.used[%PlayerAttr.a_str%]!"
+if !strength! LSS 4 (
+    set /a total-=3
+) else if !strength! LSS 5 (
+    set /a total-=2
+) else if !strength! LSS 7 (
+    set /a total-=1
+) else if !strength! LSS 18 (
+    set /a total-=0
+) else if !strength! LSS 94 (
+    set /a total+=1
+) else if !strength! LSS 109 (
+    set /a total+=2
+) else if !strength! LSS 117 (
+    set /a total+=3
+) else (
+    set /a total+=4
+)
+set "strength="
+exit /b !total!
+
+::------------------------------------------------------------------------------
+:: Adjusts a player's armor class stat
+::
+:: Arguments: None
+:: Returns:   The amount to adjust by
+::------------------------------------------------------------------------------
 :playerArmorClassAdjustment
-exit /b
+set "stat=!py.stats.used[%PlayerAttr.a_dex%]!"
+if !stat! LSS 4 (
+    set "adjustment=-4"
+) else if !stat! EQU 4 (
+    set "adjustment=-3"
+) else if !stat! EQU 5 (
+    set "adjustment=-2"
+) else if !stat! EQU 6 (
+    set "adjustment=-1"
+) else if !stat! LSS 15 (
+    set "adjustment=0"
+) else if !stat! LSS 18 (
+    set "adjustment=1"
+) else if !stat! LSS 59 (
+    set "adjustment=2"
+) else if !stat! LSS 94 (
+    set "adjustment=3"
+) else if !stat! LSS 117 (
+    set "adjustment=4"
+) else (
+    set "adjustment=5"
+)
+exit /b !adjustment!
 
+::------------------------------------------------------------------------------
+:: Adjusts a player's disarm chance
+::
+:: Arguments: None
+:: Returns:   The amount to adjust by
+::------------------------------------------------------------------------------
 :playerDisarmAdjustment
-exit /b
+set "stat=!py.stats.used[%PlayerAttr.a_dex%]!"
+if !stat! LSS 4 (
+    set "adjustment=-8"
+) else if !stat! EQU 4 (
+    set "adjustment=-6"
+) else if !stat! EQU 5 (
+    set "adjustment=-4"
+) else if !stat! EQU 6 (
+    set "adjustment=-2"
+) else if !stat! EQU 7 (
+    set "adjustment=-1"
+) else if !stat! LSS 13 (
+    set "adjustment=0"
+) else if !stat! LSS 16 (
+    set "adjustment=1"
+) else if !stat! LSS 18 (
+    set "adjustment=2"
+) else if !stat! LSS 59 (
+    set "adjustment=4"
+) else if !stat! LSS 94 (
+    set "adjustment=5"
+) else if !stat! LSS 117 (
+    set "adjustment=6"
+) else (
+    set "adjustment=8"
+)
+exit /b !adjustment!
 
+::------------------------------------------------------------------------------
+:: Adjusts a player's damage
+::
+:: Arguments: None
+:: Returns:   The amount to adjust by
+::------------------------------------------------------------------------------
 :playerDamageAdjustment
-exit /b
+set "stat=!py.stats.used[%PlayerAttr.a_str%]!"
+if !stat! LSS 4 (
+    set adjustment=-2
+) else if !stat! LSS 5 (
+    set adjustment=-1
+) else if !stat! LSS 16 (
+    set adjustment=0
+) else if !stat! LSS 17 (
+    set adjustment=1
+) else if !stat! LSS 18 (
+    set adjustment=2
+) else if !stat! LSS 94 (
+    set adjustment=3
+) else if !stat! LSS 109 (
+    set adjustment=4
+) else if !stat! LSS 117 (
+    set adjustment=5
+) else (
+    set adjustment=6
+)
+exit /b !adjustment!
