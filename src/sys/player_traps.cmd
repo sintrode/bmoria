@@ -70,13 +70,16 @@ if !odds_adj! GTR !errorlevel! (
 )
 exit /b
 
+:playerDisarmChestTrap
+exit /b
+
 ::------------------------------------------------------------------------------
 :: Disarms a trap
 ::
 :: Arguments: None
 :: Returns:   None
 ::------------------------------------------------------------------------------
-:playerDisarmChestTrap
+:playerDisarmTrap
 call game.cmd :getDirectionWithMemory "CNIL" "direction" || exit /b
 
 set "coord=%py.pos.y%;%py.pos.x%"
@@ -114,9 +117,6 @@ if "!no_disarm!"=="true" (
     call ui_io.cmd :printMessage "I do not see anything to disarm there."
     set "game.player_free_turn=true"
 )
-exit /b
-
-:playerDisarmTrap
 exit /b
 
 :chestLooseStrength
