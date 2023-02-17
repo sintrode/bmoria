@@ -155,6 +155,44 @@ set "player_max_backgrounds=128"     %= number of types of histories =%
 set "bth_per_plus_to_hit_adjust=3"   %= adjust base-to-hit per plus-to-hit =%
 set "player_name_size=27"
 
+set "py.name= "
+for %%A in (gender date_of_birth au max_exp exp exp_fraction age height weight level
+            max_dungeon_depth chance_in_search fos bth bth_with_bows mana max_hp
+            plusses_to_hit plusses_to_damage ac magical_ac display_to_hit display_ac
+            display_to_ac disarm saving_throw social_class stealth_factor class_id
+            race_id hit_die experience_factor current_mana current_mana_fraction
+            current_hp current_hp_fraction) do (
+    set "py.misc.%%~A=0"
+)
+for /L %%A in (0,1,3) do set "py.misc.history[%%A]= "
+for %%A in (max current modified used) do (
+    for /L %%B in (0,1,5) do (
+        set "py.stats.%%A[%%B]=0"
+    )
+)
+for %%A in (status rest blind paralysis confused food food_digested protection
+            speed fast slow afraid poisoned image protect_evil invulnerability
+            heroism super_heroism blessed heat_resistance cold_resistance
+            detect_invisible word_of_recall see_infra timed_infra
+            new_spells_to_learn spells_learnt spells_worked spells_forgotten) do (
+    set "py.flags.%%~A=0"
+)
+for /L %%A in (0,1,31) do set "py.flags.spells_learned_order[%%A]=0"
+for %%A in (see_invisible teleport free_action slow_digest aggravate
+            resistant_to_fire resistant_to_cold resistant_to_acid regenerate_hp
+            resistant_to_light free_fall sustain_str sustain_int sustain_wis
+            sustain_con sustain_dex sustain_chr confuse_monster) do (
+    set "py.flags.%%~A=false"
+)
+set "py.pos.y=0"
+set "py.pos.x=0"
+set "py.pos=0;0"
+set "prev_dir= "
+for /L %%A in (0,1,%player_max_level%) do (
+    set "py.base_hp_levels[%%~A]=0"
+    set "py.base_exp_levels[%%~A]=0"
+)
+
 set "py.running_tracker=0"           %= tracker for number of turns taken during one run cycle =%
 set "py.temporary_light_only=false"  %= track if temporary light about player =%
 set "py.max_score=0"                 %= maximum score attained =%
