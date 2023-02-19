@@ -311,10 +311,106 @@ if not "!is_balrog!"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determine if the player was hit by a monster attack given the specific type
+:: of attack used and the level of the creature
+::
+:: TODO: Rewrite entirely. This is admittedly exceptionally inelegant, but
+::       switch statements in batch genuinely are pretty ugly even at their
+::       most well-formed.
+::
+:: Arguments: %1 - The ID of the attack
+::            %2 - The level of the attacking creature
+:: Returns:   0 if the attack lands
+::            1 if the attack misses
+::------------------------------------------------------------------------------
 :playerTestAttackHits
-exit /b
+set "success=1"
+set /a ac_total=%py.misc.ac%+%py.misc.magical_ac%
 
+findstr /R "^:playerTestAttackHitsSwitch_%~1" "%~0" >nul && goto :playerTestAttackHitsSwitch_%~1
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_1 %= normal attack =%
+call :playerTestBeingHit 60 "%~2" %ac_total%  %class_misc_hit% && set "success=0"
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_2 %= lose strength =%
+call :playerTestBeingHit -3 "%~2" %ac_total%  %class_misc_hit% && set "success=0"
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_3 %= confusion attack =%
+:playerTestAttackHitsSwitch_4 %= fear attack =%
+:playerTestAttackHitsSwitch_5 %= fire attack =%
+:playerTestAttackHitsSwitch_7 %= cold attack =%
+:playerTestAttackHitsSwitch_8 %= lightning attack =%
+call :playerTestBeingHit 10 "%~2" %ac_total%  %class_misc_hit% && set "success=0"
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_6  %= acid attack =%
+:playerTestAttackHitsSwitch_9  %= corrosion attack =%
+:playerTestAttackHitsSwitch_15 %= lose dexterity =%
+:playerTestAttackHitsSwitch_16 %= lose constitution =%
+call :playerTestBeingHit 0 "%~2" %ac_total%  %class_misc_hit% && set "success=0"
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_10 %= blindness attack =%
+:playerTestAttackHitsSwitch_11 %= paralysis attack =%
+:playerTestAttackHitsSwitch_17 %= paralysis attack =%
+:playerTestAttackHitsSwitch_18 %= paralysis attack =%
+call :playerTestBeingHit 2 "%~2" %ac_total%  %class_misc_hit% && set "success=0"
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_12 %= steal money =%
+if %py.misc.au% GTR 0 (
+    call :playerTestBeingHit 5 "%~2" %py.misc.level%  %class_misc_hit% && set "success=0"
+)
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_13 %= steal object =%
+if %py.pack.unique_items% GTR 0 (
+    call :playerTestBeingHit 2 "%~2" %py.misc.level%  %class_misc_hit% && set "success=0"
+)
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_14 %= poison attack =%
+:playerTestAttackHitsSwitch_19 %= lose experience =%
+:playerTestAttackHitsSwitch_22 %= eat food =%
+:playerTestAttackHitsSwitch_23 %= eat light =%
+call :playerTestBeingHit 5 "%~2" %ac_total%  %class_misc_hit% && set "success=0"
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_20 %= aggravate monsters =%
+:playerTestAttackHitsSwitch_99 %= blank =%
+set "success=0"
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_21 %= disenchant =%
+call :playerTestBeingHit 20 "%~2" %ac_total%  %class_misc_hit% && set "success=0"
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitch_24 %= eat charges =%
+if %py.pack.unique_items% GTR 0 (
+    call :playerTestBeingHit 15 "%~2" %ac_total%  %class_misc_hit% && set "success=0"
+)
+goto :playerTestAttackHitsSwitchEnd
+
+:playerTestAttackHitsSwitchEnd
+exit /b !success!
+
+::------------------------------------------------------------------------------
+:: Changes the speed of monsters relative to the player
+::
+:: Arguments: %1 - The amount to change the speed by
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerChangeSpeed
+set /a py.flags.speed+=%~1
+set /a "py.flags.status|=%config.player.status.py.speed%"
+
+for /L %%A in (%next_free_monster_id%,-1,%config.monsters.mon_min_index_id%) do (
+    set /a monsters[%%A]+=%~1
+)
 exit /b
 
 :playerAdjustBonusesForItem
