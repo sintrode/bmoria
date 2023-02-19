@@ -226,13 +226,89 @@ call ui.cmd :printCharacterSpeed
 set /a "py.flags.food_digested-=1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Lets the player rest to recover HP
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerRestOn
+if %game.command_count% GTR 0 (
+    set "rest_num=%game.command_count%"
+    set "game.command_count=0"
+) else (
+    set "rest_num=0"
+    call ui_io.cmd :putStringClearToEOL "Rest for how long?" "0;0"
+
+    call ui_io.cmd :getStringInput "rest_str" "0;19" "5"
+    if "!rest_str:0,1!"=="*" (
+        set "rest_num=-32767"
+    ) else (
+        set "rest_num=!rest_str!"
+    )
+)
+
+set "is_valid_rest_length=0"
+if "!rest_num!"=="-32767" set "is_valid_rest_length=1"
+if !rest_num! GTR 0 if !rest_num! LEQ 32767 set "is_valid_rest_length=1"
+if "!is_valid_rest_length!"=="1" (
+    set /a "is_searching=%py.flags.status% & %config.player.status.py_search%"
+    if not "!is_searching!"=="0" (
+        call :playerSearchOff
+    )
+
+    set "py.flags.rest=!rest_num!"
+    set /a "py.flags.status|=%config.player.status.py_rest%"
+    call ui.cmd :printCharacterMovementState
+    set /a py.flags.food_digested-=1
+
+    call ui_io.cmd :putStringClearToEOL "Press any key to stop resting" "0;0"
+    call ui_io.cmd :putQIO
+    exit /b
+)
+
+if not "!rest_num!"=="0" (
+    call ui_io.cmd :printMessage "Invalid rest count."
+)
+call ui_io.cmd :messageLineClear
+set "game.player_free_turn=true"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Lets the player stop resting
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerRestOff
+set "py.flags.rest=0"
+set /a "py.flags.status&=~%config.player.status.py_rest%"
+call ui.cmd :printCharacterMovementState
+call ui_io.cmd :printMessage "CNIL"
+set /a py.flags.food_digested+=1
 exit /b
 
+::------------------------------------------------------------------------------
+:: Sets the string that indicates how the player died
+::
+:: Arguments: %1 - The variable that will contain the death string
+::            %2 - The name of the monster that killed the player
+::            %3 - True if the monster moved to kill the player
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerDiedFromString
+set /a "is_balrog=%~3 & %config.monsters.move_cm_win%"
+if not "!is_balrog!"=="0" (
+    set "%~1=The %~2"
+) else (
+    set "monster_name=%~2"
+    call helpers.cmd :isVowel !monster_name:~0,1!
+    if "!errorlevel!"=="0" (
+        set "%~1=an %~2"
+    ) else (
+        set "%~1=a %~2"
+    )
+)
 exit /b
 
 :playerTestAttackHits
