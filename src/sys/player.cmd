@@ -413,16 +413,217 @@ for /L %%A in (%next_free_monster_id%,-1,%config.monsters.mon_min_index_id%) do 
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: When an item is worn or taken off, this re-adjusts the player bonuses with
+:: cumulative effect; properties that depend on everything being worn are
+:: recalculated by :playerRecalculateBonuses
+::
+:: Arguments: %1 - A reference to the item changing bonuses
+::            %2 - 1 if the item is being worn, -1 if the item is being removed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerAdjustBonusesForItem
+set /a amount=!%~1.misc_use!*%~2
+
+set /a "flag_set=!%~1.flags!&%config.treasure.flags.tr_stats%"
+if not "!flag_set!"=="0" (
+    for /L %%A in (0,1,5) do (
+        set /a "flag_stat=((1<<%%A) & !%~1.flags!)"
+        if not "!flag_stat!"=="0" (
+            call player_stats.cmd :playerStatBoots %%A %amount%
+        )
+    )
+)
+
+set /a "flag_set=!%~1.flags! & %config.treasure.flags.tr_search%"
+if not "!flag_set!"=="0" (
+    set /a py.misc.chance_in_search+=%amount%
+    set /a py.misc.fos-=%amount%
+)
+
+set /a "flag_set=!%~1.flags! & %config.treasure.flags.tr_stealth%"
+if not "!flag_set!"=="0" (
+    set /a py.misc.stealth_factor+=%amount%
+)
+
+set /a "flag_set=!%~1.flags! & %config.treasure.flags.tr_speed%"
+if not "!flag_set!"=="0" (
+    REM The original code called for -%amount%, but --1 doesn't read as 1
+    REM because everything is a string in batch
+    set /a unamount=%amount%*-1
+    call :playerChangeSpeed !unamount!
+    set "unamount="
+)
+
+set /a "flag_set=!%~1.flags! & %config.treasure.flags.tr_blind%"
+if not "!flag_set!"=="0" (
+    if "%~2"=="1" (
+        set /a py.flags.blind+=1000
+    )
+)
+
+set /a "flag_set=!%~1.flags! & %config.treasure.flags.tr_timid%"
+if not "!flag_set!"=="0" (
+    if "%~2"=="1" (
+        set /a py.flags.afraid+=50
+    )
+)
+
+set /a "flag_set=!%~1.flags! & %config.treasure.flags.tr_infra%"
+if not "!flag_set!"=="0" (
+    set /a py.flags.see_infra+=%amount%
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Gives bonuses based on equipped gear
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerRecalculateBonusesFromInventory
+for /L %%A in (22,1,31) do (
+    if not "!py.inventory[%%A].category_id!"=="%TV_NOTHING%" (
+        set /a py.misc.plusses_to_hit+=!py.inventory[%%A].to_hit!
+
+        if not "!py.inventory[%%A].category_id!"=="%TV_BOW%" (
+            set /a py.misc.plusses_to_damage+=!py.inventory[%%A].to_damage!
+        )
+
+        set /a py.misc.magical_ac+=!py.inventory[%%A].to_ac!
+        set /a py.misc.ac+=!py.inventory[%%A].ac!
+
+        call identification.cmd :spellItemIdentified "py.inventory[%%A]"
+        if "!errorlevel!"=="0" (
+            set /a py.misc.display_to_hit+=!py.inventory[%%A].to_hit!
+
+            if not "!py.inventory[%%A].category_id!"=="%TV_BOW%" (
+                set /a py.misc.display_to_damage+=!py.inventory[%%A].to_damage!
+            )
+
+            set /a py.misc.display_to_ac+=!py.inventory[%%A].to_ac!
+            set /a py.misc.display_ac+=!py.inventory[%%A].ac!
+        ) else (
+            call inventory.cmd :inventoryItemIsCursed "py.inventory[%%A]" || (
+                set /a py.misc.display_ac+=!py.inventory[%%A].ac!
+            )
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Gives additional stat adjustments based on equipped gear
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerRecalculateSustainStatsFromInventory
+for /L %%A in (22,1,31) do (
+    set /a "is_sust_stat=!py.inventory[%%A].flags!&%config.treasure.flags.tr_sust_stat%"
+    if not "!is_sust_stat!"=="0" (
+        if "!py.inventory[%%A].misc_use!"=="1" (
+            set "py.flags.sustain_str=true"
+        ) else if "!py.inventory[%%A].misc_use!"=="2" (
+            set "py.flags.sustain_int=true"
+        ) else if "!py.inventory[%%A].misc_use!"=="3" (
+            set "py.flags.sustain_wis=true"
+        ) else if "!py.inventory[%%A].misc_use!"=="4" (
+            set "py.flags.sustain_con=true"
+        ) else if "!py.inventory[%%A].misc_use!"=="5" (
+            set "py.flags.sustain_dex=true"
+        ) else if "!py.inventory[%%A].misc_use!"=="6" (
+            set "py.flags.sustain_chr=true"
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Recalculate the effects of all equipment
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerRecalculateBonuses
+if "%py.flags.slow_digest%"=="true" set /a py.flags.food_digested+=1
+if "%py.flags.regenerate_hp%"=="true" set /a py.flags.food_digested-=3
+set "saved_display_ac=%py.misc.display_ac%"
+call :playerResetFlags
+
+:: Real values
+call player_stats.cmd :playerToHitAdjustment
+set "py.misc.plusses_to_hit=!errorlevel!"
+call player_stats.cmd :playerDamageAdjustment
+set "py.misc.plusses_to_damage=!errorlevel!"
+call player_stats.cmd :playerArmorClassAdjustment
+set "py.misc.magical_ac=!errorlevel!"
+set "py.misc.ac=0"
+
+:: Display values
+set "py.misc.display_to_hit=%py.misc.plusses_to_hit%"
+set "py.misc.display_to_damage=%py.misc.plusses_to_damage%"
+set "py.misc.display_to_ac=%py.misc.magical_ac%"
+set "py.misc.display_ac=0"
+
+call :playerRecalculateBonusesFromInventory
+
+set /a py.misc.display_ac+=%py.misc.display_to_ac%
+
+if "%py.weapon_is_heavy%"=="true" (
+    set /a "py.misc.display_to_hit+=(!py.stats.used[%PlayerAttr.a_str%]!*15-!py.inventory[%PlayerEquipment.Wield%].weight!)"
+)
+
+:: Add in temporary spell increases
+if %py.flags.invulnerability% GTR 0 (
+    set /a py.misc.ac+=100
+    set /a py.misc.display_ac+=100
+)
+
+if %py.flags.blessed% GTR 0 (
+    set /a py.misc.ac+=2
+    set /a py.misc.display_ac+=2
+)
+
+if %py.flags.detect_invisible% GTR 0 (
+    set "py.flags.see_invisible=true"
+)
+
+:: Don't print AC in case the player is in a store
+if not "%saved_display_ac%"=="%py.misc.display_ac%" (
+    set /a "py.flags.status|=%config.player.status.py_armor%"
+)
+
+call inventory.cmd :inventoryCollectAllItemFlags
+set "item_flags=!errorlevel!"
+
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_slow_digest%"
+if not "!has_flags!"=="0" set "py.flags.slow_digest=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_aggravate%"
+if not "!has_flags!"=="0" set "py.flags.aggravate=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_teleport%"
+if not "!has_flags!"=="0" set "py.flags.teleport=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_regen%"
+if not "!has_flags!"=="0" set "py.flags.regenerate_hp=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_res_fire%"
+if not "!has_flags!"=="0" set "py.flags.resistant_to_fire=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_res_acid%"
+if not "!has_flags!"=="0" set "py.flags.resistant_to_acid=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_res_cold%"
+if not "!has_flags!"=="0" set "py.flags.resistant_to_cold=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_free_act%"
+if not "!has_flags!"=="0" set "py.flags.free_action=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_see_invis%"
+if not "!has_flags!"=="0" set "py.flags.see_invisible=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_res_light%"
+if not "!has_flags!"=="0" set "py.flags.resistant_to_light=true"
+set /a "has_flags=!item_flags! & %config.treasure.flags.tr_ffall%"
+if not "!has_flags!"=="0" set "py.flags.free_fall=true"
+
+call :playerRecalculateSustainStatsFromInventory
+
+if "%py.flags.slow_digest%"=="true" set /a py.flags.food_digested-=1
+if "%py.flags.regenerate_hp%"=="true" set /a py.flags.food_digested+=3
 exit /b
 
 :playerTakeOff
