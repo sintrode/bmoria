@@ -626,41 +626,303 @@ if "%py.flags.slow_digest%"=="true" set /a py.flags.food_digested-=1
 if "%py.flags.regenerate_hp%"=="true" set /a py.flags.food_digested+=3
 exit /b
 
+::------------------------------------------------------------------------------
+:: Remove an item from the equipment list
+::
+:: Arguments: %1 - The ID of the item being removed
+::            %2 - The location in the pack that the item is stored in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerTakeOff
+set /a "py.flags.status|=%config.player.status.py_str_wgt%"
+set "item=py.inventory[%~1]"
+
+set /a py.pack.weight-=!%item%.weight!*!%item%.items_count!
+set /a py.equipment_count-=1
+
+if "%~1"=="%PlayerEquipment.Wield%" (
+    set "p=Was wielding "
+) else if "%~1"=="%PlayerEquipment.Auxiliary%" (
+    set "p=Was wielding "
+) else if "%~1"=="%PlayerEquipment.Light%" (
+    set "p=Light source was "
+) else (
+    set "p=Was wearing "
+)
+
+call identification.cmd :itemDescription "description" "%item%" "true"
+
+if %~2 GEQ 0 (
+    cmd /c exit /b %~2
+    set "msg=%p%%description% (!=ExitCodeAscii!)"
+) else (
+    set "msg=%p%%description%"
+)
+call ui_io.cmd :printMessage "!msg!"
+
+if not "%~1"=="%PlayerEquipment.Auxiliary%" (
+    call :playerAdjustBonusesForItem "%item%" -1
+)
+call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_nothing%" "%item%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Compare an attacker's level and bonuses vs the defender's AC
+::
+:: Arguments: %1 - base to hit
+::            %2 - level
+::            %3 - plus to hit
+::            %4 - armor class
+::            %5 - attack type ID
+:: Returns:   0 if the attack succeeds
+::            1 if the attack fails
+::------------------------------------------------------------------------------
 :playerTestBeingHit
+call :playerDisturb 1 0
+
+:: plus_to_hit could be less than 0 if the player is wielding a weapon that is
+:: too heavy for them
+set /a "hit_chance=%~1 + %~3 * %bth_per_plus_to_hit_adjust% + (%~2 * !class_level_adj[%py.misc.class_id%][%~5]!)"
+
+call rng.cmd :randomNumber 20
+set die=!errorlevel!
+
+:: Always miss on a 1, always hit on a 20
+if "!die!"=="1" exit /b 1
+if "!die!"=="20" exit /b 0
+
+if %hit_chance% GTR 0 (
+    call rng.cmd :randomNumber %hit_chance%
+    if !errorlevel! GTR %~4 exit /b 0
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Decreases player's hit points and sets the character_is_dead flag if needed
+::
+:: Arguments: %1 - The amount of damage being taken
+::            %2 - The name of the creature that killed the player
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerTakesHit
+set "damage=%~1"
+if %py.flags.invulnerability% GTR 0 set "damage=0"
+set /a py.misc.current_hp-=%damage%
+
+if %py.misc.current_hp% GEQ 0 (
+    call ui.cmd :printCharacterCurrentHitPoints
+    exit /b
+)
+
+if "%game.character_is_dead%"=="false" (
+    set "game.character_is_dead=true"
+    set "game.character_died_from=%~2"
+    set "game.total_winner=false"
+)
+
+set "dg.generate_new_level=true"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Search for hidden things
+::
+:: Arguments: %1 - The coordinates to search
+::            %2 - The chance of actually finding something
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerSearch
+if %py.flags.confused% GTR 0 set /a chance/=10
+set "cant_see=0"
+if %py.flags.blind% GTR 0 set "cant_see=1"
+call :playerNoLight && set "cant_see=1"
+if "%cant_see%"=="1" set /a chance/=10
+if %py.flags.image% GTR 0 set /a chance/=10
+
+call helpers.cmd :expandCoordName "%~1"
+for /L %%Y in (!%~1.y_dec!,1,!%~1.y_inc!) do (
+    for /L %%X in (!%1.x_dec!,1,!%~1.x_inc!) do (
+        REM This would be so much prettier if batch had a continue command
+        call rng.cmd :randomNumber 100
+        if !errorlevel! LSS %~2 (
+            set "t_id=!dg.floor[%%Y][%%X].treasure_id!"
+            if not "!t_id!"=="0" (
+                for /F "delims=" %%A in ("!t_id!") do (
+                    if "!game.treasure.list[%%A].category_id!"=="%TV_INVIS_TRAP%" (
+                        call identification.cmd :itemDescription "description" "game.treasure.list[%%A]" "true"
+                        call ui_io.cmd :printMessage "You have found !description!"
+                        call dungeon.cmd :trapChangeVisibility "%~1"
+                        call player_run.cmd :playerEndRunning
+                    ) else if "!game.treasure.list[%%A].category_id!"=="%TV_SECRET_DOOR%" (
+                        call ui_io.cmd :printMessage "You have found a secret door."
+                        call dungeon.cmd :trapChangeVisibility "%~1"
+                        call player_run.cmd :playerEndRunning
+                    ) else if "!game.treasure.list[%%A].category_id!"=="%TV_CHEST%" (
+                        set /a "is_trapped=!game.treasure.list[%%A].flags! & %config.treasure.chests.ch_trapped%"
+                        if !is_trapped! GTR 1 (
+                            call identification.cmd :spellItemIdentified "game.treasure.list[%%A]"
+                            if "!errorlevel!"=="1" (
+                                REM wtf how many layers deep am I going to nest here? This is EIGHT
+                                call identification.cmd :spellItemIdentifyAndRemoveRandomDescription "game.treasure.list[%%A]"
+                                call ui_io.cmd :printMessage "You have discovered a trap on the chest."
+                            ) else (
+                                call ui_io.cmd :printMessage "The chest is trapped."
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Computes the current weight limit
+::
+:: Arguments: None
+:: Returns:   The maximum weight that the player can carry
+::------------------------------------------------------------------------------
 :playerCarryingLoadLimit
-exit /b
+set /a weight_cap=!py.stats.used[%PlayerAttr.a_str%]! * %config.player.player_weight_cap% + %py.misc.weight%
+if !weight_cap! GTR 3000 set "weight_cap=3000"
+exit /b !weight_cap!
 
+::------------------------------------------------------------------------------
+:: Check to see if the player is strong enough for the current pack and weapon
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerStrength
+set "item=py.inventory[%PlayerEquipment.Wield%]"
+
+set "too_heavy=0"
+if not "!%item%.category_id!"=="%TV_NOTHING%" set too_heavy+=1
+set /a str_mult=!py.stats.used[%PlayerAttr.a_str%]!*15
+if !str_mult! LSS !%item%.weight! set /a too_heavy+=1
+
+if "!too_heavy!"=="2" (
+    if "%py.weapon_is_heavy%"=="false" (
+        call ui_io.cmd :printMessage "You have trouble wielding such a heavy weapon."
+        set "py.weapon_is_heavy=true"
+        call :playerRecalculateBonuses
+    )
+) else if "%py.weapon_is_heavy%"=="true" (
+    set "py.weapon_is_heavy=false"
+    if not "!%item%.category_id!"=="%TV_NOTHING%" (
+        call ui_io.cmd :printMessage "You are strong enough to wield your weapon."
+    )
+    call :playerRecalculateBonuses
+)
+set "too_heavy="
+
+call :playerCarryingLoadLimit
+set "limit=!errorlevel!"
+
+if !limit! LSS %py.pack.weight% (
+    set /a "limit=%py.pack.weight% / (!limit! + 1)"
+) else (
+    set "limit=0"
+)
+
+if not "%py.pack.heaviness%"=="!limit!" (
+    if %py.pack.heaviness% LSS !limit! (
+        call ui_io.cmd :printMessage "Your pack is so heavy that it slows you down."
+    ) else (
+        call ui_io.cmd :printMessage "You move more easily under the weight of your pack."
+    )
+    set /a speed_change=!limit!-%py.pack.heaviness%
+    call :playerChangeSpeed !speed_change!
+    set "py.pack.heaviness=!limit!"
+)
+
+set "py.flags.status&=~%config.player.status.py_str_wgt%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Checks to see if the player has a ring on their left hand
+::
+:: TODO: Remove this subroutine entirely
+::
+:: Arguments: None
+:: Returns:   0 if the player does not currently have a left ring equipped
+::            1 if the player is wearing a ring on their left
+::------------------------------------------------------------------------------
 :playerLeftHandRingEmpty
-exit /b
+if "!py.inventory[%PlayerEquipment.Left%].category_id!"=="%TV_NOTHING%" exit /b 0
+exit /b 1
 
+::------------------------------------------------------------------------------
+:: Checks to see if the player has a ring on their right hand
+::
+:: TODO: Remove this subroutine entirely
+::
+:: Arguments: None
+:: Returns:   0 if the player does not currently have a right ring equipped
+::            1 if the player is wearing a ring on their right
+::------------------------------------------------------------------------------
 :playerRightHandRingEmpty
-exit /b
+if "!py.inventory[%PlayerEquipment.Right%].category_id!"=="%TV_NOTHING%" exit /b 0
+exit /b 1
 
+::------------------------------------------------------------------------------
+:: Checks to see if the player has a weapon
+::
+:: TODO: Remove this subroutine entirely
+::
+:: Arguments: None
+:: Returns:   0 if the player does not currently have a weapon equipped
+::            1 if the player has either a main or auxiliary weapon
+::------------------------------------------------------------------------------
 :playerIsWieldingItem
-exit /b
+if "!py.inventory[%PlayerEquipment.Wield%].category_id!"=="%TV_NOTHING%" (
+    if "!py.inventory[%PlayerEquipment.Auxiliary%].category_id!"=="%TV_NOTHING%" (
+        exit /b 1
+    )
+)
+exit /b 0
 
+::------------------------------------------------------------------------------
+:: Checks to see if the player has a cursed item equipped
+::
+:: Arguments: %1 - The ID of the item to check
+:: Returns:   0 if the specified item is cursed
+::            1 if the specified item is not cursed
+::------------------------------------------------------------------------------
 :playerWornItemIsCursed
-exit /b
+call inventory.cmd :inventoryItemIsCursed "py.inventory[%~1]"
+exit /b !errorlevel!
 
+::------------------------------------------------------------------------------
+:: Removes a curse from a worn item
+::
+:: Arguments: %1 - The ID of the item to remove the curse from
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerWornItemRemoveCurse
+call inventory.cmd :inventoryItemRemoveCursed "py.inventory[%~1]"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Checks to see if the player can see in order to read
+::
+:: TODO: Merge with the same code in mage_spells.cmd
+::
+:: Arguments: None
+:: Returns:   0 if the player can see
+::            1 if the player is blind or otherwise in the dark
+::------------------------------------------------------------------------------
 :playerCanRead
-exit /b
+if %py.flags.blind% GTR 0 (
+    call ui_io.cmd :printMessage "You can't see to read your spell book."
+    exit /b 1
+)
+
+call :playerNoLight && (
+    call ui_io.cmd :printMessage "You have no light to read by."
+    exit /b 1
+)
+exit /b 0
 
 :lastKnownSpell
 exit /b
