@@ -430,7 +430,7 @@ if not "!flag_set!"=="0" (
     for /L %%A in (0,1,5) do (
         set /a "flag_stat=((1<<%%A) & !%~1.flags!)"
         if not "!flag_stat!"=="0" (
-            call player_stats.cmd :playerStatBoots %%A %amount%
+            call player_stats.cmd :playerStatBoost %%A %amount%
         )
     )
 )
@@ -924,35 +924,356 @@ call :playerNoLight && (
 )
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Get the index of the last spell in spells_learned_order[]
+::
+:: Arguments: None
+:: Returns:   The index of the last spell in spells_learned_order
+::------------------------------------------------------------------------------
 :lastKnownSpell
-exit /b
+for /L %%A in (0,1,31) do (
+    if "!py.flags.spells_learned_order[%%A]!"=="99" exit /b %%A
+)
+exit /b 0
 
+::------------------------------------------------------------------------------
+:: Determines which spells a player may learn
+::
+:: Arguments: None
+:: Returns:   An integer whose binary value is which spells can be learned
+::------------------------------------------------------------------------------
 :playerDetermineLearnableSpells
-exit /b
+set "spell_flag=0"
+set /a counter_dec=%py.pack.unique_items%-1
 
+for /L %%A in (0,1,%counter_dec%) do (
+    if "!py.inventory[%%A].category_id!"=="%TV_MAGIC_BOOK%" (
+        set /a "spell_flag|=!py.inventory[%%A].flags!"
+    )
+)
+exit /b %spell_flag%
+
+::------------------------------------------------------------------------------
+:: Gain spells when the player wants to
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerGainSpells
+if %py.flags.confused% GTR 0 (
+    call ui_io.cmd :printMessage "You are too confused."
+    exit /b
+)
+
+set "new_spells=%py.flags.new_spells_to_learn%"
+set "diff_spells=0"
+
+set /a class_dec=%py.misc.class_id%-1
+set "spells=magic_spells[%class_dec%]"
+
+:: Priests don't need light because they get spells from their god, so only
+:: fail when a blind player has mage spells
+if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.spell_type_mage%" (
+    call :playerCanRead || exit /b
+    set "stat=%PlayerAttr.a_int%"
+    set "offset=%config.spells.name_offset_spells%"
+) else (
+    set "stat=%PlayerAttr.a_wis%"
+    set "offset=%config.spells.name_offset_spells%"
+)
+
+call :lastKnownSpell
+set "last_known=!errorlevel!"
+
+if "%new_spells%"=="0" (
+    if "!stat!"=="%PlayerAttr.a_int%" (
+        call ui_io.cmd :printMessage "You can't learn any new spells."
+    ) else (
+        call ui_io.cmd :printMessage "You can't learn any new prayers."
+    )
+    set "game.player_free_turn=true"
+    exit /b
+)
+
+:: Determine which spells the player can learn
+if "!stat!"=="%PlayerAttr.a_int%" (
+    call :playerDetermineLearnableSpells
+    set "spell_flag=!errorlevel!"
+) else (
+    set "spell_flag=2147483647"
+)
+
+:: Clear bits for spells already learned
+set /a "spell_flag&=~%py.flags.spells_learnt%", "spell_id=0", "mask=1", "i=0"
+
+:playerGainSpellsWhileLoop
+if "!spell_flag!"=="0" goto :playerGainSpellsAfterWhileLoop
+set /a "mask<<=1"
+set /a "masked_flag=!spell_flag!&!mask!"
+if not "!masked_flag!"=="0" (
+    set /a "spell_flag&=~!mask!"
+    if !%spells%[%i%].level_required! LEQ %py.misc.level% (
+        set "spell_bank[!spell_id!]=%i%"
+        set /a spell_id+=1
+    )
+)
+set /a i+=1
+goto :playerGainSpellsWhileLoop
+
+:playerGainSpellsAfterWhileLoop
+if !new_spells! GTR !spell_id! (
+    call ui_io.cmd :printMessage "You seem to be missing a book."
+    set /a diff_spells=!new_spells!-!spell_id!
+    set "new_spells=!spell_id!"
+)
+
+if "!new_spells!"=="0" (
+    goto :noNewSpells
+) else if "%stat%"=="%PlayerAttr.a_int%" (
+    call ui_io.cmd :terminalSaveScreen
+    call ui.cmd :displaySpellsList "spell_bank" "!spell_id!" "false" "-1"
+
+    call :getNewSpell
+) else (
+    call :getNewPrayer
+)
+
+:noNewSpells
+set /a py.flags.new_spells_to_learn=!new_spells!+!diff_spells!
+if "%py.flags.new_spells_to_learn%"=="0" (
+    set /a "py.flags.status|=%config.player.status.py_study%"
+)
+
+:: Set the mana for the first level characters when they learn their first spell
+if "%py.misc.mana%"=="0" (
+    call :playerGainMana !stat!
+)
 exit /b
 
+:getNewSpell
+if "!new_spells!"=="0" exit /b
+call ui.cmd :getMenuItemId "Learn which spell?" "query" || exit /b
+set /a c=!query!-1
+set "is_valid_spell=0"
+if !c! GTR 0 set /a is_valid_spell+=1
+if !c! LSS !spell_id! set /a is_valid_spell+=1
+if !c! LSS 22 set /a is_valid_spell+=1
+if "!is_valid_spell!"=="3" (
+    set /a new_spells-=1
+    set /a "py.flags.spells_learnt|=1<<!spell_bank[%c%]!"
+    set "py.flags.spells_learned_order[!last_known!]=!spell_bank[%c%]!"
+    set /a last_known+=1
+
+    set /a counter_dec=!spell_id!-1
+    for /L %%C in (!c!,1,!counter_dec!) do (
+        set /a d=%%C+1
+        for /f "delims=" %%D in ("!d!") do (
+            set "spell_bank[%%C]=!spell_bank[%%D]!"
+        )
+    )
+    set "c=!counter_dec!"
+    set /a spell_id-=1
+    call ui_io.cmd :eraseLine "!d!;31"
+    call ui.cmd :displaySpellsList "spell_bank" "!spell_id!" "false" "-1"
+) else (
+    call ui_io.cmd :terminalBellSound
+)
+goto :getNewSpell
+
+:getNewPrayer
+if "!new_spells!"=="0" exit /b
+call rng.cmd :randomNumber !spell_id!
+set /a id=!errorlevel!-1
+set /a "py.flags.spells_learnt|=1<<!spell_bank[%id%]!"
+set "py.flags.spells_learned_order[!last_known!]=!spell_bank[%id%]!"
+set /a last_known+=1
+
+set /a spell_index=!spell_bank[%id%]!+!offset!
+call ui_io.cmd :printMessage "You have learned the prayer of !spell_names[%spell_index%]!"
+set /a counter_dec=!spell_id!-1
+for /L %%C in (!id!,1,!counter_dec!) do (
+    set /a d=%%C+1
+    for /f "delims=" %%D in ("!d!") do (
+        set "spell_bank[%%C]=!spell_bank[%%D]!"
+    )
+)
+set /a spell_id-=1
+set /a new_spells-=1
+goto :getNewPrayer
+
+::------------------------------------------------------------------------------
+:: Determine the player's new maximum mana level
+::
+:: Arguments: %1 - Either Wisdom or Intelligence, depending on player's class
+:: Returns:   The new maximum amount of mana, based on level
+::------------------------------------------------------------------------------
 :newMana
-exit /b
+set /a levels=%py.misc.level% - !classes[%py,misc.class_id%].min_level_for_spell_casting! + 1
+call player_stats.cmd :playerStatAdjustmentWisdomIntelligence "%~1"
+if !errorlevel! LSS 3 (
+    set "new_level=!levels!"
+) else if "!errorlevel!"=="3" (
+    set /a new_level=3 * !levels! / 2
+) else if "!errorlevel!"=="4" (
+    set /a new_level=2 * !levels!
+) else if "!errorlevel!"=="5" (
+    set /a new_level=5 * !levels! / 2
+) else if "!errorlevel!"=="6" (
+    set /a new_level=3 * !levels!
+) else if "!errorlevel!"=="7" (
+    set /a new_level=4 * !levels!
+) else (
+    set "new_level=0"
+)
+exit /b !new_level!
 
+::------------------------------------------------------------------------------
+:: Gain some mana if you know at least one spell
+::
+:: Arguments: %1 - Either Wisdom or Intelligence, depending on player's class
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerGainMana
+if not "%py.flags.spells_learnt%"=="0" (
+    call :newMana "%~1"
+    set "new_mana=!errorlevel!"
+
+    REM Increment mana by one so that first-level characters have 2 mana
+    if !new_mana! GTR 0 set /a new_mana+=1
+
+    if not "%py.misc.mana%"=="!new_mana!" (
+        if not "%py.misc.mana%"=="0" (
+            set /a "value=((%py.misc.current_mana << 16) + %py.misc.current_mana_fraction%) / %py.misc.mana% * !new_mana!"
+            set /a "py.misc.current_mana=!value!>>16"
+            set /a "py.misc.current_mana_fraction=!value! & 0xFFFF"
+        ) else (
+            set "py.misc.current_mana=!new_mana!"
+            set "py.misc.current_mana_fraction=0"
+        )
+
+        set "py.misc.mana=!new_mana!"
+        set /a "py.flags.status|=%config.player.status.py_mana%"
+    )
+) else if not "%py.misc.mana%"=="0" (
+    set "py.misc.mana=0"
+    set "py.misc.current_mana=0"
+    set /a "py.flags.status|=%config.player.status.py_mana%"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Deal critical damage
+::
+:: Arguments: %1 - The weight of the weapon
+::            %2 - The player's plus_to_hit
+::            %3 - The base damage of the weapon
+::            %4 - The ID of the attack type being done
+:: Returns:   The total amount of damage done by the player
+::------------------------------------------------------------------------------
 :playerWeaponCriticalBlow
-exit /b
+set "weapon_weight=%~1"
+set "critical=%~3"
+set /a crit_chance=%~1 + 5 * %~2 + (!class_level_adj[%py.misc.class_id%][%~4]! * %py.misc.level%)
+call rng.cmd :randomNumber 5000
+if !errorlevel! LEQ !crit_chance! (
+    call rng.cmd :randomNumber 650
+    set /a weapon_weight+=!errorlevel!
 
+    if !weapon_weight! LSS 400 (
+        set /a critical=2 * %~3 + 5
+        call ui_io.cmd :printMessage "It was a good hit^^! (x2 damage)"
+    ) else if !weapon_weight! LSS 700 (
+        set /a critical=3 * %~3 + 10
+        call ui_io.cmd :printMessage "It was an excellent hit^^! (x3 damage)"
+    ) else if !weapon_weight! LSS 900 (
+        set /a critical=4 * %~3 + 15
+        call ui_io.cmd :printMessage "It was a superb hit^^! (x4 damage)"
+    ) else (
+        set /a critical=5 * %~3 + 20
+        call ui_io.cmd :printMessage "It was a *GREAT* hit^^! (x5 damage)"
+    )
+)
+exit /b !critical!
+
+::------------------------------------------------------------------------------
+:: Saving throws for the player
+::
+:: Arguments: None
+:: Returns:   0 if the player makes their saving throw
+::            1 if the player fails to dodge, block, etc.
+::------------------------------------------------------------------------------
 :playerSavingThrow
-exit /b
+set /a class_level_adjustment=!class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.save%]! * %py.misc.level% / 3
+call player_stats.cmd :playerStatAdjustmentWisdomIntelligence "%PlayerAttr.a_wis%"
+set /a saving=%py.misc.saving_throw% + !errorlevel! + !class_level_adjustment!
 
+call rng.cmd :randomNumber 100
+if !errorlevel! LEQ !saving! exit /b 0
+exit /b 1
+
+::------------------------------------------------------------------------------
+:: Gives the player experience points for killing monsters
+::
+:: Arguments: %1 - A reference to the monster that was killed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerGainKillExperience
+set /a exp=!%~1.kill_exp_value! * !%~1.level!
+set /a "quotient=%exp% / %py.misc.level%", "remainder=%exp% %% %py.misc.level%"
+
+set /a remainder*=65536
+set /a remainder/=%py.misc.level%
+set /a remainder+=%py.misc.exp_fraction%
+
+if %remainder% GEQ 65536 (
+    set /a quotient+=1, py.misc.exp_fraction=%remainder%-65536
+) else (
+    set "py.misc.exp_fraction=%remainder%"
+)
+set /a py.misc.exp+=%quotient%
 exit /b
 
+::------------------------------------------------------------------------------
+:: Calculate the number of times a player can hit with their weapon
+:: TODO: Refactor to return %4
+::
+:: Arguments: %1 - The ID of the weapon used
+::            %2 - The weight of the weapon
+::            %3 - The name of the variable that stores the number of blows
+::            %4 - The name of the variable that stores the total to_hit
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerCalculateToHitBlows
+if not "%~1"=="%TV_NOTHING%" (
+    call player_stats.cmd :playerAttackBlows "%~2" "%~4"
+    set "blows=!errorlevel!"
+) else (
+    set "blows=2"
+    set "total_to_hit=-3"
+)
+
+if %~1 GEQ %TV_SLING_AMMO% (
+    if %~1 LEQ %TV_SPIKE% (
+        set /blows=1
+    )
+)
+set /a total_to_hit+=%py.misc.plusses_to_hit%
 exit /b
 
+::------------------------------------------------------------------------------
+:: Calculates the player's base to_hit
+::
+:: Arguments: %1 - whether or not the creature being attacked is lit
+::            %2 - total_to_hit from :playerCalculateToHitBlows
+:: Returns:   The player's base to_hit
+::------------------------------------------------------------------------------
 :playerCalculateBaseToHit
-exit /b
+if "%~1"=="true" exit /b %py.misc.bth%
+
+set /a bth=%py.misc.bth% / 2
+set /a bth-=%~2 * (%bth_per_plus_to_hit_adjust% - 1)
+set /a bth-=%py.misc.level% * !class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.bth%]! / 2
+exit /b %bth%
 
 :playerAttackMonster
 exit /b
