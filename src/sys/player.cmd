@@ -1275,7 +1275,106 @@ set /a bth-=%~2 * (%bth_per_plus_to_hit_adjust% - 1)
 set /a bth-=%py.misc.level% * !class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.bth%]! / 2
 exit /b %bth%
 
+::------------------------------------------------------------------------------
+:: Player attacks a monster
+::
+:: Arguments: %1 - The coordinates of the monster being attacked
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerAttackMonster
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set "creature_id=!dg.floor[%%A][%%B].creature_id!"
+)
+set "monster=monsters[%creature_id%]"
+set "creature=creatures_list[%creature_id%]"
+set "item=py.inventory[%PlayerEquipment.Wield%]"
+set "%monster%.sleep_count=0"
+
+:: Does the player know what they're fighting?
+if "!%monster%.lit!"=="false" (
+    set "name=it"
+) else (
+    set "name=the !%creature%.name!"
+)
+call :playerCalculateToHitBlows !%item%.category_id! !%item%.weight! blows total_to_hit
+call :playerCalculateBaseToHit !%monster%.to_hit! %total_to_hit%
+
+for /L %%A in (%blows%,-1,1) do (
+    call :blowLoop || exit /b
+)
+exit /b
+
+:blowLoop
+call :playerTestBeingHit %base_to_hit% %py.misc.level% %total_to_hit% !%creature%.ac! %PlayerClassLevelAdj.bth%
+if "!errorlevel!"=="1" exit /b 0
+
+call ui_io.cmd :printMessage "You hit !name!."
+
+if not "!%item%.category_id!"=="%TV_NOTHING%" (
+    call dice.cmd :diceRoll !%item%.damage.dice! !%item%.damage.sides!
+    call player_magic.cmd :itemMagicAbilityDamage "%item%" !errorlevel! !%monster%.creature_id!
+    call :playerWeaponCriticalBlow !%item%.weight! %total_to_hit% !errorlevel! %PlayerClassLevelAdj.bth%
+    set "damage=!errorlevel!"
+) else (
+    call :playerWeaponCriticalBlow 1 0 1 %PlayerClassLevelAdj.bth%
+    set "damage=!errorlevel!"
+)
+
+set /a damage+=%py.misc.plusses_to_damage%
+if %damage% LSS 0 set "damage=0"
+
+if "%py.flags.confuse_monster%"=="true" (
+    set "py.flags.confuse_monster=false"
+    call ui_io.cmd :printMessage "Your hands stop glowing."
+
+    set "is_unaffected=0"
+    set /a "cant_sleep=!%creature%.defenses! & %config.monsters.defense.cd_no_sleep%"
+    if not "!cant_sleep!"=="0" set "is_unaffected=1"
+    call rng.cmd :randomNumber %mon_max_levels%
+    if !errorlevel! LSS !%creature%.level! set "is_unaffected=1"
+
+    if "!is_unaffected!"=="1" (
+        set "msg=!name! is unaffected."
+    ) else (
+        set "msg=!name! appears confused."
+        if not "!%monster%.confused_amount!"=="0" (
+            set /a %monster%.confused_amount+=3
+        ) else (
+            call rng.cmd :randomNumber 16
+            set /a %monster%.confused_amount=!errorlevel!+2
+        )
+    )
+    call ui_io.cmd :printMessage "!msg!"
+
+    if "!%monster%.lit!"=="true" (
+        call rng.cmd :randomNumber 4
+        if "!errorlevel!"=="1" (
+            set /a "creature_recall[!%monster%.creature_id!].defenses|=!%creature%.defenses! & %config.monsters.defense.cd_no_sleep%"
+        )
+    )
+)
+
+call monster.cmd :monsterTakeHit %creature_id% !damage!
+if !errorlevel! GEQ 0 (
+    call ui_io.cmd :printMessage "You have slain !name!."
+    call ui.cmd :displayCharacterExperience
+    exit /b 1
+)
+
+if !%item%.category_id! GEQ %TV_SLING% (
+    if !%item%.category_id! LEQ %TV_SPIKE% (
+        set /a %item%.items_count-=1
+        set /a py.pack.weight-=!%item%.weight!
+        set /a "py.flags.status|=%config.player.status.py_str_wgt%"
+
+        if "!%item%.items_count!"=="0" (
+            set /a py.equipment_count-=1
+            call :playerAdjustBonusesForItem "%item%" -1
+            call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_nothing%" "%item%"
+            call :playerRecalculateBonuses
+        )
+    )
+)
 exit /b
 
 :playerLockPickingSkill
