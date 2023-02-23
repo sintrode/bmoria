@@ -1377,10 +1377,63 @@ if !%item%.category_id! GEQ %TV_SLING% (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Establishes the player's ability to pick a lock
+::
+:: Arguments: None
+:: Returns:   The player's lockpicking skill
+::------------------------------------------------------------------------------
 :playerLockPickingSkill
-exit /b
+set "skill=%py.misc.disarm%"
+set /a skill+=2
 
+call player_stats.cmd :playerDisarmAdjustment
+set /a skill*=!errorlevel!
+
+:: TODO: Decide if DEX should influence lockpicking rather than INT
+call player_stats.cmd :playerStatAdjustmentWisdomIntelligence %PlayerAttr.a_int%
+set /a skill+=!errorlevel!
+
+set /a skill+=!class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.disarm%]! * %py.level% / 3
+exit /b !skill!
+
+::------------------------------------------------------------------------------
+:: Opens a closed door
+::
+:: Arguments: %1 - The coordinates of the door
+:: Returns:   None
+::------------------------------------------------------------------------------
 :openClosedDoor
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do set "tile=dg.floor[%%A][%%B]"
+set "t_id=!%tile%.treasure_id!"
+set "item=game.treasure.list[%t_id%]"
+if !%item%.misc_use! GTR 0 (
+    if %py.flags.confused% GTR 0 (
+        call ui_io.cmd :printMessage "You are too confused to pick the lock."
+    ) else (
+        call :playerLockPickingSkill
+        set /a can_pick=!errorlevel!-!%item%.misc_use!
+        call rng.cmd :randomNumber 100
+        if !can_pick! GTR !errorlevel! (
+            call ui_io.cmd :printMessage "You have picked the lock."
+            set /a py.misc.exp+=1
+            call ui.cmd :displayCharacterExperience
+            set "%item%.misc_use=0"
+        ) else (
+            call ui_io.cmd :printMessage "You failed to pick the lock."
+        )
+    )
+) else if !%item%.misc_use! LSS 0 (
+    call ui_io.cmd :printMessage "It appears to be stuck."
+)
+
+if "!%item%.misc_use!"=="0" (
+    call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_open_door%" "game.treasure.list[%t_id%]"
+    set "%tile%.feature_id=%TILE_CORR_FLOOR%"
+    set "coord=%~1"
+    call dungeon.cmd :dungeonLiteSpot "coord"
+    set "game.command_count=0"
+)
 exit /b
 
 :openClosedChest
