@@ -900,7 +900,7 @@ exit /b !errorlevel!
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :playerWornItemRemoveCurse
-call inventory.cmd :inventoryItemRemoveCursed "py.inventory[%~1]"
+call inventory.cmd :inventoryItemRemoveCurse "py.inventory[%~1]"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -1436,13 +1436,141 @@ if "!%item%.misc_use!"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Opens a closed chest
+::
+:: Arguments: %1 - The coordinates of the chest
+:: Returns:   None
+::------------------------------------------------------------------------------
 :openClosedChest
+set "coord=%~1"
+for /f "tokens=1,2 delims=;" %%A in ("%coord%") do set "tile=dg.floor[%%A][%%B]"
+set "t_id=!%tile%.treasure_id!"
+set "item=game.treasure.list[%t_id%]"
+set "success=false"
+
+set /a "is_locked=!%item%.flags! & %config.treasure.chests.ch_locked%"
+if not "%is_locked%"=="0" (
+    if %py.flags.confused% GTR 0 (
+        call ui_io.cmd :printMessage "You are too confused to pick the lock."
+    ) else (
+        call :playerLockPickingSkill
+        set /a can_pick=!errorlevel!-!%item%.depth_first_found!
+        call rng.cmd :randomNumber 100
+        if !can_pick! GTR !errorlevel! (
+            call ui_io.cmd :printMessage "You have picked the lock."
+            set /a py.misc.exp+=!%item%.depth_first_found!
+            call ui.cmd :displayCharacterExperience
+            set "success=true"
+        ) else (
+            call ui_io.cmd :printMessageNoCommandInterrupt "You failed to pick the lock."
+        )
+    )
+) else (
+    set "success=true"
+)
+
+if "%success%"=="true" (
+    set /a "%item%.flags&=~%config.treasure.chest.ch_locked%"
+    set "%item%.special_name_id=%SpecialNameIds.sn_empty%"
+    call identification.cmd :spellItemIdentifyAndRemoveRandomDescription "%item%"
+    set "%item%.cost=0"
+)
+
+:: Check to see if chest is still trapped
+set /a "is_locked=!%item%.flags! & %config.treasure.chests.ch_locked%"
+if not "%is_locked%"=="0" exit /b
+call player_traps.cmd :chestTrap "%coord%"
+
+:: Chest treasure is allocated as if a creature had been killed.
+:: Clear the cursed chest/monster win flag so that people cannot
+:: win by opening a cursed chest.
+if not "!%tile%.treasure_id!"=="0" (
+    call inventory.cmd :inventoryItemRemoveCurse "game.treasure.list[%t_id%]"
+    call monster.cmd :monsterDeath "%coord%" "!game.treasure.list[%t_id%].flags!"
+    set "game.treasure.list[%t_id%].flags=0"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Opens a closed door or chest
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerOpenClosedObject
+call game.cmd :getDirectionWithMemory "CNIL" "dir" || exit /b
+
+set "coord=%py.pos.y%;%py.pos.x%"
+call :playerMovePosition "%dir%" "coord"
+set "no_object=false"
+for /f "tokens=1,2 delims=;" %%A in ("%coord%") do set "tile=dg.floor[%%A][%%B]"
+set "t_id=!%tile%.treasure_id!"
+set "item=game.treasure.list[%t_id%]"
+
+if not "!%tile%.treasure_id!"=="0" (
+    if !%tile%.creature_id! GTR 1 (
+        if "!%item%.category_id!"=="%TV_CLOSED_DOOR%" call identification.cmd :objectBlockedByMonster !%tile%.creature_id!
+        if "!%item%.category_id!"=="%TV_CLOSED_DOOR%" call identification.cmd :objectBlockedByMonster !%tile%.creature_id!
+    ) else (
+        if "!%item%.category_id!"=="%TV_CLOSED_DOOR%" (
+            call :openClosedDoor "%coord%"
+        ) else if "!%item%.category_id!"=="%TV_CLOSED_DOOR%" (
+            call :openClosedChest "%coord%"
+        ) else (
+            set "no_object=true"
+        )
+    )
+) else (
+    set "no_object=true"
+)
+
+if "%no_object%"=="true" (
+    set "game.player_free_turn=true"
+    call ui_io.cmd :printMessage "I do not see anything you can open there."
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Closes an open door
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerCloseDoor
+call game.cmd :getDirectionWithMemory "CNIL" "dir" || exit /b
+
+set "coord=%py.pos.y%;%py.pos.x%"
+call :playerMovePosition "%dir%" "coord"
+set "no_object=false"
+for /f "tokens=1,2 delims=;" %%A in ("%coord%") do set "tile=dg.floor[%%A][%%B]"
+set "t_id=!%tile%.treasure_id!"
+set "item=game.treasure.list[%t_id%]"
+
+if not "!%tile%.treasure_id!"=="0" (
+    if "!%item%.category_id!"=="%TV_OPEN_DOOR%" (
+        if "!%tile%.creature_id!"=="0" (
+            if "!%item%.misc_use!"=="0" (
+                call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_closed_door%" "%item%"
+                set "%tile%.feature_id=%TILE_BLOCKED_FLOOR%"
+                call dungeon.cmd :dungeonLiteSpot "coord"
+            ) else (
+                call ui_io.cmd :printMessage "The door appears to be broken."
+            )
+        ) else (
+            call identification.cmd :objectBlockedByMonster !%tile%.creature_id! 
+        )
+    ) else (
+        set "no_object=true"
+    )
+) else (
+    set "no_object=true"
+)
+
+if "%no_object%"=="true" (
+    set "game.player_free_turn=true"
+    call ui_io.cmd :printMessage "I do not see anything you can close there."
+)
 exit /b
 
 :playerTunnelWall
