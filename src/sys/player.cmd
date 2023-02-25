@@ -1573,32 +1573,333 @@ if "%no_object%"=="true" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Tunnel through a wall
+::
+:: Arguments: %1 - The coordinates of the wall being dug through
+::            %2 - The player's ability to dig
+::            %3 - The odds that the player will successfully dig
+:: Returns:   0 if the player tunnels through the wall
+::            1 if the wall persists
+::------------------------------------------------------------------------------
 :playerTunnelWall
-exit /b
+if %~2 LEQ %~3 exit /b 1
+set "coord=%~1"
+call helpers.cmd :expandCoordName "coord"
 
+set "tile=dg.floor[%coord.y%][%coord.x%]"
+if "!%tile%.perma_lit_room!"=="true" (
+    set "found=false"
+
+    for /L %%Y in (%coord.y_dec%,1,%coord.y_inc%) do (
+        set "break=false"
+        for /L %%X in (%coord.x_dec%,1,%coord.x_inc%) do (
+            if "!break!"=="false" (
+                if %%Y LSS %max_height% (
+                    if %%X LSS %max_width% (
+                        if !dg.floor[%%Y][%%X].feature_id! LEQ %max_cave_room% (
+                            set "%tile%.feature_id=!dg.floor[%%Y][%%X].feature_id!"
+                            set "%tile%.permanent_light=!dg.floor[%%Y][%%X].permanent_light!"
+                            set "found=true"
+                            set "break=true"
+                        )
+                    )
+                )
+            )
+        )
+    )
+
+    if "!found!"=="false" (
+        set "%tile%.feature_id=%TILE_CORR_FLOOR%"
+        set "%tile%.permanent_light=false"
+    )
+) else (
+    set "%tile%.feature_id=%TILE_CORR_FLOOR%"
+    set "%tile%.permanent_light=false"
+)
+
+set "%tile%.field_mark=false"
+
+set "is_lit=0"
+if "!%tile%.temporary_light!"=="true" set "is_lit=1"
+if "!%tile%.permanent_light!"=="true" set "is_lit=1"
+
+call ui.cmd :coordInsidePanel "%~1" && (
+    if "!is_lit!"=="1" (
+        if not "!%tile%.treasure_id!"=="0" (
+            call ui_io.cmd :printMessage "You have found something."
+        )
+    )
+)
+
+call dungeon.cmd :dungeonLiteSpot "coord"
+exit /b 0
+
+::------------------------------------------------------------------------------
+:: Check to see if the player is brave enough to attack the monster
+::
+:: Arguments: %1 - The coordinates of the monster to attack
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerAttackPosition
+if %py.flags.afrad% GTR 0 (
+    call ui_io.cmd :printMessage "You are too afraid."
+    exit /b
+)
+call :playerAttackMonster "%~1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Ensure that the player is not getting ahead of themselves
+::
+:: Arguments: %1 - The array of magic for the player's class
+::            %2 - Either the word "prayer" or the word "spell"
+::            %3 - 0 or 31 depending on the player's class
+:: Returns:   None
+::------------------------------------------------------------------------------
 :eliminateKnownSpellsGreaterThanLevel
+:: This is going to get weird since batch uses signed 32-bit integers
+:: and we just crossed that threshold so we're technically in negative numbers
+set /a mask=0x80000000
+
+for /L %%A in (31,-1,0) do (
+    set /a "masked_spell=!mask!&%py.flags.spells_learnt%"
+    if not "!masked_spell!"=="0" (
+        if !%~1[%%A].level_required! GTR %py.misc.level% (
+            set /a "py.flags.spells_learnt&=~!mask!"
+            set /a "py.flags.spells_forgotten|=!mask!"
+
+            set /a offset=%%A+%~3
+            for /f "delims=" %%B in ("!offset!") do (
+                call ui_io.cmd :printMessage "You have forgotten the %~2 of !spell_names[%%B]!."
+            )
+        ) else (
+            goto :eliminateKnownSpellsGreaterThanLevelBreak
+        )
+    )
+    set /a "mask>>=1"
+    if !mask! LSS 0 set /a mask*=-1
+)
+:eliminateKnownSpellsGreaterThanLevelBreak
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determine the number of spells that a player is allowed to know
+::
+:: Arguments: %1 - The player's INT or WIS, depending on their class
+:: Returns:   The number of spells that a player is allowed to know
+::------------------------------------------------------------------------------
 :numberOfSpellsAllowed
-exit /b
+set /a levels=%py.misc.level%-!classes[%py.misc.class_id%].min_level_for_spell_casting!+1
 
+call player_stats.cmd :playerStatAdjustmentWisdomIntelligence "%~1"
+if !errorlevel! LEQ 3 (
+    set /a allowed=!levels!
+) else if !errorlevel! LEQ 5 (
+    set /a allowed=3 * !levels! / 2
+) else if "!errorlevel!"=="6" (
+    set /a allowed=2 * !levels!
+) else if "!errorlevel!"=="7" (
+    set /a allowed=5 * !levels! / 2
+) else (
+    set "allowed=0"
+)
+exit /b !allowed!
+
+::------------------------------------------------------------------------------
+:: Count the number of known spells
+::
+:: Arguments: None
+:: Returns: The number of spells that the player knows
+::------------------------------------------------------------------------------
 :numberOfSpellsKnown
-exit /b
+set "known=0"
+set "mask=1"
+for /L %%A in (0,1,31) do (
+    set /a "known_spell=!mask! & %py.flags.spells_learnt%"
+    if not "!known_spell!"=="0" set /a known+=1
+    set /a "mask<<1"
+)
+exit /b !known!
 
+::------------------------------------------------------------------------------
+:: Remember forgotten spells in the order that they were learned
+::
+:: Arguments: %1 - The array of magic for the player's class
+::            %2 - The number of spells that the player is allowed to know
+::            %3 - The number of new spells to learn
+::            %4 - Either the word "spell" or the word "prayer"
+::            %5 - 0 or 31, depending on the player's class
+:: Returns:   The number of remaining spells to learn
+::------------------------------------------------------------------------------
 :rememberForgottenSpells
-exit /b
+set "allowed_spells=%~2"
+set "new_spells=%~3"
+for /L %%N in (0,1,32) do (
+    if %%N LSS !allowed_spells! (
+        if not "!new_spells!"=="0" (
+            if not "%py.flags.spells_forgotten%"=="0" (
+                set "order_id=!py.flags.spells_learned_order[%%N]!"
 
+                if "!order_id!"=="99" (
+                    set "mask=0"
+                ) else (
+                    set /a "mask=1<<!order_id!"
+                )
+
+                set /a "mask_forgotten=!mask! & !py.flags.spells_forgotten!"
+                if not "!mask_forgotten!"=="0" (
+                    set /a id_offset=!order_id!+!%~5
+                    for /f "tokens=1,2" %%O in ("!order_id! !id_offset!") do (
+                        if !%~1[%%~O].level_required! LEQ %py.misc.level% (
+                            set /a new_spells-=1
+                            set /a "py.flags.spells_forgotten&=~!mask!"
+                            set /a "py.flags.spells_learnt|=!mask!"
+
+                            call ui_io.cmd :printMessage "You have remembered the %~4 of !spell_names[%%~P]!."
+                        ) else (
+                            set /a allowed_spells+=1
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
+exit /b !new_spells!
+
+::------------------------------------------------------------------------------
+:: Determine which spells the player can learn
+::
+:: Arguments: %1 - An array of magic for the player's class
+::            %2 - The number of new spells to learn
+:: Returns:   None
+::------------------------------------------------------------------------------
 :learnableSpells
-exit /b
+set /a "spell_flag=0x7FFFFFFF & ~%py.flags.spells_learnt%"
+set "id=0"
+set "mask=1"
 
+for /L %%A in (0,1,30) do (
+    if not "!spell_flag!"=="0" (
+        set /a "masked_spell=!spell_flag! & !mask!"
+        if not "!masked_spell!"=="0" (
+            set /a "spell_flag&=~!mask!"
+            if !%~1[%%~A].level_required! LEQ %py.misc.level% (
+                set /a id+=1
+            )
+        )
+        set /a "mask<<=1"
+    )
+)
+
+if !new_spells! GTR !id! set "new_spells=!id!"
+exit /b !new_spells!
+
+::------------------------------------------------------------------------------
+:: Forget spells until there are no more spells to know
+::
+:: Arguments: %1 - The number of spells to forget, as a negative number
+::            %2 - Either the word "prayer" or the word "spell"
+::            %3 - Either 0 or 31, depending on the player's class
+:: Returns:   None
+::------------------------------------------------------------------------------
 :forgetSpells
+for /L %%A in (31,-1,0) do (
+    if not "!new_spells!"=="0" (
+        if not "!py.flags.spells_learnt!"=="0" (
+            set "order_id=!py.flags.spells_learned_order[%%~A]!"
+
+            if "!order_id!"=="99" (
+                set "mask=0"
+            ) else (
+                set /a "mask=1<<!order_id!"
+            )
+
+            set /a "masked_spell=!mask! & !py.flags.spells_learnt!"
+            if not "!masked_spell!"=="0" (
+                set /a "py.flags.spells_learnt&=~!mask!"
+                set /a "py.flags.spells_forgotten|=!mask!"
+                set /a new_spells+=1
+
+                set /a id_offset=!order_id!+%~3
+                for /f "delims=" %%B in ("!id_offset!") do (
+                    call ui_io.cmd :printMessage "You have forgotten the %~2 of !spell_names[%%~B]!."
+                )
+            )
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Calculate the number of spells that the player should have, and learn or
+:: forget spells until that number is met
+::
+:: Arguments: %1 - Either INT or WIS depending on the player's class
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerCalculateAllowedSpellsCount
+set /a class_dec=%py.misc.class_id%-1
+set "spell=magic_spells[%class_dec%]"
+
+if "%~1"=="%PlayerAttr.a_int%" (
+    set "magic_type_str=spell"
+    set "offset=%config.spells.name_offset_spells%"
+) else (
+    set "magic_type_str=prayer"
+    set "offset=%config.spells.name_offset_prayers%"
+)
+
+call :eliminateKnownSpellsGreaterThanLevel "%spell%" "%magic_type_str%" %offset%
+
+call :numberOfSpellsAllowed %~1
+set "num_allowed=!errorlevel!"
+call :numberOfSpellsKnown
+set "num_known=!errorlevel!"
+set /a new_spells=%num_allowed%-%num_known%
+
+if %new_spells% GTR 0 (
+    call :rememberForgottenSpells "%spell%" %num_allowed% %new_spells% "%magic_type_str%" %offset%
+
+    if !new_spells! GTR 0 (
+        call :learnableSpells "%spell%" !new_spells!
+        set "new_spells=!errorlevel!"
+    )
+) else if %new_spells% LSS 0 (
+    call :forgetSpells %new_spells% "%magic_type_str%" %offset%
+    set "new_spells=0"
+)
+
+if not "!new_spells!"=="!py.flags.new_spells_to_learn!" (
+    if !new_spells! GTR 0 (
+        if "!py.flags.new_spells_to_learn!"=="0" (
+            call ui_io.cmd :printMessage "You can learn some new %magic_type_str%s now."
+        )
+    )
+    set "py.flags.new_spells_to_learn=!new_spells!"
+    set /a "py.flags.status|=%config.player.status.py_study%"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Sets the player's final rank on the death screen
+::
+:: Arguments: %1 - The variable to store the title in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerRankTitle
+set /a level_dec=%py.misc.level%-1
+if %py.misc.level% LSS 1 (
+    set "%~1=Babe in arms"
+) else if %py.misc.level% LEQ %player_max_level% (
+    set "%~1=!class_rank_titles[%py.misc.class_id%][%level_dec%]!"
+) else (
+    call :playerIsMale
+    if "!errorlevel!"=="0" (
+        set "%~1=**KING**"
+    ) else (
+        set "%~1=**QUEEN**"
+    )
+)
 exit /b
