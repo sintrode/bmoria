@@ -81,8 +81,8 @@ exit /b 1
 ::------------------------------------------------------------------------------
 :: Wizards know everything
 ::
-:: Arguments: %1 - A reference to the recollection
-::            %2 - A reference to the creature being recalled
+:: Arguments: %1 - A reference to the creature's known characteristics
+::            %2 - A reference to the creature's actual characteristics
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :memoryWizardModeInit
@@ -329,8 +329,8 @@ exit /b
 :: resistances if the player has cast spells at the monster
 ::
 :: Arguments: %1 - frequent monster spells
-::            %2 - monster spell flags
-::            %3 - creature spell flags
+::            %2 - the creature's known spell flags
+::            %3 - the creature's actual spell flags
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :memoryMagicSkills
@@ -403,27 +403,420 @@ set "either_or="
 set "quite_freq="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display how hard the monster is to kill
+::
+:: Arguments: %1 - A reference to the creature being remembered
+::            %2 - The number of times this monster has been killed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :memoryKillDifficulty
+set /a kill_knowledge_threshold=304/(4+!%~1.level!)
+if %~2 LEQ !kill_knowledge_threshold! exit /b
+set "kill_knowledge_threshold="
+
+call :memoryPrint " It has an armor rating of !%~1.ac!"
+
+set /a "uses_max_hp=!%~1.defenses! & %config.monsters.defense.cd_max_hp%"
+set "hp_type="
+if not "%uses_max_hp%"=="0" set "hp_type= maximized"
+call :memoryPrint " and a%hp_type% life rating of !%~1.hit_die.dice!d!%~1.hit_die.sides!."
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display special abilities
+::
+:: Arguments: %1 - The movement type of the creature
+:: Returns:   None
+::------------------------------------------------------------------------------
 :memorySpecialAbilities
+set "known=true"
+set "move_type=%~1"
+
+set "i=0"
+:memorySpecialAbilitiesLoop
+set /a "special_move=!move_type! & %config.monsters.move.cm_special%"
+if "!special_move!"=="0" goto :memorySpecialAbilitiesAfterLoop
+
+:: TODO : Determine if I need to use %i% or !i!
+set /a "move_invisibly=!move_type! & (%config.monsters.move.cm_invisible% << %i%)"
+if not "!move_invisibly!"=="0" (
+    set /a "move_type&=~(%config.monsters.move.cm_invisible% << %i%)"
+
+    if "!known!"=="true" (
+        call :memoryPrint " It can "
+        set "known=false"
+    ) else if not "!special_move!"=="0" (
+        call :memoryPrint ", "
+    ) else (
+        call :memoryPrint " and "
+    )
+    call :memoryPrint "!recall_description_move[%i%]!"
+)
+
+set /a i+=1
+goto :memorySpecialAbilitiesLoop
+
+:memorySpecialAbilitiesAfterLoop
+if "!known!"=="false" call :memoryPrint "."
+
+:: Cleanup
+for %%A in (known i move_type special_move move_invisibly) do set "%%~A="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display any known special weaknesses
+::
+:: Arguments: %1 - The creature's defenses flag
+:: Returns:   None
+::------------------------------------------------------------------------------
 :memoryWeaknesses
+set "known=true"
+set "defense=%~1"
+
+set "i=0"
+:memoryWeaknessesLoop
+set /a "def_weakness=!defense! & %config.monsters.defense.cd_weakness%"
+if "!def_weakness!"=="0" goto :memoryWeaknessesAfterLoop
+
+set /a "frost_defense=!defense! & (%config.monsters.defense.cd_frost% << %i%)"
+if not "!frost_defense!"=="0" (
+    set /a "defense&=!(%config.monsters.defense.cd_frost% << %i%)"
+
+    if "!known!"=="true" (
+        call :memoryPrint " It is susceptible to "
+        set "known=false"
+    ) else if not "!frost_defense!"=="0" (
+        call :memoryPrint ", "
+    ) else (
+        call :memoryPrint " and "
+    )
+    call :memoryPrint "!recall_description_weakness[%i%]!"
+)
+
+set /a i+=1
+goto :memoryWeaknessesLoop
+
+:memoryWeaknessesAfterLoop
+if "!known!"=="false" call :memoryPrint "."
+
+:: Cleanup
+for %%A in (known i frost_defense defense def_weakness) do set "%%~A="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display the creature's awareness
+::
+:: Arguments: %1 - A reference to the creature's actual characteristics
+::            %2 - A reference to the creature's known characteristics
+:: Returns:   None
+::------------------------------------------------------------------------------
 :memoryAwareness
+set "memorable=0"
+set /a square_wake=!%~2.wake!*!%~2.wake!
+if !square_wake! GTR !%~1.sleep_counter! set "memorable=1"
+if "!%~2.ignore!"=="32767" set "memorable=1"
+if "!%~1.sleep_counter!"=="0" if !%~2.kills! GEQ 10 set "memorable=1"
+
+if "!memorable!"=="1" (
+    call :memoryPrint " It "
+    if !%~1.sleep_counter! GTR 200 (
+        call :memoryPrint "prefers to ignore"
+    ) else if !%~1.sleep_counter! GTR 95 (
+        call :memoryPrint "pays very little attention to"
+    ) else if !%~1.sleep_counter! GTR 75 (
+        call :memoryPrint "pays little attention to"
+    ) else if !%~1.sleep_counter! GTR 45 (
+        call :memoryPrint "tends to overlook"
+    ) else if !%~1.sleep_counter! GTR 25 (
+        call :memoryPrint "takes quite a while to see"
+    ) else if !%~1.sleep_counter! GTR 10 (
+        call :memoryPrint "takes a while to see"
+    ) else if !%~1.sleep_counter! GTR 5 (
+        call :memoryPrint "is fairly observant of"
+    ) else if !%~1.sleep_counter! GTR 3 (
+        call :memoryPrint "is observant of"
+    ) else if !%~1.sleep_counter! GTR 1 (
+        call :memoryPrint "is very observant of"
+    ) else if !%~1.sleep_counter! NEQ 0 (
+        call :memoryPrint "is vigilant for"
+    ) else (
+        call :memoryPrint "is ever vigilant for"
+    )
+
+    call :memoryPrint " intruders, which it may notice from !%~1.area_affect_radius! feet."
+)
+
+:: Cleanup
+set "memorable="
+set "square_wake="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display what the creature might carry
+::
+:: Arguments: %1 - The creature's actual movement flags
+::            %2 - The creature's known movement flags
+:: Returns:   None
+::------------------------------------------------------------------------------
 :memoryLootCarried
+set /a "carries_gold=%~2 & %config.monsters.move.cm_carry_gold%"
+set /a "carries_obj=%~2 & %config.monsters.move.cm_carry_obj%"
+if "!carries_gold!"=="0" if "!carries_treasure!"=="0" exit /b
+
+call :memoryPrint " It may"
+set /a "carrying_chance=(%~2 & %config.monsters.move.cm_treasure%) >> %config.monsters.move.cm_tr_shift%"
+set /a "carries_treasure=%~1 & %config.monsters.move.cm_treasure%"
+set /a "carries_small_objects=%~2 & %config.monsters.move.cm_small_obj%"
+if "%carrying_chance%"=="1" (
+    if "%carries_treasure%"=="%config.monsters.move.cm_60_random%" (
+        call :memoryPrint " sometimes"
+    ) else (
+        call :memoryPrint " often"
+    )
+) else if "%carrying_chance%"=="2" (
+    if "%carries_treasure%"=="%config.monsters.move.cm_60_random%" call :memoryPrint " often"
+    if "%carries_treasure%"=="%config.monsters.move.cm_90_random%" call :memoryPrint " often"
+)
+call :memoryPrint " carry"
+
+if not "!carries_small_objects!"=="0" set "p= small"
+set "p=!p! objects"
+
+if "%carrying_chance%"=="1" (
+    if not "!carries_small_objects!"=="0" (
+        set "p= a small object"
+    ) else (
+        set " an object"
+    )
+) else if "%carrying_chance%"=="2" (
+    call :memoryPrint " one or two"
+) else (
+    call :memoryPrint " up to %carrying chance%"
+)
+
+if not "%carries_obj%"=="0" (
+    call :memoryPrint "!p!"
+    if not "%carries_gold%"=="0" (
+        call :memoryPrint " or treasure"
+        if %carrying_chance% GTR 1 call :memoryPrint "s"
+    )
+    call :memoryPrint "."
+) else if not "%carrying_chance%"=="1" (
+    call :memoryPrint " treasures."
+) else (
+    call :memoryPrint " treasure."
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display known attack stats
+::
+:: Arguments: %1 - A reference to the creature's known characteristics
+::            %2 - A reference to the creature's actual characteristics
+:: Returns:   None
+::------------------------------------------------------------------------------
 :memoryAttackNumberAndDamage
+set "known_attacks=0"
+for /L %%A in (0,1,3) do (
+    if not "!%~1.attacks[%%A]!"=="0" (
+        set /a known_attacks+=1
+    )
+)
+
+set "attack_count=0"
+set /a counter_dec=%MON_MAX_ATTACKS%-1
+for /L %%A in (0,1,%counter_dec%) do (
+    set "attack_id=!%~2.damage[%%A]!"
+    if "!attack_id!"=="0" goto :memoryAttackNumberAndDamageAfterLoop
+
+    REM Only print known attacks. The C code was using a bouncer pattern here,
+    REM but batch doesn't have a `continue` equivalent.
+    if not "!%~1.attacks[%%A]!"=="0" (
+        for /f "delims=" %%B in ("!attack_id!") do (
+            set "attack_type=!monster_attacks[%%~B].type_id!"
+            set "attack_description_id=!monster_attacks[%%~B].description_id!"
+            set "dice.dice=!monster_attacks[%%~B].dice.dice!"
+            set "dice.sides=!monster_attacks[%%~B].dice.sides!"
+        )
+        set /a attack_count+=1
+
+        if "!attack_count!"=="1" (
+            call :memoryPrint " It can "
+        ) else if "!attack_count!"=="!known_attacks!" (
+            call :memoryPrint ", and "
+        ) else (
+            call :memoryPrint ", "
+        )
+
+        if !attack_description_id! GTR 19 set "attack_description_id=0"
+        for /f "delims=" %%B in ("!attack_description_id!") do (
+            call :memoryPrint "!recall_description_attack_method[%%~B]!"
+        )
+
+        set /a "multidie_attack=0"
+        if not "!attack_type!"=="1" set "multidie_attack=1"
+        if !dice.dice! GTR 0 if !dice.sides! GTR 0 set "multidie_attack=1"
+        if "!multidie_attack!"=="1" (
+            call :memoryPrint " to "
+            if !attack_type! GTR 24 set "attack_type=0"
+            
+            for /f "delims=" %%B in ("!attack_type!") do (
+                call :memoryPrint "!recall_description_attack_type[%%~B]!"
+            )
+
+            if not "!dice.dice!"=="0" (
+                if not "!dice.sides!"=="0" (
+                    set /a "left_side=(4 + !%~2.level!) * !%~1.attacks[%%~A]!"
+                    set /a right_side=80*!dice.dice!*!dice.sides!
+                    if !left_side! GTR !right_side! (
+                        if "!attack_type!"=="19" (
+                            call :memoryPrint " by"
+                        ) else (
+                            call :memoryPrint " with damage"
+                        )
+
+                        call :memoryPrint " !dice.dice!d!dice.sides!"
+                    )
+                )
+            )
+        )
+    )
+)
+
+:memoryAttackNumberAndDamageAfterLoop
+if not "!attack_count!"=="0" (
+    call :memoryPrint "."
+) else if !known_attacks! GTR 0 (
+    if !%~1.attacks[0]! GEQ 10 (
+        call :memoryPrint " It has no physical attacks."
+    )
+) else (
+    call :memoryPrint " Nothing is known about its attack."
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Print out what the player has discovered about the monster
+::
+:: Arguments: %1 - The ID of the monster to remember
+:: Returns:   The value returned by getKeyInput so that the game knows if it
+::            needs to abort rather than continue
+::------------------------------------------------------------------------------
 :memoryRecall
+set "memory=creature_recall[%~1]"
+set "creature=creatures_list[%~1]"
+
+if "%game.wizard_mode%"=="true" (
+    call :copyMemory saved_memory "%memory%"
+    call :memoryWizardModeInit "%memory%" "%creature%"
+)
+
+set "roff_print_line=0"
+set /a "spells=!%memory%.spells! & !%creature%.spells! & ~%config.monsters.spells.cs_freq%"
+
+:: CM_WIN is always known to the player
+set /a "win_creature=!%creature%.movement! & %config.monsters.move.cm_win%"
+set /a "movement_type=!%memory%.movement! ^| %win_creature%"
+set /a "defense=!%memory%.defenses! & !%creature%.defenses!"
+
+call :memoryPrint "The !%creature%.name!:\n"
+
+set "known=false"
+call :memoryConflictHistory "!%memory%.deaths!" "!%memory%.kills!"
+call :memoryDepthFoundAt "!%creature%.level!" "!%memory%.kills!"
+call :memoryMovement "!movement_type!" "!%creature%.speed!" "!errorlevel!"
+if "!errorlevel!"=="0" set "known=true"
+
+:: Finish the paragraph with a period
+if "!known!"=="true" call :memoryPrint "."
+
+if not "!%memory%.kills!"=="0" (
+    call :memoryKillPoints "!%creature%.defenses!" "!%creature%.kill_exp_value!" "!%creature%.level!"
+)
+
+call :memoryMagicSkills "!spells!" "!%memory%.spells!" "!%creature%.spells!"
+call :memoryKillDifficulty "%creature%" "!%memory%.kills!"
+call :memorySpecialAbilities "!movement_type!"
+call :memoryWeaknesses "!defense!"
+
+set /a "warm_blooded=!defense! & %config.monsters.defense.cd_infra%"
+set /a "sleepless=!defense! & %config.monsters.defense.cd_no_sleep%"
+if not "!warm_blooded!"=="0" call :memoryPrint " It is warm blooded"
+if not "!sleepless!"=="0" (
+    if not "!warm_blooded!"=="0" (
+        call :memoryPrint ", and"
+    ) else (
+        call :memoryPrint " It"
+    )
+    call :memoryPrint " cannot be charmed or slept"
+)
+set "no_charm=0"
+if not "!sleepless!"=="0" set "no_charm=1"
+if not "!warm_blooded!"=="0" set "no_charm=1"
+if "!no_charm!"=="1" call :memoryPrint "."
+
+call :memoryAwareness "%creature%" "%memory%"
+call :memoryLootCarried "!%creature%.movement!" "!movement_type!"
+call :memoryAttackNumberAndDamage "%memory%" "%creature%"
+
+if not "%win_creature%"=="0" (
+    call :memoryPrint " Killing one of these wins the game^^!"
+)
+call :memoryPrint "\n"
+call ui_io.cmd :putStringClearToEOF "--pause--" "!roff_print_line!;0"
+
+if "%game.wizard_mode%"=="true" (
+    call :copyMemory "%memory%" "saved_memory"
+)
+
+:: Cleanup
+for %%A in (no_charm sleepless warm_blooded movement_type known) do (
+    set "%%A="
+)
+
+call ui_io.cmd :getKeyInput
+exit /b !errorlevel!
+
+:copyMemory
+for %%A in (movement spells kills deaths defenses wake ignore) do (
+    set "%~1.%%~A=!%~2.%%~A!"
+)
+set /a counter_dec=%MON_MAX_ATTACKS%-1
+for /L %%A in (0,1,%counter_dec%) do (
+    set "%~1.attacks[%%A]=!%~2.attacks[%%A]!"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Ask the user if they want to remember a monster
+:: TODO: refactor to not have everything inside of the loop
+::
+:: Arguments: %1 - Sprite character of the monster to recall
+:: Returns:   None
+::------------------------------------------------------------------------------
 :recallMonsterAttributes
-exit /b
+set "n=0"
+set /a counter_dec=%MON_MAX_ATTACKS%-1
 
+for /L %%A in (%counter_dec%,-1,0) do (
+    if "!creatures_list[%%A].sprite!"=="%~1" (
+        call :memoryMonsterKnown "creature_recall[%%A]"
+        if "!errorlevel!"=="0" (
+            if "!n!"=="0" (
+                call ui_io.cmd :getConfirmationWithAbort 40 "You recall those details?"
+                if not "!errorlevel!"=="1" exit /b
+
+                call ui_io.cmd :eraseLine "0;40"
+                call ui_io.cmd :terminalSaveScreen
+            )
+            set /a n+=1
+
+            call :memoryRecall %%A
+            set "query=!errorlevel!"
+            call ui_io.cmd :terminalRestoreScreen
+            if "!query!"=="-1" exit /b
+        )
+    )
+)
+exit /b
