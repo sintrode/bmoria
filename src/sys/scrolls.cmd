@@ -40,8 +40,29 @@ exit /b 0
 :inventoryItemIdOfCursedEquipment
 exit /b
 
+::------------------------------------------------------------------------------
+:: Enchants a weapon with bonuses to improve power
+::
+:: Arguments: None
+:: Returns:   0 if an item was supposed to be enchanted
+::            1 if the player tried to enchant nothing
+::------------------------------------------------------------------------------
 :scrollEnchantWeaponToHit
-exit /b
+set "item=py.inventory[%PlayerEquipment.wield%]"
+
+if "!%item%.category_id!"=="%TV_NOTHING%" exit /b 1
+
+call identification.cmd :itemDescription "desc" "%item%" "false"
+call ui_io.cmd :printMessage "Your %desc% glows faintly."
+
+call spells.cmd :spellEnchantItem "%item%.to_hit" 10
+if "!errorlevel!"=="0" (
+    call inventory.cmd :inventoryItemRemoveCurse "%item%"
+    call player.cmd :playerRecalculateBonuses
+) else (
+    call ui_io.cmd :printMessage "The enchantment failed."
+)
+exit /b 0
 
 :scrollEnchantWeaponToDamage
 exit /b
