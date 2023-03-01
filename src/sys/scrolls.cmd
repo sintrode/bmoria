@@ -60,7 +60,7 @@ if "!errorlevel!"=="0" (
     call inventory.cmd :inventoryItemRemoveCurse "%item%"
     call player.cmd :playerRecalculateBonuses
 ) else (
-    call ui_io.cmd :printMessage "The enchantment fails."
+    call ui_io.cmd :printMessage "The enchantment failed."
 )
 exit /b 0
 
