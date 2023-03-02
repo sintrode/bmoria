@@ -89,13 +89,6 @@ call player.cmd :playerWornItemIsCursed %PlayerEquipment.Body% && set "item_id=%
 call player.cmd :playerWornItemIsCursed %PlayerEquipment.Body% && set "item_id=%PlayerEquipment.Feet%"
 exit /b !item_id!
 
-::------------------------------------------------------------------------------
-:: Enchants a weapon with bonuses to improve likelihood of hitting
-::
-:: Arguments: None
-:: Returns:   0 if an item was supposed to be enchanted
-::            1 if the player tried to enchant nothing
-::------------------------------------------------------------------------------
 :scrollEnchantWeaponToHit
 set "item=py.inventory[%PlayerEquipment.wield%]"
 
