@@ -543,15 +543,187 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :monsterOpenDoor
+set "t_id=!%~1.treasure_id!"
+set "item=game.treasure.list[%t_id%]"
+
+set /a "can_open_doors=%~3 & %config.monsters.move.cm_open_door%"
+if not "!can_open_doors!"=="0" (
+    set "door_is_stuck=false"
+    if "!%item%.category_id!"=="%TV_CLOSED_DOOR%" (
+        set "%~4=true"
+
+        set /a "rnd_misc_left=(%~2+1)*(50-!%item%.misc_use!)"
+        set /a "rnd_misc_right=%~2-10-!%item%.misc_use!"
+        if "!%item%.misc_use!"=="0" (
+            REM Closed doors
+            set "%~5=true"
+        ) else if !%item%.misc_use! GTR 0 (
+            REM Locked doors
+            call rng.cmd :randomNumber !rnd_misc_left!
+            if !errorlevel! LSS !rnd_misc_right! (
+                set "%item%.misc_use=0"
+            )
+        ) else if !%item%.misc_use! LSS 0 (
+            REM Stuck doors
+            call rng.cmd :randomNumber !rnd_misc_left!
+            if !errorlevel! LSS !rnd_misc_right! (
+                call ui_io.cmd :printMessage "You hear a door burst open."
+                call player.cmd :playerDisturb 1 0
+                set "door_is_stuck=true"
+                set "%~5=true"
+            )
+        )
+    ) else if "!%item%.category_id!"=="%TV_SECRET_DOOR%" (
+        set "%~4=true"
+        set "%~5=true"
+    )
+
+    if "!%~5!"=="true" (
+        REM KNOCK KNOCK OPEN UP THE DOOR IT'S REAL
+        call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_open_door%" "%item%"
+        if "!door_is_stuck!"=="true" (
+            call rng.cmd :randomNumber 2
+            set /a %item%.misc_use=1-!errorlevel!
+        )
+        set "!%~1.feature_id!=%TILE_CORR_FLOOR%"
+        set "coord=%~7"
+        call dungeon.cmd :dungeonLiteSpot "coord"
+        call ui_io.cmd :printMessage "You hear a door burst open."
+        call player.cmd :playerDisturb 1 0
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Check to see if a Glyph of Warding Protection was broken, which destroys any
+:: monster that crosses through its threshold
+::
+:: Arguments: %1 - The ID of the creature that is approaching the glyph
+::            %2 - The creature's movement flags
+::            %3 - A variable that stores whether the creature moves
+::            %4 - A variable that stores whether the creature turns
+::            %5 - The coordinates of the creature
+:: Returns:   None
+::------------------------------------------------------------------------------
 :glyphOfWardingProtection
+call rng.cmd :randomNumber %config.treasure.objects_rune_protection%
+if !errorlevel! LSS !creatures_list[%~1].level! (
+    for /f "tokens=1,2 tokens=;" %%A in ("%~5") do (
+        if "%%~A"=="%py.pos.y%" (
+            if "%%~B"=="%py.pos.x%" (
+                call ui_io.cmd :printMessage "The rune of protection is broken^^!"
+            )
+        )
+    )
+    set "coord=%~5"
+    call dungeon.cmd :dungeonDeleteObject "coord"
+    exit /b
+)
+
+set "%~3=false"
+
+set /a "is_attack_only=%~2 & %config.monsters.move.cm_attack_only%"
+if not "!is_attack_only!"=="0" (
+    set "%~4=true"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Code for the monster moving towards the player and interacting with things
+:: along its path
+::
+:: NOTE: This is too many arguments imo
+::
+:: Arguments: %1 - A reference to the monster that is moving
+::            %2 - The creature_id of the monster being moved onto
+::            %3 - The monster_id of the monster
+::            %4 - The monster's movement flags
+::            %5 - A variable that stores whether the creature moves
+::            %6 - A variable that stores whether the creature turns
+::            %7 - A reference to the monster's movement recall data
+::            %8 - The monster's coordinates
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterMovesOnPlayer
+set "source_id=!%~1.creature_id!"
+set "target_id=!monsters[%~2].creature_id!"
+if "%~3"=="1" (
+    if "!%~1.lit!"=="false" call :monsterUpdateVisibility %~3
+    call :monsterAttackPlayer %~3
+    set "%~5=false"
+    set "%~4=true"
+) else (
+    if %~3 GTR 1 (
+        set "is_misaligned=0"
+        for /f "tokens=1,2 delims=;" %%A in ("%~8") do (
+            if not "%%~A"=="!%~1.pos.y!" set "is_misaligned=1"
+            if not "%%~B"=="!%~1.pos.x!" set "is_misaligned=1"
+        )
+        if "!is_misaligned!"=="1" (
+            set /a "eats_monsters=%~4 & %config.monsters.move.cm_eats_others%"
+            if not "!eats_monsters!"=="0" (
+                if !creatures_list[%source_id%].kill_exp_value! GEQ !creatures_list[%target_id%].kill_exp_value! (
+                    if "!monsters[%~2].lit!"="true" (
+                        set /a "%~7|=%config.monsters.move.cm_eats_others%"
+                    )
+
+                    if %~3 LSS %~2 (
+                        call dungeon.cmd :dungeonDeleteMonster %~2
+                    ) else (
+                        call dungeon.cmd :dungeonRemoveMonsterFromLevel %~2
+                    )
+                )
+            ) else (
+                set "%~5=false"
+            )
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Checks that the monster is allowed to move
+::
+:: Arguments: %1 - A reference the monster that is trying to move
+::            %2 - The movement flags of the monster that is moving
+::            %3 - A variable that stores whether or not the monster turns
+::            %4 - A reference to the monster's movement recall data
+::            %5 - The coordinates of the monster
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterAllowedToMove
+set "coord=%~5"
+set /a "can_pick_up=%~2 & %config.monsters.move.cm_picks_up%"
+if not "%can_pick_up%"=="0" (
+    for /f "tokens=1,2 delims=;" %%A in ("%~5") do (
+        set "treasure_id=!dg.floor[%%~A][%%~B].treasure_id!"
+    )
+
+    for /f "delims=" %%A in ("!treasure_id!") do (
+        if not "%%~A"=="0" (
+            if !game.treasure.list[%%~A].category_id! LEQ %TV_MAX_OBJECT% (
+                set /a "%~4|=%config.monsters.move.cm_picks_up%"
+                call dungeon.cmd :dungeonDeleteObject "coord"
+            )
+        )
+    )
+)
+
+set "from_coord=!%~1.pos.y!;!%~1.pos.x!"
+call dungeon.cmd :dungeonMoveCreatureRecord "from_coord" "coord"
+
+if "!%~1.lit!"=="true" (
+    set "%~1.lit=false"
+    call dungeon.cmd :dungeonLiteSpot "from_coord"
+)
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "%~1.pos.y=%%~A"
+    set "%~1.pos.x=%%~B"
+)
+call dungeon.cmd :coordDistanceBetween "py.pos" "coord"
+set "%~1.distance_from_player=!errorlevel!"
+set "%~3=true"
 exit /b
 
 :makeMove
