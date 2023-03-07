@@ -726,13 +726,310 @@ set "%~1.distance_from_player=!errorlevel!"
 set "%~3=true"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Makes the monster move if possible
+::
+:: Arguments: %1 - The ID of the monster that is moving
+::            %2 - an array of directions that the monster can move in
+::            %3 - a reference to the monster's recalled movement
+:: Returns:   None
+::------------------------------------------------------------------------------
 :makeMove
+set "do_turn=false"
+set "do_move=false"
+set "rcmove=%~3"
+
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "move_bits=!creatures_list[%c_id%].movement!"
+
+set "starter=0"
+set "continue=set /a starter+=1&goto :makeMoveForLoop"
+:makeMoveForLoop
+for /L %%A in (!starter!,1,4) do (
+    set "starter=%%A"
+    if "!do_turn!"=="true" exit /b
+
+    set "coord.y=!%monster%.pos.y!"
+    set "coord.x=!%monster%.pos.x!"
+    set "coord=!coord.y!;!coord.x!"
+
+    call player.cmd :playerMovePosition "!%~2[%%A]!" "coord"
+    for /f "tokens=1,2" %%X in ("!coord.x! !coord.y!") do set "tile=dg.floor[%%~Y][%%~X]"
+    if "!%tile%.feature_id!"=="%TILE_BOUNDARY_WALL%" %continue%
+
+    set /a "move_through_walls=%~2 & %config.monsters.move.cm_phase%"
+    if !%tile%.feature_id! LEQ %MAX_OPEN_SPACE% (
+        REM The floor is open
+        set "do_move=true"
+    ) else if not "!move_through_walls!"=="0" (
+        REM The creature moves through walls
+        set "do_move=true"
+        set /a "rcmove|=%config.monsters.move.cm_phase%"
+    ) else if not "!%tile%.treasure_id!"=="0" (
+        REM The creature can open doors. Clever girl.
+        call :monsterOpenDoor "%tile%" "!%monster%.hp!" "%~2" "do_turn" "do_move" "rcmove" "!coord!"
+    )
+
+    REM A Glyph of warding is present
+    for /f "delims=" %%B in ("!%tile%.treaure_id!") do (
+        if "!do_move!"=="true" (
+            if not "%%~B"=="0" (
+                if "!game.treasure.list[%%~B].category_id!"=="%TV_VIS_TRAP%" (
+                    if "!game.treasure.list[%%~B].sub_category_id!"=="99" (
+                        call :glyphOfWardingProtection "!%monster%.creature_id!" "%~2" "do_move" "do_turn" "!coord!"
+                    )
+                )
+            )
+        )
+    )
+
+    REM Determine if the creature has attempted to move towards the player
+    if "!do_move!"=="true" (
+        call :monsterMovesOnPlayer "%monster%" "!%tile%.creature_id!" "%~1" "%~2" "do_move" "do_turn" "rc_move" "!coord!"
+    )
+
+    REM There's a separate !do_move! check here in case :monsterMovesOnPlayer changes its value
+    if "!do_move!"=="true" (
+        call :monsterAllowedToMove "%monster%" "%~2" "do_turn" "rcmove" "!coord!"
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Some monsters have a 1 in x chance of casting a spell
+::
+:: Arguments: %1 - A reference to the monster that is casting the spell
+::            %2 - A bit flag of the creature's spells
+:: Returns:   0 if the monster successfully cast a spell
+::            1 if the monster is out of range, is obstructed, or could not get
+::              the spell off
+::------------------------------------------------------------------------------
 :monsterCanCastSpells
-exit /b
+set /a "can_cast_spell=%~2 & %config.monsters.spells.cs_freq%"
+call rng.cmd :randomNumber %can_cast_spell%
+if not "!errorlevel!"=="1" exit /b 1
+set "can_cast_spell="
 
+set "within_range=false"
+set "unobstructed=false"
+
+if !%~1.distance_from_player! LEQ %config.monsters.mon_max_spell_cast_distance% set "within_range=true"
+call dungeon_los.cmd :los "%py.pos.y%;%py.pos.x%" "!%~1.pos.y!;!%~1.pos.x!" &&  set "unobstructed=true"
+
+if "!within_range!"=="true" (
+    if "!unobstructed!"=="true" (
+        exit /b 0
+    )
+)
+exit /b 1
+
+::------------------------------------------------------------------------------
+:: Performs the actual casting of the monster's spell
+::
+:: Arguments: %1 - A reference to the monster that is casting the spell
+::            %2 - The ID of the monster that is casting the spell
+::            %3 - The ID of the spell that is being cast
+::            %4 - The level of the monster that is casting the spell
+::            %5 - The name of the monster that is casting the spell
+::            %6 - A description of the player's death
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterExecuteCastingOfSpell
+set "coord=%py.pos.y%;%py.pos.x%"
+set "death_description=%~6"
+
+if "%~3"=="5" (
+    REM Short teleport
+    call spells.cmd :spellTeleportAwayMonster %~2 5
+    exit /b
+) else if "%~3"=="6" (
+    REM Long teleport
+    call spells.cmd :spellTeleportAwayMonster %~2 %config.monsters.mon_max_sight%
+) else if "%~3"=="7" (
+    REM Teleport the player to the monster
+    call spells.cmd :spellTeleportPlayerTo "!%~1.pos.y!;!%~1.pos.x!"
+    exit /b
+) else if "%~3"=="8" (
+    REM Light wound
+    call player.cmd :playerSavingThrow
+    if "!errorlevel!"=="0" (
+        call ui_io.cmd :printMessage "You resist the effects of the spell."
+    ) else (
+        call dice.cmd :diceRoll 3 8
+        call player.cmd :playerTakesHit !errorlevel! "!death_description!"
+    )
+    exit /b
+) else if "%~3"=="9" (
+    REM Serious wound
+    call player.cmd :playerSavingThrow
+    if "!errorlevel!"=="0" (
+        call ui_io.cmd :printMessage "You resist the effects of the spell."
+    ) else (
+        call dice.cmd :diceRoll 8 8
+        call player.cmd :playerTakesHit !errorlevel! "!death_description!"
+    )
+    exit /b
+) else if "%~3"=="10" (
+    REM Hold person
+    if "%py.flags.free_action%"=="true" (
+        call ui_io.cmd :printMessage "You are unaffected."
+    ) else (
+        call player.cmd :playerSavingThrow
+        if "!errorlevel!"=="0" (
+            call ui_io.cmd :printMessage "You resist the effects of the spell."
+        ) else if %py.flags.paralysis% GTR 0 (
+            set /a py.flags.paralysis+=2
+        ) else (
+            call rng.cmd :randomNumber 5
+            set /a paralysis+=!errorlevel!+4
+        )
+    )
+    exit /b
+) else if "%~3"=="11" (
+    REM Cause blindness
+    call player.cmd :playerSavingThrow
+    if "!errorlevel!"=="0" (
+        call ui_io.cmd :printMessage "You resist the effects of the spell."
+    ) else (
+        if %py.flags.blind% GTR 0 (
+            set /a py.flags.blind+=6
+        ) else (
+            call rng.cmd :randomNumber 3
+            set /a py.flags.blind=!errorlevel!+12
+        )
+    )
+    exit /b
+) else if "%~3"=="12" (
+    REM Cause confusion
+    call player.cmd :playerSavingThrow
+    if "!errorlevel!"=="0" (
+        call ui_io.cmd :printMessage "You resist the effects of the spell."
+    ) else (
+        if %py.flags.confused% GTR 0 (
+            set /a py.flags.confused+=2
+        ) else (
+            call rng.cmd :randomNumber 5
+            set /a py.flags.confused=!errorlevel!+3
+        )
+    )
+    exit /b
+) else if "%~3"=="13" (
+    REM Cause fear
+    call player.cmd :playerSavingThrow
+    if "!errorlevel!"=="0" (
+        call ui_io.cmd :printMessage "You resist the effects of the spell."
+    ) else (
+        if %py.flags.afraid% GTR 0 (
+            set /a py.flags.afraid+=2
+        ) else (
+            call rng.cmd :randomNumber 5
+            set /a py.flags.afraid=!errorlevel!+3
+        )
+    )
+    exit /b
+) else if "%~3"=="14" (
+    REM Summon monster
+    call ui_io.cmd :printMessage "%~5 magically summons a monster."
+    set "coord.y=%py.pos.y%"
+    set "coord.x=%py.pos.x%"
+    set "coord=!coord.y!;!coord.x!"
+
+    set "hack_monptr=%~2"
+    call monster_manager.cmd :monsterSummon "coord" "false"
+    set "hack_monptr=-1"
+    for /f "tokens=1,2" %%X in ("!coord.x! !coord.y!") do (
+        call :monsterUpdateVisibility "!dg.floor[%%~Y][%%~X].creature_id!"
+    )
+    exit /b
+) else if "%~3"=="15" (
+    REM Summon undead
+    call ui_io.cmd :printMessage "%~5 magically summons an undead."
+    set "coord.y=%py.pos.y%"
+    set "coord.x=%py.pos.x%"
+    set "coord=!coord.y!;!coord.x!"
+
+    set "hack_monptr=%~2"
+    call monster_manager.cmd :monsterSummonUndead "coord" "false"
+    set "hack_monptr=-1"
+    for /f "tokens=1,2" %%X in ("!coord.x! !coord.y!") do (
+        call :monsterUpdateVisibility "!dg.floor[%%~Y][%%~X].creature_id!"
+    )
+    exit /b
+) else if "%~3"=="16" (
+    REM Slow person
+    if "%py.flags.free_action%"=="true" (
+        call ui_io.cmd :printMessage "You are unaffected."
+    ) else (
+        call player.cmd :playerSavingThrow
+        if "!errorlevel!"=="0" (
+            call ui_io.cmd :printMessage "You resist the effects of the spell."
+        ) else (
+            if %py.flags.slow% GTR 0 (
+                set /a py.flags.slow+=2
+            ) else (
+                call rng.cmd :randomNumber 5
+                set /a py.flags.slow=!errorlevel!+3
+            )
+        )
+    )
+    exit /b
+) else if "%~3"=="17" (
+    REM Drain mana
+    if %py.misc.current_mana% GTR 0 (
+        call player.cmd :playerDisturb 1 0
+
+        call ui_io.cmd :printMessage "%~5draws psychic energy from you."
+        if "!%monster%.lit!"=="true" (
+            call ui_io.cmd :printMessage "%~5appears healthier."
+        )
+
+        call rng.cmd :randomNumber %~4
+        set /a "num=(!errorlevel! >> 1) + 1"
+        if !num! GTR %py.misc.current_mana% (
+            set "num=%py.misc.current_mana%"
+            set "py.misc.current_mana=0"
+            set "py.misc.current_mana_fraction=0"
+        ) else (
+            set /a py.misc.current_mana-=!num!
+        )
+        call ui.cmd :printCharacterCurrentMana
+        set /a %monster%.hp+=6*!num!
+    )
+    exit /b
+) else if "%~3"=="20" (
+    REM Breathe light
+    call ui_io.cmd :printMessage "%~5breathes lightning."
+    set /a damage_hp=!%monster%.hp!/4
+    call spells.cmd. :spellBreath "%py.pos.y%;%py.pos.x%" "%~2" "!damage_hp!" "%MagicSpellFlags.Lightning%" "death_description"
+    exit /b
+) else if "%~3"=="21" (
+    REM Breathe Gas
+    call ui_io.cmd :printMessage "%~5breathes gas."
+    set /a damage_hp=!%monster%.hp!/3
+    call spells.cmd. :spellBreath "%py.pos.y%;%py.pos.x%" "%~2" "!damage_hp!" "%MagicSpellFlags.PoisonGas%" "death_description"
+    exit /b
+) else if "%~3"=="22" (
+    REM Breathe Acid
+    call ui_io.cmd :printMessage "%~5breathes acid."
+    set /a damage_hp=!%monster%.hp!/3
+    call spells.cmd. :spellBreath "%py.pos.y%;%py.pos.x%" "%~2" "!damage_hp!" "%MagicSpellFlags.Acid%" "death_description"
+    exit /b
+) else if "%~3"=="23" (
+    REM Breathe Frost
+    call ui_io.cmd :printMessage "%~5breathes frost."
+    set /a damage_hp=!%monster%.hp!/3
+    call spells.cmd. :spellBreath "%py.pos.y%;%py.pos.x%" "%~2" "!damage_hp!" "%MagicSpellFlags.Frost%" "death_description"
+    exit /b
+) else if "%~3"=="24" (
+    REM Breathe Fire
+    call ui_io.cmd :printMessage "%~5breathes fire."
+    set /a damage_hp=!%monster%.hp!/3
+    call spells.cmd. :spellBreath "%py.pos.y%;%py.pos.x%" "%~2" "!damage_hp!" "%MagicSpellFlags.Fire%" "death_description"
+    exit /b
+) else (
+    call ui_io.cmd :printMessage "%~5casts an unknown spell. Nothing seems to happen."
+)
 exit /b
 
 :monsterCastSpell
