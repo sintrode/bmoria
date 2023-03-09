@@ -737,7 +737,6 @@ exit /b
 :makeMove
 set "do_turn=false"
 set "do_move=false"
-set "rcmove=%~3"
 
 set "monster=monsters[%~1]"
 set "c_id=!%monster%.creature_id!"
@@ -765,10 +764,10 @@ for /L %%A in (!starter!,1,4) do (
     ) else if not "!move_through_walls!"=="0" (
         REM The creature moves through walls
         set "do_move=true"
-        set /a "rcmove|=%config.monsters.move.cm_phase%"
+        set /a "%~3|=%config.monsters.move.cm_phase%"
     ) else if not "!%tile%.treasure_id!"=="0" (
         REM The creature can open doors. Clever girl.
-        call :monsterOpenDoor "%tile%" "!%monster%.hp!" "%~2" "do_turn" "do_move" "rcmove" "!coord!"
+        call :monsterOpenDoor "%tile%" "!%monster%.hp!" "%~2" "do_turn" "do_move" "%~3" "!coord!"
     )
 
     REM A Glyph of warding is present
@@ -786,12 +785,12 @@ for /L %%A in (!starter!,1,4) do (
 
     REM Determine if the creature has attempted to move towards the player
     if "!do_move!"=="true" (
-        call :monsterMovesOnPlayer "%monster%" "!%tile%.creature_id!" "%~1" "%~2" "do_move" "do_turn" "rc_move" "!coord!"
+        call :monsterMovesOnPlayer "%monster%" "!%tile%.creature_id!" "%~1" "%~2" "do_move" "do_turn" "%~3" "!coord!"
     )
 
     REM There's a separate !do_move! check here in case :monsterMovesOnPlayer changes its value
     if "!do_move!"=="true" (
-        call :monsterAllowedToMove "%monster%" "%~2" "do_turn" "rcmove" "!coord!"
+        call :monsterAllowedToMove "%monster%" "%~2" "do_turn" "%~3" "!coord!"
     )
 )
 exit /b
@@ -1242,31 +1241,316 @@ if !counter! LSS 4 (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Extracts a monster from inside of a rock wall
+::
+:: Arguments: %1 - A reference to the monster that is being moved
+::            %2 - The monster_id of the monster
+::            %3 - A reference to the monster's recalled movement
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterMoveOutOfWall
+set "monster=%~1"
+set "rcmove=%~3"
+if !%monster%.hp! LSS 0 exit /b
+
+set "id=0"
+set "dir=1"
+
+call helpers.cmd :expandCoordName "monster.pos"
+for /L %%Y in (%monster.pos.y_dec%,1,%monster.pos.y_inc%) do (
+    for /L %%X in (%monster.pos.x_dec%,1,%monster.pos.x_inc%) do (
+        if not "!dir!"=="5" (
+            if !dg.floor[%%Y][%%X].feature_id! LEQ %MAX_OPEN_SPACE% (
+                if not "!dg.floor[%%Y][%%X].creature_id!"=="1" (
+                    set "directions[!id!]=!dir!"
+                    set /a id+=1
+                )
+                set "dir+=1"
+            )
+        )
+    )
+)
+
+if not "!id!"=="0" (
+    call rng.cmd :randomNumber !id!
+    set /a dir=!errorlevel!-1
+
+    for /f "delims=" %%A in ("!dir!") do (
+        set "saved_id=!directions[0]!"
+        set "directions[0]=!directions[%%~A]!"
+        set "directions[%%~A]=!saved_id!"
+    )
+
+    call :makeMove "%~2" "directions" "%~3" rcmove
+)
+
+:: If it's still in the wall, let it try to dig out
+if !dg.floor[%monster.pos.y%][%monster.pos.x%].feature_id! GEQ %MIN_CAVE_WALL% (
+    set "hack_monptr=%~2"
+    call dice.cmd :diceRoll 8 8
+    call :monsterTakeHit "%~2" "!errorlevel!"
+    set "i=!errorlevel!"
+    set "hack_monptr=-1"
+
+    if !i! GEQ 0 (
+        call ui_io.cmd :printMessage "You hear a scream muffled by rock."
+        call ui.cmd :displayCharacterExperience
+    ) else (
+        call ui_io.cmd : printMessage "A creature digs itself out from the rock."
+        call player.cmd :playerTunnelWall "%monster.pos.y%;%monster.pos.x%" 1 0
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Undead move away unless cornered
+::
+:: Arguments: %1 - A reference to the creature that is moving
+::            %2 - The monster_id of the undead creature
+::            %3 - A reference to the monster's recalled movement
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterMoveUndead
+call :monsterGetMoveDirection "%~2" "directions"
+
+set /a directions[0]=10-!directions[0]!
+set /a directions[1]=10-!directions[1]!
+set /a directions[2]=10-!directions[2]!
+call rng.cmd :randomNumber 9
+set "directions[3]=!errorlevel!"
+call rng.cmd :randomNumber 9
+set "directions[4]=!errorlevel!"
+
+set /a "is_attack_only=!%~1.movement! & %config.monsters.move.cm_attack_only%"
+if "!is_attack_only!"=="0" (
+    call :makeMove "%~2" "directions" "%~3"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Have the creature move in a random direction when it's confused
+::
+:: Arguments: %1 - A reference to the creature that is moving
+::            %2 - The monster_id of the undead creature
+::            %3 - A reference to the monster's recalled movement
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterMoveConfused
+for /L %%A in (0,1,4) do (
+    call rng.cmd :randomNumber 9
+    set "directions[%%A]=!errorlevel!"
+)
+
+set /a "is_attack_only=!%~1.movement! & %config.monsters.move.cm_attack_only%"
+if "!is_attack_only!"=="0" (
+    call :makeMove "%~2" "directions" "%~3"
+)
+set "is_attack_only="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determines how a monster can move
+::
+:: Arguments: %1 - The monster_id of the monster that is moving
+::            %2 - A reference to the monster's recalled movement
+::            %3 - A reference to the monster
+::            %4 - A reference to the creature
+:: Returns:   0 if the monster moves
+::            1 if the monster stays still
+::------------------------------------------------------------------------------
 :monsterDoMove
-exit /b
+if not "!%~3.confused_amount!"=="0" (
+    set /a "is_undead=!%~4.defenses! & %config.monsters.defense.cd_undead%"
+    if not "!is_undead!"=="0" (
+        call :monsterMoveUndead "%~4" "%~1" "%~2"
+    ) else (
+        call :monsterMoveConfused "%~4" "%~1" "%~2"
+    )
+    set "is_undead="
+    set /a %~3.confused_amount-=1
+    exit /b 0
+)
 
+set /a "can_cast_spell=!%~4.spells! & %config.monsters.spells.cs_freq%"
+if not "%can_cast_spell%"=="0" (
+    call :monsterCastSpell "%~1"
+    exit /b !errorlevel!
+)
+exit /b 1
+
+::------------------------------------------------------------------------------
+:: Moves the monster in a random direction
+::
+:: Arguments: %1 - The monster_id of the monster that is moving
+::            %2 - A reference to the monster's recalled movement
+::            %3 - The level of randomness in the monster's movements
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterMoveRandomly
+for /L %%A in (0,1,8) do set "directions[%%A]=0"
+for /L %%A in (0,1,4) do (
+    call rng.cmd :randomNumber 9
+    set "directions[%%A]=!errorlevel!"
+)
+set /a "%~2|=%~3"
+call :makeMove "%~1" "directions" "%~2"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Moves the monster in a preset direction, but also has a 1/200 chance of
+:: moving randomly instead
+::
+:: Arguments: %1 - The monster_id of the monster that is moving
+::            %2 - A reference to the monster's recalled movement
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterMoveNormally
+for /L %%A in (0,1,8) do set "directions[%%A]=0"
+call rng.cmd :randomNumber 200
+if "!errorlevel!"=="1" (
+    for /L %%A in (0,1,4) do (
+        call rng.cmd :randomNumber 9
+        set "directions[%%A]=!errorlevel!"
+    )
+) else (
+    call :monsterGetMoveDirection "%~1" "directions"
+)
+
+set /a "%~2|=%config.monsters.move.cm_move_normal%"
+call :makeMove "%~1" "directions" "%~2"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Attacks if the player is within range but does not move otherwise
+::
+:: Arguments: %1 - The monster_id of the monster that is attacking
+::            %2 - A reference to the monster's recalled movement
+::            %3 - The monster's distance from the player
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterAttackWithoutMoving
+for /L %%A in (0,1,8) do set "directions[%%A]=0"
+if %~3 LSS 2 (
+    call :monsterGetMoveDirection "%~1" "directions"
+    call :makeMove "%~1" "directions" "%~2"
+) else (
+    REM Learn that the monster does not move when it normally would
+    set /a "rcmove|=%config.monsters.move.cm_attack_only%"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: A wrapper for all of the monster movement subroutines
+::
+:: Arguments: %1 - The monster_id of the monster that is attacking
+::            %2 - A reference to the monster's recalled movement
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterMove
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+:: Check to see if the monster can multiply
+set "abs_rest_period=%py.flags.rest%"
+if %abs_rest_period% LSS 0 set /a abs_rest_period*=-1
+set /a "can_multiply=!%creature%.movement! & %config.monsters.move.cm_multiply%"
+set /a mult_freq=%abs_rest_period% %% %config.monsters.mon_multiply_adjust% mon_mult
+if not "%can_multiply%"=="0" (
+    if %config.monsters.mon_max_multiply_per_level% GEQ %monster_multiply_total% (
+        if "%mult_freq%"=="0" (
+            call :monsterMultiplyCritter "%monster%" "%~1" "%~2"
+        )
+    )
+)
+for %%A in (abs_rest_period can_multiply mult_freq) do set "%%~A="
+
+:: Move the monster out of the wall if applicable
+set /a "can_phase=!%creature%.movement! & %config.monsters.move.cm_phase%"
+set "monster_coords=!%monster%.pos.y!][!%monster%.pos.x!"
+if "%can_phase%"=="0" (
+    REM I'm weirdly proud of this
+    if !dg.floor[%monster_coords%].feature_id! GEQ %MIN_CAVE_WALL% (
+        call :monsterMoveOutOfWall "%monster%" "%~1" "%~2"
+        exit /b
+    )
+)
+set "can_phase="
+set "monster_coords="
+
+call :monsterDoMove "%~1" "%~2" "%monster%" "%creature%" && exit /b
+
+:: Random movement
+for %%A in ("75" "40" "20") do (
+    set /a "rnd_move=!%creature%.movement! & !config.monsters.move.cm_%%~A_random!"
+    if not "%rnd_move%"=="0" (
+        call rng.cmd :randomNumber 100
+        if !errorlevel! LSS %%~A (
+            call :monsterMoveRandomly "%~1" "%~2" "!config.monsters.move.cm_%%~A_random!"
+            exit /b
+        )
+    )
+)
+set "rnd_move="
+
+:: Normal movement
+set /a "is_normal_movement=!%creature%.movement! & %config.monsters.move.cm_move_normal%"
+if not "!is_normal_movement!"=="0" (
+    call :monsterMoveNormally %*
+    exit /b
+)
+set "is_normal_movement="
+
+:: Attacking while standing still
+set /a "is_attack_only=!%creature%.movement! & %config.mosnters.move.cm_attack_only%"
+if not "%is_attack_only%"=="0" (
+    call :monsterAttackWithoutMoving "%~1" "%~2" "!%monster%.distance_from_player!"
+    exit /b
+)
+set "is_attack_only="
+
+:: And the Quylthulgs are also here
+set /a "is_only_magic=!%creature%.movement! & %config.monsters.move.cm_only_magic%"
+if not "%is_only_magic%"=="0" (
+    if !%monster%.distance_from_player! LSS 2 (
+        if !creature_recall[%c_id%].attacks[0]! LSS 32767 (
+            set /a creature_recall[%c_id%].attacks[0]+=1
+        )
+
+        if !creature_recall[%c_id%].attacks[0]! GTR 20 (
+            set /a "creature_recall[%c_id%].movement|=%config.monsters.move.cm_only_magic%"
+        )
+    )
+)
+set "is_only_magic="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Updates various recollection flags for a specified monster
+::
+:: Arguments: %1 - A reference to the monster being recalled
+::            %2 - Indicates if the monster is currently awake
+::            %3 - Indicates if the monster is currently ignoring the player
+::            %4 - The monster's recalled movement flags
+:: Returns:   None
+::------------------------------------------------------------------------------
 :memoryUpdateRecall
+if "!%~1.lit!"=="false" exit /b
+
+set "c_id=!%~1.creature_id!"
+set "memory=creature_recall[%c_id%]"
+
+if "%~2"=="true" (
+    if !%memory%.wake! LSS 255 (
+        set /a %memory%.wake+=1
+    )
+) else if "%~3"=="true" (
+    if !%memory%.ignore! LSS 255 (
+        set /a %memory%.ignore+=1
+    )
+)
+set /a "%memory%.movement|=%~4"
 exit /b
 
 :monsterAttackingUpdate
