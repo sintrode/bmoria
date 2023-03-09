@@ -372,7 +372,7 @@ exit /b
 ::------------------------------------------------------------------------------
 :: Confuses a monster if applicable
 ::
-:: Arguments: %1 - A reference to the monster's creature_list[] data
+:: Arguments: %1 - A reference to the monster's creatures_list[] data
 ::            %2 - A reference to the monster's monsters[] data
 ::            %3 - The attack type used against the monster
 ::            %4 - An extended version of the creature's name
@@ -772,7 +772,7 @@ for /L %%A in (!starter!,1,4) do (
     )
 
     REM A Glyph of warding is present
-    for /f "delims=" %%B in ("!%tile%.treaure_id!") do (
+    for /f "delims=" %%B in ("!%tile%.treasure_id!") do (
         if "!do_move!"=="true" (
             if not "%%~B"=="0" (
                 if "!game.treasure.list[%%~B].category_id!"=="%TV_VIS_TRAP%" (
@@ -1032,13 +1032,214 @@ if "%~3"=="5" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: A wrapper for monsterExecuteCastingOfSpell, mostly
+::
+:: Arguments: %1 - The ID of the monster that is casting the spell
+:: Returns:   0 if the monster cast a spell
+::            1 if the monster was not able to cast a spell
+::------------------------------------------------------------------------------
 :monsterCastSpell
-exit /b
+if "%game.character_is_dead%"=="true" exit /b 1
 
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+call :monsterCanCastSpells "%monster%" "!%creature%.spells!" || exit /b 1
+
+call :monsterUpdateVisibility "%~1"
+
+if "!%monster%.lit!"=="true" (
+    set "name=The !%creature%.name! "
+) else (
+    set "name It "
+)
+
+call player.cmd :playerDiedFromString "death_description" "!%creature%.name!" "!%creature%.movement!"
+
+set /a "spell_flags=!%creature%.spells! & ~%config.monsters.spells.cs_freq%"
+set "id=0"
+:monsterCastSpellWhileLoop
+if "!spell_flags!"=="0" goto :monsterCastSpellAfterWhileLoop
+call helpers.cmd :getAndClearFirstBit "!spell_flags!"
+set "spell_choice[!id!]=!errorlevel!"
+set /a id+=1
+goto :monsterCastSpellWhileLoop
+:monsterCastSpellAfterWhileLoop
+
+call rng.cmd :randomNumber !id!
+set /a rnd_dec=!errorlevel!-1
+set /a thrown_spell=!spell_choice[%rnd_dec%]! + 1
+
+:: All spells spellTeleportAwayMonster and Drain Mana spells always disturb the player
+if %thrown_spell% GTR 6 (
+    if not "%thrown_spell% "=="17" (
+        call player.cmd :playerDisturb 1 0
+    )
+
+    if %thrown_spell% LSS 14 (
+        call ui_io.cmd :printMessage "%name%casts a spell."
+    )
+)
+
+if "%thrown_spell%"=="16" (
+    call ui_io.cmd :printMessage "%name%casts a spell."
+)
+
+call :monsterExecuteCastingOfSpell "%monster%" "%~1" "%thrown_spell%" "!%creature%.level!" "%name%" "%death_description%"
+
+if "!%monster%.lit!"=="true" (
+    set /a "creature_recall[%c_id%].spells|=1 << (%thrown_spell% - 1)"
+    set /a "freq_time=!creature_recall[%c_id%].spells! & %config.monsters.spells.cs_freq%"
+    if not "!freq_time!"=="%config.monsters.spells.cs_freq%" (
+        set /a creature_recall[%c_id%].spells+=1
+    )
+
+    if "!game.character_is_dead!"=="true" (
+        if !creature_recall[%c_id%].deaths! LSS 32767 (
+            set /a creature_recall[%c_id%].deaths+=1
+        )
+    )
+)
+
+set "c_id="
+set "freq_time="
+set "thrown_spell="
+set "many_deaths="
+exit /b 0
+
+::------------------------------------------------------------------------------
+:: Places creature adjacent to a specified set of coordinates
+::
+:: Arguments: %1 - The coordinates to place the monster next to
+::            %2 - The creature_id of the monster being placed
+::            %3 - The monster_id of the monster being placed
+:: Returns:   0 if a monster is successfully placed
+::            1 if there is no place to put the monster
+::------------------------------------------------------------------------------
 :monsterMultiply
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set "coord.y=%%~A"
+    set "coord.x=%%~B"
+)
+set "coord=%coord.y%;%coord.x%"
+
+for /L %%A in (0,1,18) do (
+    call rng.cmd :randomNumber 3
+    set /a position.y=%coord.y% - 2 + !errorlevel!
+    call rng.cmd :randomNumber 3
+    set /a position.x=%coord.x% - 2 + !errorlevel!
+
+    set "position=!position.y!;!position.x!"
+    call dungeon.cmd :coordInBounds "position"
+    if "!errorlevel!"=="0" (
+        set "is_misaligned=0"
+        if not "!position.y!"=="!coord.y!" set "is_misaligned=1"
+        if not "!position.x!"=="!coord.x!" set "is_misaligned=1"
+        if "!is_misaligned!"=="1" (
+            for /f "delims" %%T in ("dg.floor[!position.y!][!position.x!]") do (
+                if !%%~T.feature_id! LEQ %MAX_OPEN_SPACE% (
+                    if "!%%~T.treasure_id!"=="0" (
+                        if not "!%%~T.creature_id!"=="1" (
+                            if !%%~T.creature_id! GTR 1 (
+                                set "cannibalistic=false"
+                                set /a "is_cannibalistic=!creatures_list[%~2].movement! & %config.monsters.move.cm_eats_others%"
+                                if not "!is_cannibalistic!"=="0" set "cannibalistic=true"
+
+                                set "experienced=false"
+                                for /f "delims=" %%B in ("!%%~T.creature_id!") do (
+                                    for /f "delims=" %%C in ("!monsters[%%~B].creature_id!") do (
+                                        if !creatures_list[%~2].kill_exp_value! GEQ !creatures_list[%%~C].kill_exp_value! (
+                                            REM TODO: Rewrite so that this isn't eleven indents deep
+                                            set "experienced=true"
+                                        )
+                                    )
+                                )
+
+                                if "!cannibalistic!"=="true" (
+                                    if "!experienced!"=="true" (
+                                        if %~3 LSS !%%~T.creature_id! (
+                                            REM It ate an already-processed monster. Handle normally.
+                                            call dungeon.cmd :dungeonDeleteMonster "!%%~T.creature_id!"
+                                        ) else (
+                                            REM An already-processed monster will take its place, which breaks things
+                                            call dungeon.cmd :dungeonRemoveMonsterFromLevel "!%%~T.creature_id!"
+                                        )
+
+                                        REM In case :compact_monster is called, it needs monster_id
+                                        set "hack_monptr=%~3"
+                                        call monster_manager.cmd :monsterPlaceNew "coord" "%~2" "false"
+                                        set "result=!errorlevel!"
+                                        set "hack_monptr=-1"
+                                        if "!result!"=="1" exit /b 1
+
+                                        set /a monster_multiply_total+=1
+                                        call :monsterMakeVisible "!position.y!;!position.x!"
+                                        exit /b !errorlevel!
+                                    )
+                                )
+                            ) else (
+                                REM Place a monster
+                                REM In case :compact_monster is called, it needs monster_id
+                                set "hack_monptr=%~3"
+                                call monster_manager.cmd :monsterPlaceNew "coord" "%~2" "false"
+                                set "result=!errorlevel!"
+                                set "hack_monptr=-1"
+                                if "!result!"=="1" exit /b 1
+
+                                set /a monster_multiply_total+=1
+                                call :monsterMakeVisible "!position.y!;!position.x!"
+                                exit /b !errorlevel!
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Remember that certain monsters can multiply
+::
+:: Arguments: %1 - A reference to the monster
+::            %2 - The monster_id of the monster
+::            %3 - A reference to the recalled movement of the monster
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterMultiplyCritter
+set "monster=%~1"
+set "counter=0"
+
+call helpers.cmd :expandCoordName "monster.pos"
+
+for /L %%Y in (%monster.pos.y_dec%,1,%monster.pos.y_inc%) do (
+    for /L %%X in (%monster.pos.x_dec%,1,%monster.pos.x_inc%) do (
+        set "coord=%%Y;%%X"
+        call dungeon.cmd :coordInBounds "coord"
+        if "!errorlevel!"=="0" (
+            if !dg.floor[%%Y][%%X].creature_id! GTR 1 (
+                set /a counter+=1
+            )
+        )
+    )
+)
+
+:: randomNumber can't be called with a value of zero so increment it
+if "!counter!"=="0" set /a counter+=1
+
+if !counter! LSS 4 (
+    set /a mon_mult=!counter!*%config.monsters.mon_multiply_adjust%
+    call rng.cmd :randomNumber !mon_mult!
+    if "!errorlevel!"=="1" (
+        call :monsterMultiply "%monster.pos.y%;%monster.pos.x%" "!%~1.creature_id!" "%~2"
+        if "!errorlevel!"=="0" (
+            set /a "%~3|=%config.monsters.move.cm_multiply%"
+        )
+    )
+)
 exit /b
 
 :monsterMoveOutOfWall
