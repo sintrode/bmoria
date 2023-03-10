@@ -1553,7 +1553,84 @@ if "%~2"=="true" (
 set /a "%memory%.movement|=%~4"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Process a monster's stun, sleep, and trapped states
+::
+:: Arguments: %1 - A reference to the monster being updated
+::            %2 - The monster_id of the monster
+::            %3 - The number of moves that a monster has
+:: Returns:   None
+::------------------------------------------------------------------------------
 :monsterAttackingUpdate
+set "cid=!%~1.creature_id!"
+set /a "can_phase=!creatures_list[%c_id%].movement! & %config.monsters.move.cm_phase%"
+set "monster.pos.x=!%~1.pos.x!"
+set "monster.pos.y=!%~1.pos.y!"
+for /L %%A in (%~3,-1,1) do (
+    set "wake=false"
+    set "ignore=false"
+    set "rcmove=0"
+
+    set "should_perform_action=0"
+    if "!%~1.lit!"=="true" set "should_perform_action=1"
+    if !%~1.distance_from_player! LEQ !creatures_list[%c_id%].area_affect_radius! set "should_perform_action=1"
+    if "%can_phase%"=="0" if !dg.floor[%monster.pos.y%][%monster.pos.x%].feature_id! GEQ %MIN_CAVE_WALL% set "should_perform_action=1"
+
+    if "!should_perform_action!"=="1" (
+        if !%~1.sleep_count! GTR 0 (
+            if "%py.flags.aggravate%"=="true" (
+                set "%~1.sleep_count=0"
+            ) else (
+                set "can_notice=0"
+                if "%py.flags.rest%"=="0" if %py.flags.paralysis% LSS 1 set "can_notice=1"
+                call rng.cmd :randomNumber 50
+                if "!errorlevel!"=="1" set "can_notice=1"
+
+                if "!can_notice!"=="1" (
+                    call rng.cmd :randomNumber 1024
+                    set "notice=!errorlevel!"
+
+                    set /a notice_cubed=!notice!*!notice!*!notice!
+                    set /a "stealth_offset=1<<(29-%py.misc.stealth_factor%)"
+                    if !notice_cubed! LEQ !stealth_offset! (
+                        set /a %~1.sleep_count-=(100/!%~1.distance_from_player!)
+
+                        if !%~1.sleep_count! GTR 0 (
+                            set "ignore=true"
+                        ) else (
+                            set "wake=true"
+                            set "%~1.sleep_count=0"
+                        )
+                    )
+                )
+            )
+        )
+
+        if not "!%~1.stunned_amount!"=="0" (
+            set /a c_level_squared=!creatures_list[%c_id%].level! * !creatures_list[%c_id%].level!
+            call rnd.cmd :randomNumber 5000
+            if !errorlevel! LSS !c_level_squared! (
+                set "%~1.stunned_amount=0"
+            ) else (
+                set /a %~1.stunned_amount-=1
+            )
+
+            if "!%~1.stunned_amount!"=="0" (
+                if "!%~1.lit!"=="true" (
+                    call ui_io.cmd :printMessage "The !creatures_list[%c_id%].name! recovers and glares at you."
+                )
+            )
+        )
+        if "!%~1.sleep_count!"=="0" (
+            if "!%~1.stunned_amount!"=="0" (
+                call :monsterMove "%~2" "rcmove"
+            )
+        )
+    )
+
+    call :monsterUpdateVisibility "%~2"
+    call :memoryUpdateRecall "%~1" "!wake!" "!ignore!" "!rcmove!"
+)
 exit /b
 
 :updateMonsters
