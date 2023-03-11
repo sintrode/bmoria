@@ -1633,7 +1633,48 @@ for /L %%A in (%~3,-1,1) do (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Creature movement and attacks
+::
+:: Arguments: %1 - Determines if the monster attacks on this turn
+:: Returns:   None
+::------------------------------------------------------------------------------
 :updateMonsters
+set /a id=%next_free_monster_id%-1
+set "continue=set /a id-=1 & goto :updateMonstersLoop"
+
+:updateMonstersLoop
+for /L %%A in (%id%,-1,%MON_MIN_INDEX_ID%) do (
+    if "!game.character_is_dead!"=="true" exit /b
+
+    if !monsters[%%A].hp! LSS 0 (
+        call dungeon.cmd :dungeonDeleteMonsterRecord "%%~A"
+        %continue%
+    )
+
+    set "monster.pos=!monsters[%%A].pos.y!;!monsters[%%A].pos.x!"
+    call dungeon.cmd :coordDistanceBetween "py.pos" "monsters.pos"
+
+    if "%~1"=="true" (
+        call :monsterMovementRate "!monsters[%%A].speed!"
+        set "moves=!errorlevel!"
+
+        if !moves! LEQ 0 (
+            call :monsterUpdateVisibility "%%~A"
+        ) else (
+            call :monsterAttackingUpdate "monsters[%%A]" "%%~A" "!moves!"
+        )
+    ) else (
+        call :monsterUpdateVisibility "%%~A"
+    )
+
+    REM Have this in here a second time to prevent errors while scanning monsters
+    REM in case the monster was killed during monsterMove
+    if !monsters[%%A].hp! LSS 0 (
+        call dungeon.cmd :dungeonDeleteMonsterRecord "%%~A"
+        %continue%
+    )
+)
 exit /b
 
 :monsterTakeHit
