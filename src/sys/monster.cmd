@@ -1608,7 +1608,7 @@ for /L %%A in (%~3,-1,1) do (
 
         if not "!%~1.stunned_amount!"=="0" (
             set /a c_level_squared=!creatures_list[%c_id%].level! * !creatures_list[%c_id%].level!
-            call rnd.cmd :randomNumber 5000
+            call rng.cmd :randomNumber 5000
             if !errorlevel! LSS !c_level_squared! (
                 set "%~1.stunned_amount=0"
             ) else (
@@ -1677,26 +1677,528 @@ for /L %%A in (%id%,-1,%MON_MIN_INDEX_ID%) do (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Deals damage to a specified monster, removing it entirely if it is killed
+::
+:: Arguments: %1 - The monster_id of the monster being attacked
+::            %2 - The amount of damage done to the monster
+:: Returns:   The creature_id of the monster being attacked
+::            -1 if the creature is still alive after being attacked
+::------------------------------------------------------------------------------
 :monsterTakeHit
-exit /b
+set "monster=monsters[%~1]"
+set "creature_id=%c_id%"
+set "creature=creatures_list[%c_id%]"
 
+set "%monster%.sleep_count=0"
+set /a %monster%.hp-=%~2
+
+if !%monster%.hp! GEQ 0 exit /b -1
+
+call :monsterDeath "!%monster%.pos.y!;!%monster%.pos.x!" "!%creature%.movement!"
+set "treasure_flags=!errorlevel!"
+set "memory=creature_recall[%c_id%]"
+
+set "known_treasure=0"
+if %py.flags.blind% LSS 1 if "!%monster%.lit!"=="true" set "known_treasure=1"
+set /a "is_win_monster=!%creature%.movement! & %config.monsters.move.cm_win%"
+if not "!is_win_monster!"=="0" set "known_treasure=1"
+
+if "!known_treasure!"=="1" (
+    set /a "movement_treasure_shift=(!%memory%.movement! & %config.monsters.move.cm_treasure%) >> %config.monsters.move.cm_tr_shift%"
+    set /a "treasure_treasure_shift=(!treasure_flags! & %config.monsters.move.cm_treasure%) >> %config.monsters.move.cm_tr_shift%"
+    if !movement_treasure_shift! GTR !treasure_treasure_shift! (
+        set /a "treasure_flags=(!treasure_flags! & ~%config.monsters.move.cm_treasure%) | (!movement_treasure_shift! << %config.monsters.move.cm_tr_shift%)"
+    )
+
+    set /a "%monster%.movement=(!%memory%.movement! & ~%config.monsters.move.cm_treasure%) | !treasure_flags!"
+
+    if !%memory%.kills! LSS 32767 (
+        set /a %memory%.kills+=1
+    )
+)
+
+call player.cmd :playerGainKillExperience "%creature%"
+
+set "m_take_hit=!%monster%.creature_id!"
+
+if %hack_monptr% LSS %monster_id% (
+    call dungeon.cmd :dungeonDeleteMonster "%~1"
+) else (
+    call dungeon.cmd :dungeonDeleteMonsterRecord "%~1"
+)
+
+set "is_win_monster="
+set "known_treasure="
+set "movement_treasure_shift="
+set "treasure_treasure_shift="
+exit /b !m_take_hit!
+
+::------------------------------------------------------------------------------
+:: Determines what kind of item a monster drops upon death, if anything
+::
+:: Arguments: %1 - The monster's creature.movement flags
+:: Returns:   The decimal equivalent of creature.movement's death item flags
+::------------------------------------------------------------------------------
 :monsterDeathItemDropType
-exit /b
+set /a "carries_object=%~1 & %config.monsters.move.cm_carry_obj%"
+set /a "carries_gold=%~1 & %config.monsters.move.cm_carry_gold%"
+set /a "carries_small_object=%~1 & %config.monsters.move.cm_small_obj%"
 
+set "object=0"
+if not "%carries_object%"=="0" set "object=1"
+if not "%carries_gold%"=="0" set /a object+=2
+if not "%carries_small_object%"=="0" set /a object+=4
+
+set "carries_object="
+set "carries_gold="
+set "carries_small_object="
+exit /b %object%
+
+::------------------------------------------------------------------------------
+:: Determines how many objects the monster drops upon death
+::
+:: Arguments: %1 - The monster's creature.movement flags
+:: Returns:   The number of items that a monster should generate
+::------------------------------------------------------------------------------
 :monsterDeathItemDropCount
-exit /b
+set "count=0"
+set /a "has_flag=%~1 & %config.monsters.move.cm_60_random%"
+if not "%has_flag%"=="0" (
+    call rng.cmd :randomNumber 100
+    if !errorlevel! LSS 60 set /a count+=1
+)
 
+set /a "has_flag=%~1 & %config.monsters.move.cm_90_random%"
+if not "%has_flag%"=="0" (
+    call rng.cmd :randomNumber 100
+    if !errorlevel! LSS 90 set /a count+=1
+)
+
+set /a "has_flag=%~1 & %config.monsters.move.cm_1d2_obj%"
+if not "%has_flag%"=="0" (
+    call rng.cmd :randomNumber 2
+    set /a count+=!errorlevel!
+)
+
+set /a "has_flag=%~1 & %config.monsters.move.cm_2d2_obj%"
+if not "%has_flag%"=="0" (
+    call dice.cmd :diceRoll 2 2
+    set /a count+=!errorlevel!
+)
+
+set /a "has_flag=%~1 & %config.monsters.move.cm_2d2_obj%"
+if not "%has_flag%"=="0" (
+    call dice.cmd :diceRoll 4 2
+    set /a count+=!errorlevel!
+)
+exit /b !count!
+
+::------------------------------------------------------------------------------
+:: Rewards the player for killing a monster based on the monster's flags
+::
+:: Arguments: %1 - The coordinates of the monster
+::            %2 - The monster's creature.movement flags
+:: Returns:   A mask of bits that indicate what the monster was seen dropping
 :monsterDeath
-exit /b
+call :monsterDeathItemDropType "%~2"
+set "item_type=!errorlevel!"
+call :monsterDeathItemDropCount "%~2"
+set "item_count=!errorlevel!"
 
+set "dropped_item_id=0"
+
+if %item_count% GTR 0 (
+    call dungeon.cmd :dungeonSummonObject "%~1" "%item_count%" "%item_type%"
+    set "dropped_item_id=!errorlevel!"
+)
+
+:: Check to make sure that the monster didn't die mid-turn
+set /a "is_win_monster=%~2 & %config.monsters.move.cm_win%"
+if not "%is_win_monster%"=="0" (
+    if "%game.character_is_dead%"=="false" (
+        set "game.total_winner=true"
+        call ui.cmd :printCharacterWinner
+        call ui_io.cmd :printMessage "*** CONGRATULATIONS^^! *** You have won the game^^!"
+        call ui_io.cmd :printMessage "You cannot save this game, but you may retire when ready."
+    )
+)
+set "is_win_monster="
+
+if "%dropped_item_id%"=="0" exit /b 0
+
+set "return_flags=0"
+set /a "first_eight=%dropped_item_id% & 255"
+if not "%first_eight%"=="0" (
+    set /a "return_flags|=%config.monsters.move.cm_carry_obj%"
+    set /a "third_byte=%item_type% & 4"
+    if not "!third_byte!"=="0" (
+        set /a "return_flags|=%config.monsters.move.cm_small_obj%"
+    )
+)
+set "first_eight="
+set "third_byte="
+
+if %dropped_item_id% GEQ 256 (
+    set /a "return_flags|=%config.monsters.move.cm_carry_gold%"
+)
+
+set /a "number_of_items=((%dropped_item_id% %% 256) + (%dropped_item_id% / 256)) << %config.monsters.move.cm_tr_shift"
+set /a "ret_val=%return_flags%|%number_of_items%"
+exit /b %ret_val%
+
+::------------------------------------------------------------------------------
+:: Displays an action that is performed by a specified monster
+::
+:: Arguments: %1 - A reference to the name of the monster that is acting
+::            %2 - A reference to the action that the monster is performing
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printMonsterActionText
+call ui_io.cmd :printMessage "!%~1! !%~2!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Displays the name of a specified monster if the player knows what it is
+::
+:: Arguments: %1 - The name of the monster
+::            %2 - Determines if the monster is lit or not
+::            %3 - The variable to store the output in
+:: Returns: None
+::------------------------------------------------------------------------------
 :monsterNameDescription
+if "%~2"=="true" (
+    set "%~3=The %~1"
+) else (
+    set "%~3=It"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Puts monsters adjacent to the player to sleep
+::
+:: Arguments: %1 - The coordinates of the player
+:: Returns:   0 if the monster is asleep
+::            1 if the monster is awake, or if there are no monsters to put to
+::              sleep
+::------------------------------------------------------------------------------
 :monsterSleep
+set "coord=%~1"
+call helpers.cmd :expandCoordName "coord"
+
+set "asleep=1"
+for /L %%Y in (%coord.y_dec%,1,%coord.y_inc%) do (
+    for /L %%X in (%coord.x_dec%,1,%coord.x_inc%) do (
+        set "monster_id=!dg.floor[%%Y][%%X].creature_id!"
+
+        if !monster_id! GTR 1 (
+            call :monsterSleepInner "!monster_id!"
+        )
+    )
+)
+exit /b !asleep!
+
+:monsterSleepInner
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+call :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+set "is_unaffected=0"
+call rng.cmd :randomNumber %mon_max_levels%
+if !errorlevel! LSS !%creature%.level! set "is_unaffected=1"
+set /a "cant_sleep=!%creature%.defenses! & %config.monsters.defense.cd_no_sleep%"
+if not "!cant_sleep!"=="0" set "is_unaffected=1"
+if "!is_unaffected!"=="1" (
+    if "!%monster%.lit!"=="true" (
+        if not "!cant_sleep!"=="0" (
+            set /a "creature_recall[%c_id%].defenses|=%config.monsters.defense.cd_no_sleep%"
+        )
+        call ui_io.cmd :printMessage "%name% is unaffected."
+    )
+) else (
+    set "%monster%.sleep_count=500"
+    set "asleep=0"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Allows a specified monster to attack the player
+::
+:: Arguments: %1 - The level of the attacking creature
+::            %2 - A reference to the monster's HP
+::            %3 - The monster_id of the attacking monster
+::            %4 - The type of attack being performed by the monster
+::            %5 - The damage done by the monster's attack
+::            %6 - A written description of the player's death
+::            %7 - True if the monster has noticed the player, false otherwise
+:: Returns:   0 if the monster has noticed the player
+::            1 if the player remains ignored
+::------------------------------------------------------------------------------
 :executeAttackOnPlayer
-exit /b
+set "damage=%~5"
+set "noticed=%~7"
+
+if "%~4"=="1" (
+    REM The Default
+    set /a damage-=((%py.misc.ac% + %py.misc.magical_ac%) * %~5) / 200
+    call player.cmd :playerTakesHit "!damage!" "%~6"
+    goto :finishAttackOnPlayer
+) else if "%~4"=="2" (
+    REM Lose Strength
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    if "%py.flags.sustain_str%"=="true" (
+        call ui_io.cmd :printMessage "You feel weaker for a moment, but it passes."
+    ) else (
+        call rng.cmd :randomNumber 2
+        if "!errorlevel!"=="1" (
+            call ui_io.cmd :printMessage "You feel weaker."
+            call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_str%"
+        ) else (
+            set "noticed=false"
+        )
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="3" (
+    REM Confusion attack
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    call rng.cmd :randomNumber 2
+    if "!errorlevel!"=="1" (
+        if %py.flags.confused% LSS 1 (
+            call ui_io.cmd :printMessage "You feel confused."
+            call rng.cmd :randomNumber "%~1"
+            set /a py.flags.confused+=!errorlevel!
+        ) else (
+            set "noticed=false"
+        )
+        set /a py.flags.confused+=3
+    ) else (
+        set "noticed=false"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="4" (
+    REM Fear attack
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    call player.cmd :playerSavingThrow
+    if "!errorlevel!"=="0" (
+        call ui_io.cmd :printMessage "You resist the effects."
+    ) else if %py.flags.afraid% LSS 1 (
+        call ui_io.cmd :printMessage "You are suddenly afraid."
+        call rng.cmd :randomNumber "%~1"
+        set /a py.flags.afraid+=3+!errorlevel!
+    ) else (
+        set /a py.flags.afraid+=3
+        set "noticed=false"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="5" (
+    REM Fire attack
+    call ui_io.cmd :printMessage "You are enveloped in flames."
+    call inventory.cmd :damageFire "%damage%" "%~6"
+    goto :finishAttackOnPlayer
+) else if "%~4"=="6" (
+    REM Acid attack
+    call ui_io.cmd printMessage "You are covered in acid."
+    call inventory.cmd :damageAcid "%damage%" "%~6"
+    goto :finishAttackOnPlayer
+) else if "%~4"=="7" (
+    REM Cold attack
+    call ui_io.cmd printMessage "You are covered with frost."
+    call inventory.cmd :damageCold "%damage%" "%~6"
+    goto :finishAttackOnPlayer
+) else if "%~4"=="86" (
+    REM Lightning attack
+    call ui_io.cmd printMessage "Lightning strikes you."
+    call inventory.cmd :damageLightningBolt "%damage%" "%~6"
+    goto :finishAttackOnPlayer
+) else if "%~4"=="9" (
+    REM Corrosion gas attack
+    call ui_io.cmd printMessage "You are covered in acid."
+    call inventory.cmd :damageCorrodingGas "%damage%" "%~6"
+    goto :finishAttackOnPlayer
+) else if "%~4"=="10" (
+    REM Blindness attack
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    if %py.flags.blind% LSS 1 (
+        call rng.cmd :randomNumber "%~1"
+        set /a py.flags.blind+=10+!errorlevel!
+        call ui_io.cmd :printMessage "Your eyes begin to sting."
+    ) else (
+        set /a py.flags.blind+=5
+        set "noticed=false"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="11" (
+    REM Paralysis attack
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    call player.cmd :playerSavingThrow
+    if "!errorlevel!"=="0" (
+        call ui_io.cmd :printMessage "You resist the effects."
+    ) else (
+        if %py.flags.paralysis% LSS 1 (
+            if "%py.flags.free_action%"=="true" (
+                call ui_io.cmd :printMessage "You are unaffected."
+            ) else (
+                call rng.cmd :randomNumber "%~1"
+                set /a py.flags.paralysis+=!errorlevel!+3
+                call ui_io.cmd :printMessage "You are paralysed."
+            )
+        ) else (
+            set "noticed=false"
+        )
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="12" (
+    REM Steal money
+    set "can_block=0"
+    if %py.flags.paralysis% LSS 1 (
+        call rng.cmd :randomNumber 124
+        if !errorlevel! LSS !py.stats.used[%PlayerAttr.a_dex%]! (
+            set "can_block=1"
+        )
+    )
+    if "!can_block!"=="1" (
+        call ui_io.cmd :printMessage "You quickly protect your money pouch."
+    ) else (
+        call rng.cmd :randomNumber 25
+        set /a "gold=(%py.misc.au% / 10) + !errorlevel!"
+        if !gold! GTR %py.misc.au% (
+            set "py.misc.au=0"
+        ) else (
+            set /a py.misc.au-=!gold!
+        )
+        call ui_io.cmd printMessage "Your purse feels lighter."
+        call ui.cmd :printCharacterGoldValue
+    )
+
+    call rng.cmd :randomNumber 2
+    if "!errorlevel!"=="1" (
+        call ui_io.cmd :printMessage "There is a puff of smoke."
+        call spells.cmd :spellTeleportAwayMonster "%~3" "%config.monsters.mon_max_sight%"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="13" (
+    REM Steal object
+    set "can_block=0"
+    if %py.flags.paralysis% LSS 1 (
+        call rng.cmd :randomNumber 124
+        if !errorlevel! LSS !py.stats.used[%PlayerAttr.a_dex%]! (
+            set "can_block=1"
+        )
+    )
+    if "!can_block!"=="1" (
+        call ui_io.cmd :printMessage "You quickly protect your backpack."
+    ) else (
+        call rng.cmd :randomNumber %py.pack.unique_items%
+        set /a rnd_item=!errorlevel!-1
+        call inventory.cmd :inventoryDestroyItem !rnd_item!
+        set "rnd_item="
+        call ui_io.cmd printMessage "Your backpack feels lighter."
+    )
+
+    call rng.cmd :randomNumber 2
+    if "!errorlevel!"=="1" (
+        call ui_io.cmd :printMessage "There is a puff of smoke."
+        call spells.cmd :spellTeleportAwayMonster "%~3" "%config.monsters.mon_max_sight%"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="14" (
+    REM Poison
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    call ui_io.cmd :printMessage "You feel very sick."
+    call rng.cmd :randomNumber "%~1"
+    set /a py.flags.poisoned+=!errorlevel!+5
+    goto :finishAttackOnPlayer
+) else if "%~4"=="15" (
+    REM Lose dexterity
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    if "%py.flags.sustain_dex%"=="true" (
+        call ui_io.cmd :printMessage "You feel clumsy for a moment, but it passes."
+    ) else (
+        call ui_io.cmd :printMessage "You feel more clumsy."
+        call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_dex%"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="16" (
+    REM Lose constitution
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    if "%py.flags.sustain_con%"=="true" (
+        call ui_io.cmd :printMessage "Your body resists the effects of the disease."
+    ) else (
+        call ui_io.cmd :printMessage "Your health is damaged"
+        call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_con%"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="17" (
+    REM Lose intelligence
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    call ui_io.cmd :printMessage "You have trouble thinking clearly."
+    if "%py.flags.sustain_int%"=="true" (
+        call ui_io.cmd :printMessage "But your mind quickly clears."
+    ) else (
+        call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_int%"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="18" (
+    REM Lose wisdom
+    call player.cmd :playerTakesHit "%damage%" "%~6"
+    if "%py.flags.sustain_wis%"=="true" (
+        call ui_io.cmd :printMessage "Your wisdom is sustained."
+    ) else (
+        call ui_io.cmd :printMessage "Your wisdom is drained."
+        call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_wis%"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="19" (
+    REM Lose experience
+    call ui_io.cmd :printMessage "You feel your life draining away."
+    set /a "xp_drain=%damage% + (%py.misc.exp% / 100) * %config.monsters.mon_player_exp_drained_per_hit%"
+    call spells.cmd :spellLoseEXP "!xp_drain!"
+    goto :finishAttackOnPlayer
+) else if "%~4"=="20" (
+    REM Aggravate monster
+    call spells.cmd :spellAggravateMonsters 20
+    goto :finishAttackOnPlayer
+) else if "%~4"=="21" (
+    REM Disenchant
+    call inventory.cmd :executeDisenchantAttack
+    if "!errorlevel!"=="0" (
+        call ui_io.cmd :printMessage "There is a static feeling in the air."
+        call player.cmd :playerRecalculateBonuses
+    ) else (
+        set "noticed=false"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="22" (
+    REM Eat food
+    call inventory.cmd :inventoryFindRange "%TV_FOOD%" "%TV_NEVER%" "item_pos_start" "item_pos_end"
+    if "!errorlevel!"=="0" (
+        call inventory.cmd :inventoryDestroyItem "!item_pos_start!"
+        call ui_io.cmd :printMessage "It got at your rations^^!"
+    ) else (
+        set "noticed=false"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="23" (
+    call inventory.cmd :inventoryDiminishLightAttack "%~7"
+    if "!errorlevel!"=="0" (
+        set "noticed=true"
+    ) else (
+        set "noticed=false"
+    )
+    goto :finishAttackOnPlayer
+) else if "%~4"=="24" (
+    call inventory.cmd :inventoryDiminishChargesAttack "%~1" "%~2" "%~7"
+    if "!errorlevel!"=="0" (
+        set "noticed=true"
+    ) else (
+        set "noticed=false"
+    )
+    goto :finishAttackOnPlayer
+) else (
+    set "noticed=false"
+)
+
+:finishAttackOnPlayer
+if "!noticed!"=="false" exit /b 1
+exit /b 0
