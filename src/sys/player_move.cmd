@@ -327,63 +327,41 @@ set "item=game.treasure.list[%t_id%]"
 call dice.cmd :diceRoll "!%item%.damage.dice!" "!%item.damage.sides!"
 set "damage=!errorlevel!"
 
-:: TODO: Stick each option in an array element and call that element instead of
-::       having a massive nested if statement chain
-if "!%item%.sub_category_id!"=="%TrapTypes.OpenPit%" (
-    call :trapOpenPit "%item%" "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.ArrowPit%" (
-    call :trapArrow "%item%" "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.CoveredPit%" (
-    call :trapCoveredPit "%item%" "%damage%" "%coord%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.TrapDoor%" (
-    call :trapDoor "%item%" "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.SleepingGas%" (
-    call :trapSleepingGas
-) else if "!%item%.sub_category_id!"=="%TrapTypes.HiddenObject%" (
-    call :trapHiddenObject "%coord%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.DartOfStr%" (
-    call :trapStrengthDart "%item%" "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.Teleport%" (
-    call :trapTeleport "%coord%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.Rockfall%" (
-    call :trapRockfall "%coord%" "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.CorrodingGas%" (
-    call :trapCorrodeGas
-) else if "!%item%.sub_category_id!"=="%TrapTypes.SummonMonster%" (
-    call :trapSummonMonster "%coord%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.FireTrap%" (
-    call :trapFire "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.AcidTrap%" (
-    call :trapAcid "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.PoisonGasTrap%" (
-    call :trapPoisonGas "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.BlindingGas%" (
-    call :trapBlindGas
-) else if "!%item%.sub_category_id!"=="%TrapTypes.ConfuseGas%" (
-    call :trapConfuseGas
-) else if "!%item%.sub_category_id!"=="%TrapTypes.SlowDart%" (
-    call :trapSlowDart "%item%" "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.DartOfCon%" (
-    call :trapConstitutionDart "%item%" "%damage%"
-) else if "!%item%.sub_category_id!"=="%TrapTypes.SecretDoor%" (
-    exit /b
-) else if "!%item%.sub_category_id!"=="%TrapTypes.ScareMonster%" (
-    exit /b
-) else if "!%item%.sub_category_id!"=="%TrapTypes.GeneralStore%" (
-    call store.cmd :storeEnter 0
-) else if "!%item%.sub_category_id!"=="%TrapTypes.Armory%" (
-    call store.cmd :storeEnter 1
-) else if "!%item%.sub_category_id!"=="%TrapTypes.Weaponsmith%" (
-    call store.cmd :storeEnter 2
-) else if "!%item%.sub_category_id!"=="%TrapTypes.Temple%" (
-    call store.cmd :storeEnter 3
-) else if "!%item%.sub_category_id!"=="%TrapTypes.Alchemist%" (
-    call store.cmd :storeEnter 4
-) else if "!%item%.sub_category_id!"=="%TrapTypes.MagicShop%" (
-    call store.cmd :storeEnter 5
-) else (
+set useTrap[%TrapTypes.OpenPit%]=call :trapOpenPit "%item%" "%damage%"
+set useTrap[%TrapTypes.ArrowPit%]=call :trapArrow "%item%" "%damage%"
+set useTrap[%TrapTypes.CoveredPit%]=call :trapCoveredPit "%item%" "%damage%" "%coord%"
+set useTrap[%TrapTypes.TrapDoor%]=call :trapDoor "%item%" "%damage%"
+set useTrap[%TrapTypes.SleepingGas%]=call :trapSleepingGas
+set useTrap[%TrapTypes.HiddenObject%]=call :trapHiddenObject "%coord%"
+set useTrap[%TrapTypes.DartOfStr%]=call :trapStrengthDart "%item%" "%damage%"
+set useTrap[%TrapTypes.Teleport%]=call :trapTeleport "%coord%"
+set useTrap[%TrapTypes.Rockfall%]=call :trapRockfall "%coord%" "%damage%"
+set useTrap[%TrapTypes.CorrodingGas%]=call :trapCorrodeGas
+set useTrap[%TrapTypes.SummonMonster%]=call :trapSummonMonster "%coord%"
+set useTrap[%TrapTypes.FireTrap%]=call :trapFire "%damage%"
+set useTrap[%TrapTypes.AcidTrap%]=call :trapAcid "%damage%"
+set useTrap[%TrapTypes.PoisonGasTrap%]=call :trapPoisonGas "%damage%"
+set useTrap[%TrapTypes.BlindingGas%]=call :trapBlindGas
+set useTrap[%TrapTypes.ConfuseGas%]=call :trapConfuseGas
+set useTrap[%TrapTypes.SlowDart%]=call :trapSlowDart "%item%" "%damage%"
+set useTrap[%TrapTypes.DartOfCon%]=call :trapConstitutionDart "%item%" "%damage%"
+set useTrap[%TrapTypes.SecretDoor%]=exit /b
+set useTrap[%TrapTypes.ScareMonster%]=exit /b
+:: Fun fact, stores are technically traps
+set useTrap[%TrapTypes.GeneralStore%]=call store.cmd :storeEnter 0
+set useTrap[%TrapTypes.Armory%]=call store.cmd :storeEnter 1
+set useTrap[%TrapTypes.Weaponsmith%]=call store.cmd :storeEnter 2
+set useTrap[%TrapTypes.Temple%]=call store.cmd :storeEnter 3
+set useTrap[%TrapTypes.Alchemist%]=call store.cmd :storeEnter 4
+set useTrap[%TrapTypes.MagicShop%]=call store.cmd :storeEnter 5
+
+set "sub_category_id=!%item%.sub_category_id!"
+if not defined useTrap[%sub_category_id%] (
     call ui_io.cmd :printMessage "You encounter an unknown trap. It does not do anything."
+) else (
+    !useTrap[%sub_category_id%]!
 )
+
 exit /b 
 
 ::------------------------------------------------------------------------------
