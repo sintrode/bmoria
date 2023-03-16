@@ -149,9 +149,38 @@ exit /b
 ::
 :: Arguments: %1 - The character to test
 :: Returns:   0 if the character is uppercase
-::            1 if the character is lowercase
+::            1 if the character does not match the regex [A-Z]
 ::------------------------------------------------------------------------------
 :isUpper
 set "is_upper=0"
-for /f "delims=ABCDEFGHIJKLMNOPQRSTUVWXYZ" %%A in ("%~1") do set "is_upper=1"
+for /f "delims=abcdefghijklmnopqrstuvwxyz" %%A in ("%~1") do set "is_upper=1"
 exit /b %is_upper%
+
+::------------------------------------------------------------------------------
+:: Determines if a character is lowercase
+:: Note that this is here because * is a valid character in :spellGetId
+::
+:: Arguments: %1 - The character to test
+:: Returns:   0 if the character is lowercase
+::            1 if the character does not match the regex [a-z]
+::------------------------------------------------------------------------------
+:isLower
+set "is_lower=0"
+for /f "delims=ABCDEFGHIJKLMNOPQRSTUVWXYZ" %%A in ("%~1") do set "is_lower=1"
+exit /b %is_lower%
+
+::------------------------------------------------------------------------------
+:: Checks a character to determine if it is alphabetic, and if it's uppercase
+:: or lowercase
+::
+:: Arguments: %1 - The character to check
+:: Returns:   0 if the character does not match the regex [A-Za-z]
+::            1 if the character matches the regex [A-Z]
+::            2 if the character matches the regex [a-z]
+::------------------------------------------------------------------------------
+:checkLetter
+set "char=%~1"
+set "char=!char:~0,1!"
+for /f "delims=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" %%A in ("!char!") do exit /b 0
+for /f "delims=abcdefghijklmnopqrstuvwxyz" %%A in ("!char!") do exit /b 1
+exit /b 2
