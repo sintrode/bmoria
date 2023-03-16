@@ -143,3 +143,15 @@ for /f "tokens=1,2 delims=;" %%A in ("!%~1!") do (
     set /a %~1.y_inc=%%A+1, %~1.x_inc=%%B+1
 )
 exit /b
+
+::------------------------------------------------------------------------------
+:: Determines if a character is uppercase
+::
+:: Arguments: %1 - The character to test
+:: Returns:   0 if the character is uppercase
+::            1 if the character is lowercase
+::------------------------------------------------------------------------------
+:isUpper
+set "is_upper=0"
+for /f "delims=ABCDEFGHIJKLMNOPQRSTUVWXYZ" %%A in ("%~1") do set "is_upper=1"
+exit /b %is_upper%
