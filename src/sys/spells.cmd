@@ -113,8 +113,57 @@ if "!spell_found!"=="true" (
 if "!spell_found!"=="false" exit /b 1
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: A wrapper for :spellGetId
+::
+:: Arguments: %1 - The prompt for getting user input
+::            %2 - The inventory ID of the spell book or prayer book
+::            %3 - A variable that stores the value of the spell_id
+::            %4 - A variable that stores the odds of the spell failing
+:: Returns:   -1 if there are no spells in the book
+::             0 if no spell was chosen
+::             1 if a spell was successfully chosen
+::------------------------------------------------------------------------------
 :castSpellGetId
-exit /b
+set "flags=!py.inventory[%~2].flags!"
+call helpers.cmd :getAndClearFirstBit "flags"
+set "first_spell=!errorlevel!"
+
+set /a "flags=!py.inventory[%~2].flags! & !py.flags.spells_learnt!"
+set /a class_dec=%py.misc.class_id%-1
+set "spells=magic_spells[%class_dec%]"
+
+set "spell_count=0"
+
+:castSpellGetIdWhileLoop
+if "!flags!"=="0" goto :castSpellGetIdAfterWhileLoop
+call helpers.cmd :getAndClearFirstBit "flags"
+set "pos=!errorlevel!"
+if !%spells%[%pos%].level_required! LEQ %py.misc.level% (
+    set "spell_list[!spell_count!]=!pos!"
+    set /a spell_count+=1
+)
+goto :castSpellGetIdWhileLoop
+
+
+:castSpellGetIdAfterWhileLoop
+if "!spell_count!"=="0" exit /b -1
+
+set "result=0"
+call :spellGetId "spell_list" "!spell_count!" "%~3" "%~4" "%~1" "!first_spell!"
+if "!errorlevel!"=="0" set "result=1"
+
+if not "!result!"=="0" (
+    if !magic_spells[%class_dec%][%spell_id%].mana_required! GTR %py.misc.current_mana% (
+        if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.spell_type_mage%" (
+            call ui_io.cmd :getInputConfirmation "You summon your limited strength to cast this one. Confirm?"
+            set "result=!errorlevel!"
+        ) else (
+            call ui_io.cmd :getInputConfirmation "The gods may think you presumptuous for this. Confirm?"
+        )
+    )
+)
+exit /b !result!
 
 :spellDetectTreasureWithinVicinity
 exit /b
