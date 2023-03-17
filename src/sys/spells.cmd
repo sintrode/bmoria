@@ -165,28 +165,275 @@ if not "!result!"=="0" (
 )
 exit /b !result!
 
+::------------------------------------------------------------------------------
+:: Detects any treasure on the current panel
+::
+:: Arguments: None
+:: Returns:   0 if any treasure is found
+::            1 if there is nothing left to find
+::------------------------------------------------------------------------------
 :spellDetectTreasureWithinVicinity
-exit /b
+set "detected=1"
 
+for %%Y in (%dg.panel.top%,1,%dg.panel.bottom%) do (
+    for %%X in (%dg.panel.left%,1,%dg.panel.right%) do (
+        for /f "delims=" %%A in ("!dg.floor[%%Y][%%X].treasure_id!") do (
+            if not "%%~A"=="0" (
+                set "coord=%%Y;%%X"
+                call dungeon.cmd :caveTileVisible "coord"
+                if "!errorlevel!"=="1" (
+                    if "!game.treasure.list[%%~A].category_id!"=="%TV_GOLD%" (
+                        set "dg.floor[%%Y][%%X].field_mark=true"
+                        call dungeon.cmd :dungeonLiteSpot "coord"
+                        set "detected=0"
+                    )
+                )
+            )
+        )
+    )
+)
+exit /b %detected%
+
+::------------------------------------------------------------------------------
+:: Detect all objects on the current panel
+::
+:: Arguments: None
+:: Returns:   0 if any objects are found
+::            1 if there is nothing left to find
+::------------------------------------------------------------------------------
 :spellDetectObjectsWithinVicinity
-exit /b
+set "detected=1"
 
+for %%Y in (%dg.panel.top%,1,%dg.panel.bottom%) do (
+    for %%X in (%dg.panel.left%,1,%dg.panel.right%) do (
+        for /f "delims=" %%A in ("!dg.floor[%%Y][%%X].treasure_id!") do (
+            if not "%%~A"=="0" (
+                set "coord=%%Y;%%X"
+                call dungeon.cmd :caveTileVisible "coord"
+                if "!errorlevel!"=="1" (
+                    if !game.treasure.list[%%~A].category_id! LSS %TV_MAX_OBJECT% (
+                        set "dg.floor[%%Y][%%X].field_mark=true"
+                        call dungeon.cmd :dungeonLiteSpot "coord"
+                        set "detected=0"
+                    )
+                )
+            )
+        )
+    )
+)
+exit /b %detected%
+
+::------------------------------------------------------------------------------
+:: Locates and displays traps on the current panel
+::
+:: Arguments: None
+:: Returns:   0 if any traps are detected
+::            1 if no traps are present
+::------------------------------------------------------------------------------
 :spellDetectTrapsWithinVicinity
-exit /b
+set "detected=1"
 
+for %%Y in (%dg.panel.top%,1,%dg.panel.bottom%) do (
+    for %%X in (%dg.panel.left%,1,%dg.panel.right%) do (
+        for /f "delims=" %%A in ("!dg.floor[%%Y][%%X].treasure_id!") do (
+            if not "%%~A"=="0" (
+                if "!game.treasure.list[%%~A].category_id!"=="%TV_INVIS_TRAP%" (
+                    set "dg.floor[%%Y][%%X].field_mark=true"
+                    set "coord=%%Y;%%X"
+                    call dungeon.cmd :trapChangeVisibility "coord"
+                    set "detected=0"
+                ) else if "!game.treasure.list[%%~A].category_id!"=="%TV_CHEST%" (
+                    set "item=game.treasure.list[%%~A]"
+                    call identification.cmd :spellItemIdentifyAndRemoveRandomInscription "item"
+                )
+            )
+        )
+    )
+)
+exit /b %detected%
+
+::------------------------------------------------------------------------------
+:: Locate and display all secret doors on the current panel
+::
+:: Arguments: None
+:: Returns:   0 if secret doors are found
+::            1 if there are no more doors to find
+::------------------------------------------------------------------------------
 :spellDetectSecretDoorssWithinVicinity
-exit /b
+set "detected=1"
 
+for %%Y in (%dg.panel.top%,1,%dg.panel.bottom%) do (
+    for %%X in (%dg.panel.left%,1,%dg.panel.right%) do (
+        set "coord=%%Y;%%X"
+        for /f "delims=" %%A in ("!dg.floor[%%Y][%%X].treasure_id!") do (
+            if not "%%~A"=="0" (
+                if "!game.treasure.list[%%~A].category_id!"=="%TV_SECRET_DOOR%" (
+                    set "dg.floor[%%Y][%%X].field_mark=true"
+                    call dungeon.cmd :trapChangeVisibility "coord"
+                    set "detected=0"
+                ) else if "!dg.floor[%%Y][%%X].field_mark!"=="true" (
+                    set "is_stairs=0"
+                    if "!game.treasure.list[%%~A].category_id!"=="%TV_UP_STAIR%" set "is_stairs=1"
+                    if "!game.treasure.list[%%~A].category_id!"=="%TV_DOWN_STAIR%" set "is_stairs=1"
+
+                    if "!is_stairs!"=="1" (
+                        set "dg.floor[%%Y][%%X].field_mark=true"
+                        call dungeon.cmd :dungeonLiteSpot "coord"
+                        set "detected=0"
+                    )
+                    set "is_stairs="
+                )
+            )
+        )
+    )
+)
+exit /b %detected%
+
+::------------------------------------------------------------------------------
+:: Locates and displays all invisible creatures on the current panel
+::
+:: Arguments: None
+:: Returns:   0 if any monsters are detected
+::            1 if there are no more monsters to find
+::------------------------------------------------------------------------------
 :spellDetectInvisibleCreaturesWithinVicinity
-exit /b
+set "detected=1"
+set /a mon_dec=%next_free_monster_id%-1
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    set "mon_coord=!monsters[%%A].pos.y!;!monsters[%%A].pos.x!"
+    call ui.cmd :coordInsidePanel "!mon_coord!"
+    if "!errorlevel!"=="0" (
+        for /f "delims=" %%C in ("!monsters[%%A].creature_id!") do (
+            set /a "is_invisible=!creatures_list[%%~C].movement! & %config.monsters.move.cm_invisible%"
+            if not "!is_invisible!"=="0" (
+                set "monsters[%%A].lit=true"
+                call ui_io.cmd :panelPutTile "!creatures_list[%%~C].sprite!" "!mon_coord!"
+                set "detected=0"
+            )
+        )
+    )
+)
+set "mon_coord="
 
+if "!detected!"=="0" (
+    call ui_io.cmd :printMessage "You sense the presence of invisible creatures."
+    call ui_io.cmd :printMessage "CNIL"
+    call monster.cmd :updateMonsters "false"
+)
+exit /b %detected%
+
+::------------------------------------------------------------------------------
+:: Lights the immediate area if the player is in a corridor, or lights the
+:: entire room plus the immediate area if the player is in a room
+::
+:: Arguments: %1 - The player's coordinates
+:: Returns:   0 always
+::------------------------------------------------------------------------------
 :spellLightArea
-exit /b
+if %py.flags.blind% LSS 1 (
+    call ui_io.cmd :printMessage "You are surrounded by a white light."
+)
 
+set "coord=%~1"
+call helpers.cmd :expandCoordName "coord"
+if "!dg.floor[%coord.y%][%coord.x%].perma_lit_room!"=="true" (
+    if %dg.current_level% GTR 0 (
+        call dungeon.cmd :dungeonLightRoom "coord"
+    )
+)
+
+for /L %%Y in (%coord.y_dec%,1,%coord.y_inc%) do (
+    for /L %%X in (%coord.x_dec%,1,%coord.x_inc%) do (
+        set "dg.floor[%%Y][%%X].permanent_light=true"
+        set "spot=%%Y;%%X"
+        call dungeon.cmd :dungeonLiteSpot "spot"
+    )
+)
+exit /b 0
+
+::------------------------------------------------------------------------------
+:: Darkens an area
+::
+:: Arguments: %1 - The player's coordinates
+:: Returns:   0 if the area is successfully darkened
+::            1 if the area remains lit
+::------------------------------------------------------------------------------
 :spellDarkenArea
-exit /b
+set "darkened=1"
+set "coord=%~1"
+call helpers.cmd :expandCoordName "coord"
 
+if "!dg.floor[%coord.y%][%coord.x%].perma_lit_room!"=="true" (
+    if %dg.current_level% GTR 0 (
+        set /a half_height=%screen_height%/2, half_width=%screen_width%/2
+        set /a "start_row=(%coord.y% / !half_height!) * !half_height! + 1"
+        set /a "start_col=(%coord.x% / !half_width!)  * !half_width!  + 1"
+        set /a end_row=!start_row! + !half_height! - 1
+        set /a end_col=!start_col! + !half_width!  - 1
+
+        for /L %%Y in (!start_row!,1,!end_row!) do (
+            for /L %%X in (!start_col!,1,!end_col!) do (
+                set "spot=%%Y;%%X"
+                if "!dg.floor[%%Y][%%X].perma_lit_room!"=="true" (
+                    if !dg.floor[%%Y][%%X].feature_id! LEQ %MAX_CAVE_FLOOR% (
+                        set "dg.floor[%%Y][%%X].permanent_light=false"
+                        set "dg.floor[%%Y][%%X].feature_id=%TILE_DARK_FLOOR%"
+                        call dungeon.cmd :dungeonLiteSpot "spot"
+
+                        call dungeon.cmd :caveTileVisible "spot"
+                        if "!errorlevel!"=="1" set "darkened=0"
+                    )
+                )
+            )
+        )
+    )
+) else (
+    for /L %%Y in (%coord.y_dec%,1,%coord.y_inc%) do (
+        for /L %%X in (%coord.x_dec%,1,%coord.x_inc%) do (
+            if "!dg.floor[%%Y][%%X].feature_id!"=="%TILE_CORR_FLOOR%" (
+                if "!dg.floor[%%Y][%%X].permanent_light!"=="true" (
+                    set "dg.floor[%%Y][%%X].permanent_light=false"
+                    set "darkened=0"
+                )
+            )
+        )
+    )
+)
+
+if "!darkened!"=="0" (
+    if %py.flags.blind% LSS 1 (
+        call ui_io.cmd :printMessage "Darkness surrounds you."
+    )
+)
+exit /b %darkened%
+
+::------------------------------------------------------------------------------
+:: Lights the area around a specified tile
+::
+:: Arguments: %1 - The coordinates of the center of the lit area
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonLightAreaAroundFloorTile
+set "coord=%~1"
+call helpers.cmd :expandCoordName "coord"
+
+for /L %%Y in (%coord.y_dec%,1,%coord.y_inc%) do (
+    for /L %%X in (%coord.x_dec%,1,%coord.x_inc%) do (
+        if !dg.floor[%%Y][%%X].feature_id! GEQ %MIN_CAVE_WALL% (
+            set "dg.floor[%%Y][%%X]=true"
+        ) else (
+            for /f "delims=" %%A in ("!dg.floor[%%Y][%%X].treasure_id!") do (
+                if not "%%~A"=="0" (
+                    if !game.treasure.list[%%~A].category_id! GEQ %TV_MIN_VISIBLE% (
+                        if !game.treasure.list[%%~A].category_id! LEQ %TV_MAX_VISIBLE% (
+                            set "dg.floor[%%Y][%%X].field_mark=true"
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
 exit /b
 
 :spellMapCurrentArea
