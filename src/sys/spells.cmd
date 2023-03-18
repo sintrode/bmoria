@@ -436,34 +436,330 @@ for /L %%Y in (%coord.y_dec%,1,%coord.y_inc%) do (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Maps the current area and a bit extra
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellMapCurrentArea
+call rng.cmd :randomNumber 10
+set /a row_min=%dp.panel.top%-!errorlevel!
+call rng.cmd :randomNumber 10
+set /a row_max=%dp.panel.bottom%+!errorlevel!
+call rng.cmd :randomNumber 20
+set /a col_min=%dp.panel.left%-!errorlevel!
+call rng.cmd :randomNumber 20
+set /a col_max=%dp.panel.right%+!errorlevel!
+
+for /L %%Y in (%row_min%,1,%row_max%) do (
+    for /L %%X in (%col_min%,1,%col_max%) do (
+        set "coord=%%Y;%%X"
+        call dungeon.cmd :coordInBounds "coord"
+        if "!errorlevel!"=="0" (
+            if !dg.floor[%%Y][%%X].feature_id! LEQ %MAX_CAVE_FLOOR% (
+                call dungeon.cmd :dungeonLightAreaAroundFloorTile "!coord!"
+            )
+        )
+    )
+)
+call ui.cmd :drawDungeonPanel
 exit /b
 
+::------------------------------------------------------------------------------
+:: Identifies an object
+::
+:: Arguments: None
+:: Returns:   0 if an item is selected
+::            1 if the player backs out before making a selection
+::------------------------------------------------------------------------------
 :spellIdentifyItem
-exit /b
+call ui_inventory.cmd :inventoryGetInputForItemId "item_id" "Item you wish identified?" 0 "%PLAYER_INVENTORY_SIZE%" "CNIL" "CNIL"
+if "!errorlevel!"=="1" exit /b 1
 
+call identification.cmd :itemIdentify "py.inventory[%item_id%]" "item_id"
+
+set "item=py.inventory[%item_id%]"
+call identification.cmd :spellItemIdentifyAndRemoveRandomInscription "item"
+call identification.cmd :itemDescription "description" "item" "true"
+
+if %item_id% GEQ %PlayerEquipment.Wield% (
+    call player.cmd :playerRecalculateBonuses
+    call ui_inventory.cmd :playerItemWearingDescription "%item_id%" "item_char"
+    call ui_io.cmd :printMessage "!item_char!: !description!"
+) else (
+    set /a disp_item_ascii=%item_id%+97
+    cmd /c exit /b !disp_item_ascii!
+    call ui_io.cmd :printMessage "!=ExitCodeAscii! !description!"
+)
+exit /b 0
+
+::------------------------------------------------------------------------------
+:: Makes all of the nearby monsters angry
+::
+:: Arguments: %1 - The range of the spell
+:: Returns:   0 if there are nearby monsters to annoy
+::            1 if there are no monsters in the area
+::------------------------------------------------------------------------------
 :spellAggravateMonsters
-exit /b
+set "aggravated=1"
+set /a mon_dec=%next_free_monster_id%-1
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    set "monsters[%%A].sleep_count=0"
+    if !monsters[%%A].distance_from_player! LEQ %~1 (
+        if !monsters[%%A].speed! LSS 2 (
+            set /a monsters[%%A].speed+=1
+            set "aggravated=0"
+        )
+    )
+)
 
+if "%aggravated%"=="0" (
+    call ui_io.cmd :printMessage "You hear a sudden stirring in the distance."
+)
+exit /b %aggravated%
+
+::------------------------------------------------------------------------------
+:: Puts traps on up to all eight available spaces around the player
+::
+:: Arguments: None
+:: Returns:   0 always
+::------------------------------------------------------------------------------
 :spellSurroundPlayerWithTraps
-exit /b
+call helpers.cmd :expandCoordName "py.pos"
+for /L %%Y in (%py.pos.y_dec%,1,%py.pos.y_inc%) do (
+    for /L %%X in (%py.pos.x_dec%,1,%py.pos.x_inc%) do (
+        REM Make sure there is no trap under a player so that they can rest
+        if not "%%Y"=="%py.pos.y%" if not "%%X"=="%py.pos.x%" (
+            if !dg.floor[%%Y][%%X].feature_id! LEQ %MAX_CAVE_FLOOR% (
+                if not "!dg.floor[%%Y][%%X].treasure_id!"=="0" (
+                    set "coord=%%Y;%%X"
+                    call dungeon.cmd :dungeonDeleteObject "coord"
+                )
 
+                call rng.cmd :randomNumber %config.dungeon.objects.max_traps%
+                set /a rnd_trap=!errorlevel!-1
+                call dungeon.cmd :dungeonSetTrap "coord" !rnd_trap!
+
+                REM The player can not gain experience from disarming these traps
+                for /f "delims=" %%A in ("!dg.floor[%%Y][%%X].treasure_id!") do (
+                    set "game.treasure_list[%%~A].misc_use=0"
+                )
+
+                REM Light the area to see open pits
+                call dungeon.cmd :dungeonLiteSpot "coord"
+            )
+        )
+    )
+)
+exit /b 0
+
+::------------------------------------------------------------------------------
+:: Puts doors on all eight spaces surrounding the player
+::
+:: Arguments: None
+:: Returns:   0 if any doors are placed
+::            1 if no doors are able to be placed
+::------------------------------------------------------------------------------
 :spellSurroundPlayerWithDoors
-exit /b
+set "created=1"
+call helpers.cmd :expandCoordName "py.pos"
+for /L %%Y in (%py.pos.y_dec%,1,%py.pos.y_inc%) do (
+    for /L %%X in (%py.pos.x_dec%,1,%py.pos.x_inc%) do (
+        REM Make sure there is no door under a player
+        if not "%%Y"=="%py.pos.y%" if not "%%X"=="%py.pos.x%" (
+            if !dg.floor[%%Y][%%X].feature_id! LEQ %MAX_CAVE_FLOOR% (
+                if not "!dg.floor[%%Y][%%X].treasure_id!"=="0" (
+                    set "coord=%%Y;%%X"
+                    call dungeon.cmd :dungeonDeleteObject "coord"
+                )
 
+                call game_objects.cmd :popt
+                set "free_id=!errorlevel!"
+                set "dg.floor[%%Y][%%X].feature_id=%TILE_BLOCKED_FLOOR%"
+                set "dg.floor[%%Y][%%X].treasure_id=!free_id!"
+
+                call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_closed_door%" "game.treasure.list[!free_id!]"
+                set "coord=%%Y;%%X"
+                call dungeon.cmd :dungeonLiteSpot "coord"
+                set "created=true"
+            )
+        )
+    )
+)
+exit /b %created%
+
+::------------------------------------------------------------------------------
+:: Destroys any adjacent doors or traps
+::
+:: Arguments: None
+:: Returns:   0 if any door or trap was destroyed
+::            1 if there was nothing to get rid of
+::------------------------------------------------------------------------------
 :spellDestroyAdjacentDoorsTraps
+set "destroyed=1"
+
+call helpers.cmd :expandCoordName "py.pos"
+for /L %%Y in (%py.pos.y_dec%,1,%py.pos.y_inc%) do (
+    for /L %%X in (%py.pos.x_dec%,1,%py.pos.x_inc%) do (
+        if not "!dg.floor[%%Y][%%X].treasure_id!"=="0" (
+            call :spellDestroyAdjacentDoorsTrapsSub "!dg.floor[%%Y][%%X].treasure_id!" "%%Y;%%X"
+        )
+    )
+)
+exit /b %destroyed%
+
+:spellDestroyAdjacentDoorsTrapsSub
+set "item=game.treasure.list[%~1]"
+set "auto_destroy=0"
+if !%item%!.category_id! GEQ %TV_INVIS_TRAP% (
+    if !%item%.category_id! LEQ %TV_CLOSED_DOOR% (
+        if not "!%item%.category_id!"=="%TV_RUBBLE%" (
+            set "auto_destroy=1"
+        )
+    )
+)
+if "!%item%.category_id!"=="%TV_SECRET_DOOR%" set "auto_destroy=1"
+if "!auto_destroy!"=="1" (
+    set "coord=%~2"
+    call dungeon.cmd :dungeonDeleteObject "coord"
+    if "!errorlevel!"=="0" set "destroyed=0"
+) else (
+    if "!%item%.category_id!"=="%TV_CHEST%" (
+        if not "!%item%.flags!"=="0" (
+            set /a "%item%.flags&=~(%config.treasure.chests.ch_trapped% | %config.treasure.chests.ch_locked%)"
+            set "%item%.special_name_id=%SpecialNameIds.sn_unlocked%"
+            set "destroyed=0"
+
+            call ui_io.cmd :printMessage "You have disarmed the chest."
+            call identification.cmd :spellItemIdentifyAndRemoveRandomInscription "%item%"
+        )
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Displays all creatures on the current panel
+::
+:: Arguments: None
+:: Returns:   0 if any monsters are detected
+::            1 if there are no monsters to be found or if they are invisible
+::------------------------------------------------------------------------------
 :spellDetectMonsters
-exit /b
+set "detected=1"
 
+set /a mon_dec=%next_free_monster_id%-1
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    for /f "delims=" %%M in ("monsters[%%A]") do (
+        call ui.cmd :coordInsidePanel "!%%~M.pos.y!;!%%~M.pos.x!"
+        if "!errorlevel!"=="0" (
+            for /f "delims=" %%C in ("!%%~M.creature_id!") do (
+                set /a "is_invisible=!creatures_list[%%~C].movement! & %config.monsters.move.cm_invisible%"
+                if "!is_invisible!"=="0" (
+                    set "%%~M.lit=true"
+                    set "detected=0"
+
+                    call ui_io.cmd :panelPutTile "!creatures_list[%%~C].sprite!" "!%%~M.pos.y!;!%%~M.pos.x!"
+                )
+            )
+        )
+    )
+)
+exit /b %detected%
+
+::------------------------------------------------------------------------------
+:: Update a monster when the light line spell touches it
+::
+:: Arguments: %1 - The monster_id of the monster that is seen
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellLightLineTouchesMonster
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+call monster.cmd :monsterUpdateVisibility "%~1"
+call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+
+set /a "hates_light=!%creature%.defenses! & %config.monsters.defense.cd_light%"
+if not "!hates_light!"=="0" (
+    if "!%monster%.lit!"=="true" (
+        set /a "creature_recall[!%monster%.creature_id!].defenses|=%config.monsters.defense.cd_light%"
+    )
+
+    call dice.cmd :diceRoll 2 8
+    call monster.cmd :monsterTakeHit "%~1" "!errorlevel!"
+    if !errorlevel! GEQ 0 (
+        call monster.cmd :printMonsterActionText "!name!" "shrivels away in the light."
+        call ui.cmd :displayCharacterExperience
+    ) else (
+        call monster.cmd :printMonsterActionText "!name!" "cringes from the light."
+    )
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Creates a line of light in a given direction
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction to shoot the light in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellLightLine
-exit /b
+set "distance=0"
 
+:spellLightLineWhileLoop
+for /f "tokens=1,2" %%X in ("!coord.x! !coord.y!") do set "tile=dg.floor[%%Y][%%X]"
+
+set "break_condition_met=0"
+if %~2 GTR %config.treasure.objects_bolts_max_range% set "break_condition_met=1"
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% set "break_condition_met=1"
+if "!break_condition_met!"=="1" (
+    call player.cmd :playerMovePosition "%~2" "coord"
+    exit /b
+)
+
+if "!%tile%.permanent_light!"=="false" (
+    if "!%tile%.temporary_light!"=="false" (
+        set "%tile%.permanent_light=true"
+        set "tmp_coord.y=!%~1.y!"
+        set "tmp_coord.x=!%~1.x!"
+        set "tmp_coord=!tmp_coord.y!;!tmp_coord.x!"
+
+        if "!%tile%.feature_id!"=="%TILE_LIGHT_FLOOR%" (
+            call ui.cmd :coordInsidePanel "!tmp_coord!"
+            if "!errorlevel!"=="0" call dungeon.cmd :dungeonLightRoom "tmp_coord"
+        ) else (
+            call dungeon.cmd :dungeonLiteSpot "tmp_coord"
+        )
+    )
+)
+
+set "%tile%.permanent_light=true"
+if !%tile%.creature_id! GTR 1 (
+    call :spellLightLineTouchesMonster "!%tile%.creature_id!"
+)
+
+set "coord=%~1"
+call player.cmd :playerMovePosition "%~2" "coord"
+set /a distance+=1
+goto :spellLightLineWhileLoop
+
+::------------------------------------------------------------------------------
+:: Lights a line in all directions
+::
+:: Arguments: %1 - The coordinates of the player
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellStarlite
+if %py.flags.blind% LSS 1 (
+    call ui_io.cmd :printMessage "The end of the staff bursts into a blue shimmering light."
+)
+for /L %%A in (1,1,9) do (
+    if not "%%A"=="5" (
+        call :spellLightLine "%~1" "%%~A"
+    )
+)
 exit /b
 
 :spellDisarmAllInDirection
