@@ -816,10 +816,73 @@ if !distance! LEQ %config.treasure.objects_bolts_max_range% (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Returns flags for a given type area affect
+:: TODO: Presumably I'll have to add a fifth argument to pass an item for
+::       the DestroyableItems function later
+::
+:: Arguments: %1 - The type of spell
+::            %2 - A variable to store the type of weapon used
+::            %3 - A variable to store the damage type
+::            %4 - A variable that indicates if certain items get destroyed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellGetAreaAffectFlags
+if "%~1"=="%MagicSpellFlags.MagicMissile%" (
+    set "weapon_type=0"
+    set "harm_type=0"
+    call inventory.cmd :setNull
+    set "%~4=!errorlevel!"
+) else if "%~1"=="%MagicSpellFlags.Lightning%" (
+    set "weapon_type=%config.monsters.spells.cs_br_light%"
+    set "harm_type=%config.monsters.defense.cd_light%"
+    call inventory.cmd :setLightningDestroyableItems
+    set "%~4=!errorlevel!"
+) else if "%~1"=="%MagicSpellFlags.PoisonGas%" (
+    set "weapon_type=%config.monsters.spells.cs_br_gas%"
+    set "harm_type=%config.monsters.defense.cd_poison%"
+    call inventory.cmd :setNull
+    set "%~4=!errorlevel!"
+) else if "%~1"=="%MagicSpellFlags.Acid%" (
+    set "weapon_type=%config.monsters.spells.cs_br_acid%"
+    set "harm_type=%config.monsters.defense.cd_acid%"
+    call inventory.cmd :setAcidDestroyableItems
+    set "%~4=!errorlevel!"
+) else if "%~1"=="%MagicSpellFlags.Frost%" (
+    set "weapon_type=%config.monsters.spells.cs_br_frost%"
+    set "harm_type=%config.monsters.defense.cd_frost%"
+    call inventory.cmd :setFrostDestroyableItems
+    set "%~4=!errorlevel!"
+) else if "%~1"=="%MagicSpellFlags.Fire%" (
+    set "weapon_type=%config.monsters.spells.cs_br_fire%"
+    set "harm_type=%config.monsters.defense.cd_fire%"
+    call inventory.cmd :setFireDestroyableItems
+    set "%~4=!errorlevel!"
+) else if "%~1"=="%MagicSpellFlags.HolyOrb%" (
+    set "weapon_type=0"
+    set "harm_type=%config.monsters.defense.cd_evil%"
+    call inventory.cmd :setLightningDestroyableItems
+    set "%~4=!errorlevel!"
+) else (
+    call ui_io.cmd :printMessage "Error in :spellGetAreaAffectFlags"
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints a message saying that the monster was struck
+:: 
+:: Arguments: %1 - A reference to the monster being struck
+::            %2 - A reference to the type of bolt striking the monster
+::            %3 - Determines if the monster is visible or not
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printBoltStrikesMonsterMessage
+if "%~3"=="true" (
+    set "monster_name=the !%~1.name!"
+) else (
+    set "monster_name=it"
+)
+call ui_io.cmd :printMessage "The !%~2! strikes !monster_name!."
 exit /b
 
 :spellFireBoltTouchesMonster
