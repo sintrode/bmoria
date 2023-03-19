@@ -762,7 +762,58 @@ for /L %%A in (1,1,9) do (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Disarms all traps/chests in a given direction
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction to disarm in
+:: Returns:   0 if something was successfully disarmed
+::            1 if there is nothing to disarm
+::------------------------------------------------------------------------------
 :spellDisarmAllInDirection
+set "coord=%~1"
+set "distance=0"
+set "disarmed=1"
+
+:spellDisarmAllInDirectionWhileLoop
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do set "tile=dg.floor[%%~A][%%~B]"
+set "t_id=!%tile%.treasure_id!"
+set "item=game.treasure.list[%t_id%]"
+if not "!%tile%.treasure_id!"=="0" (
+    set "is_trap=0"
+    if "!%item%.category_id!"=="%TV_INVIS_TRAP%" set "is_trap=1"
+    if "!%item%.category_id!"=="%TV_VIS_TRAP%" set "is_trap=1"
+    if "!is_trap!"=="1" (
+        call dungeon.cmd :dungeonDeleteObject "coord"
+        if "!errorlevel!"=="0" set "disarmed=0"
+    ) else if "!%item%.category_id!"=="%TV_CLOSED_DOOR%" (
+        REM Locked or jammed doors become merely closed
+        set "%item%.misc_use=0"
+    ) else if "!%item%.category_id!"=="%TV_SECRET_DOOR%" (
+        set "%tile%.field_mark=true"
+        call dungeon.cmd :trapChangeVisibility "coord"
+        set "disarmed=0"
+    ) else (
+        if "!%item%.category_id!"=="%TV_CHEST%" (
+            if not "!%item%.flags!"=="0" (
+                set "disarmed=0"
+                call ui_io.cmd :printMessage "Click^^!"
+
+                set /a "%item%.flags&=~(%config.treasure.chests.ch_trapped%|%config.treasure.chests.ch_locked%)"
+                set "%item%.special_name_id=%SpecialNameIds.sn_unlocked%"
+                call identification.cmd :spellItemIdentifyAndRemoveRandomInscription "%item%"
+            )
+        )
+    )
+)
+call player.cmd :playerMovePosition "%~2" "coord"
+set /a distance+=1
+
+if !distance! LEQ %config.treasure.objects_bolts_max_range% (
+    if !%tile%.feature_id! LEQ %MAX_OPEN_SPACE% (
+        goto :spellDisarmAllInDirectionWhileLoop
+    )
+)
 exit /b
 
 :spellGetAreaAffectFlags
