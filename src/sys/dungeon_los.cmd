@@ -403,7 +403,7 @@ call ui.cmd :coordInsidePanel "%~1" || (
 )
 
 for %%A in (feature_id creature_id temporary_light permanent_light field_mark treasure_id) do (
-    set "tile.%%~A=!dg.floor[%coord.y%][%coord.x%].%%~A"
+    set "tile.%%~A=!dg.floor[%coord.y%][%coord.x%].%%~A!"
 )
 
 :: Don't look at a direct line of sight

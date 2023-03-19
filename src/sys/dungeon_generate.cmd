@@ -97,11 +97,10 @@ for /L %%A in (0,1,66) do (
         set "dg.floor[%%A][%%B].treasure_id=0"
         set "dg.floor[%%A][%%B].feature_id=0"
 
-        REM TODO: determine if these need to be "false" instead of "0"
-        set "dg.floor[%%A][%%B].perma_lit_room=0"
-        set "dg.floor[%%A][%%B].field_mark=0"
-        set "dg.floor[%%A][%%B].permanent_light=0"
-        set "dg.floor[%%A][%%B].temporary_light=0"
+        set "dg.floor[%%A][%%B].perma_lit_room=false"
+        set "dg.floor[%%A][%%B].field_mark=false"
+        set "dg.floor[%%A][%%B].permanent_light=false"
+        set "dg.floor[%%A][%%B].temporary_light=false"
     )
 )
 exit /b
