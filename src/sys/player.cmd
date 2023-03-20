@@ -107,6 +107,7 @@ if !new_coord.y! GEQ 0 (
             if !new_coord.x! LSS %dg.width% (
                 set "coord.y=!new_coord.y!"
                 set "coord.x=!new_coord.x!"
+                set "coord=!coord.y!;!coord.x!"
                 set "can_move=0"
             )
         )

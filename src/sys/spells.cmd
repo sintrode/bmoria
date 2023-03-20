@@ -818,13 +818,12 @@ exit /b
 
 ::------------------------------------------------------------------------------
 :: Returns flags for a given type area affect
-:: TODO: Presumably I'll have to add a fifth argument to pass an item for
-::       the DestroyableItems function later
 ::
 :: Arguments: %1 - The type of spell
 ::            %2 - A variable to store the type of weapon used
 ::            %3 - A variable to store the damage type
 ::            %4 - A variable that indicates if certain items get destroyed
+::            %5 - A reference to the item located in the area
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :spellGetAreaAffectFlags
@@ -836,7 +835,7 @@ if "%~1"=="%MagicSpellFlags.MagicMissile%" (
 ) else if "%~1"=="%MagicSpellFlags.Lightning%" (
     set "weapon_type=%config.monsters.spells.cs_br_light%"
     set "harm_type=%config.monsters.defense.cd_light%"
-    call inventory.cmd :setLightningDestroyableItems
+    call inventory.cmd :setLightningDestroyableItems "%~5"
     set "%~4=!errorlevel!"
 ) else if "%~1"=="%MagicSpellFlags.PoisonGas%" (
     set "weapon_type=%config.monsters.spells.cs_br_gas%"
@@ -846,22 +845,22 @@ if "%~1"=="%MagicSpellFlags.MagicMissile%" (
 ) else if "%~1"=="%MagicSpellFlags.Acid%" (
     set "weapon_type=%config.monsters.spells.cs_br_acid%"
     set "harm_type=%config.monsters.defense.cd_acid%"
-    call inventory.cmd :setAcidDestroyableItems
+    call inventory.cmd :setAcidDestroyableItems "%~5"
     set "%~4=!errorlevel!"
 ) else if "%~1"=="%MagicSpellFlags.Frost%" (
     set "weapon_type=%config.monsters.spells.cs_br_frost%"
     set "harm_type=%config.monsters.defense.cd_frost%"
-    call inventory.cmd :setFrostDestroyableItems
+    call inventory.cmd :setFrostDestroyableItems "%~5"
     set "%~4=!errorlevel!"
 ) else if "%~1"=="%MagicSpellFlags.Fire%" (
     set "weapon_type=%config.monsters.spells.cs_br_fire%"
     set "harm_type=%config.monsters.defense.cd_fire%"
-    call inventory.cmd :setFireDestroyableItems
+    call inventory.cmd :setFireDestroyableItems "%~5"
     set "%~4=!errorlevel!"
 ) else if "%~1"=="%MagicSpellFlags.HolyOrb%" (
     set "weapon_type=0"
     set "harm_type=%config.monsters.defense.cd_evil%"
-    call inventory.cmd :setLightningDestroyableItems
+    call inventory.cmd :setLightningDestroyableItems "%~5"
     set "%~4=!errorlevel!"
 ) else (
     call ui_io.cmd :printMessage "Error in :spellGetAreaAffectFlags"
@@ -885,13 +884,273 @@ if "%~3"=="true" (
 call ui_io.cmd :printMessage "The !%~2! strikes !monster_name!."
 exit /b
 
+::------------------------------------------------------------------------------
+:: Light up the tile since fire glows and then try to burn the monster
+:: TODO: s/spellFire/spell/g
+::
+:: Arguments: %1 - A reference to the tile that the monster is on
+::            %2 - The damage done by the spell
+::            %3 - The type of damage done by the spell
+::            %4 - The weapon_id of the weapon that cast the spell
+::            %5 - A reference to the name of the spell that was cast
+::------------------------------------------------------------------------------
 :spellFireBoltTouchesMonster
+set "damage=%~2"
+set "t_id=!%~1.creature_id!"
+set "monster=monsters[%t_id%]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+:: Temporarily set permanent light so that :monsterUpdateVisibility works
+set "saved_lit_status=!%~1.permanent_light!"
+set "%~1.permanent_light=true"
+call monster.cmd :monsterUpdateVisibility "%c_id%"
+set "%~1.permanent_light=%saved_lit_status%"
+
+call ui_io.cmd :putQIO
+call :printBoltStrikesMonsterMessage "%creature%" "%~5" "!%monster%.lit!"
+
+set /a "is_weak_to_type=%~3 & !%creature%.defenses!"
+set /a "is_monster_type=%~4 & !%creatures%.spells!"
+
+if not "%is_weak_to_type%"=="0" (
+    set /a damage*=2
+    if "!%monster%.lit!"=="true" (
+        set /a "creature_recall[%c_id%].defenses|=%~3"
+    )
+) else if not "%is_monster_type%"=="0" (
+    set /a damage/=4
+    if "!%monster%.lit!"=="true" (
+        set /a "creature_recall[%c_id%].defenses|=%~4"
+    )        
+)
+
+call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+call monster.cmd :monsterTakeHit "!%~1.creature_id!" "!damage!"
+if !errorlevel! GEQ 0 (
+    call monster.cmd :printMonsterActionText "!name!" "dies in a fit of agony."
+    call ui.cmd :displayCharacterExperience
+) else (
+    call monster.cmd :printMonsterActionText "!name!" "screams in agony."
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Fires a generic bolt in a specified direction
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction the bolt is being fired
+::            %3 - The damage done to any monster that is hit
+::            %4 - The type of spell (missile, lightning, frost, fire)
+::            %5 - A reference to the name of the spell
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellFireBolt
-exit /b
+set "harm_type=0"
+call :spellGetAreaAffectFlags "%~4" "weapon_type" "harm_type" "dummy"
 
+set "distance=0"
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    set "coord.y=%%A"
+    set "coord.x=%%B"
+    set "coord=%%A;%%B"
+)
+
+:spellFireBoltWhileLoop
+set "old_coord.y=!coord.y!"
+set "old_coord.x=!coord.x!"
+set "old_coord=!coord!"
+call player.cmd :playerMovePosition "%~2" "coord"
+set /a distance+=1
+
+set "tile=dg.floor[%coord.y%][%coord.x%]"
+call dungeon.cmd :dungeonLiteSpot "old_coord"
+
+if %distance% GTR %config.treasure.objects_bolts_max_range% exit /b
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b
+
+if !%tile%.creature_id! GTR 1 (
+    call :spellFireBoltTouchesMonster "%tile%" "%~3" "%harm_type%" "%weapon_type%" "%~5"
+    exit /b
+) else (
+    call ui.cmd :coordInsidePanel "!coord!"
+    if "!errorlevel!"=="0" (
+        if %py.flags.blind% LSS 1 (
+            call ui_io.cmd :panelPutTile "*" "!coord!"
+            call ui_io.cmd :putQIO
+        )
+    )
+)
+goto :spellFireBoltWhileLoop
+
+::------------------------------------------------------------------------------
+:: Fires a projectile ball in a specified direction with AoE damage
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction of the spell
+::            %3 - The damage done to any monster that is hit
+::            %4 - The type of spell (missile, lightning, frost, fire)
+::            %5 - A reference to the name of the spell
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellFireBall
+set "coord=%~1"
+set "direction=%~2"
+set "damage_hp=%~3"
+set "spell_type=%~4"
+set "total_hits=0"
+set "total_kills=0"
+set "distance=0"
+set "finished=false"
+
+:spellFireBallWhileLoop
+if "!finished!"=="true" goto :spellFireBallAfterWhileLoop
+
+for /f "tokens=1,2 delims=;" %%A in ("%coord%") do (
+    set "coord.y=%%~A"
+    set "coord.x=%%~B"
+)
+set "old_coord.y=%coord.y%"
+set "old_coord.x=%coord.x%"
+set "old_coord=%coord%"
+call player.cmd :playerMovePosition "%direction%" "coord"
+
+set /a distance+=1
+call dungeon.cmd :dungeonLiteSpot "old_coord"
+
+if %distance% GTR %config.treasure.objects_bolts_max_range% exit /b
+
+set "tile=dg.floor[%coord.y%][%coord.x%]"
+
+set "ball_can_hit=0"
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% set "ball_can_hit=1"
+if !%tile%.creature_id! GTR 1 set "ball_can_hit=1"
+if "%ball_can_hit%"=="1" (
+    set "finished=true"
+
+    if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% (
+        set "coord.y=!old_coord.y!"
+        set "coord.x=!old_coord.x!"
+        set "coord=!old_coord!"
+    )
+
+    REM Explosion have an area of effect
+    set /a aoe_top=!coord.y!-2, aoe_bottom=!coord.y!+2, aoe_left=!coord.x!-2, aoe_right=!coord.x!+2
+    for /L %%Y in (!aoe_top!,1,!aoe_bottom!) do (
+        for /L %%X in (!aoe_left!,1,!aoe_right!) do (
+            set "spot.y=%%Y"
+            set "spot.x=%%X"
+            set "spot=%%Y;%%X"
+
+            set "can_be_seen=0"
+            call dungeon.cmd :coordInBounds "spot" && set /a can_be_seen+=1
+            call dungeon.cmd :coordDistanceBetween "coord" "spot"
+            if !errorlevel! LEQ 2 set /a can_be_seen+=1
+            call dungeon_los.cmd :los "!coord!" "!spot!" && set /a can_be_seen+=1
+            if "!can_be_seen!"=="3" (
+                call :spellFireBallOuterIf "!spot.y!" "!spot.x!"
+            )
+        )
+    )
+
+    call ui_io.cmd :putQIO
+
+    REM TODO: See what happens when I put this in the outer if statment
+    for /L %%Y in (!aoe_top!,1,!aoe_bottom!) do (
+        for /L %%X in (!aoe_left!,1,!aoe_right!) do (
+            set "spot.y=%%Y"
+            set "spot.x=%%X"
+
+            set "can_be_seen=0"
+            call dungeon.cmd :coordInBounds "spot" && set /a can_be_seen+=1
+            call dungeon.cmd :coordDistanceBetween "coord" "spot"
+            if !errorlevel! LEQ 2 set /a can_be_seen+=1
+            call dungeon_los.cmd :los "!coord!" "!spot!" && set /a can_be_seen+=1
+            if "!can_be_seen!"=="3" (
+                call dungeon.cmd :dungeonLiteSpot "spot"
+            )
+        )
+    )
+
+    if "!total_hits!"=="1" (
+        call ui_io.cmd :printMessage "The !%~5! envelops a creature."
+    ) else if !total_hits! GTR 1 (
+        call ui_io.cmd :printMessage "The !%~5! envelops several creatures."
+    )
+
+    if "!total_hits!"=="1" (
+        call ui_io.cmd :printMessage "There is a scream of agony."
+    ) else if !total_kills! GTR 1 (
+        call ui_io.cmd :printMessage "There are several screams of agony."
+    )
+
+    if !total_kills! GEQ 0 (
+        call ui.cmd :displayCharacterExperience
+    )
+) else (
+    call ui.cmd :coordInsidePanel "!spot!"
+    if "!errorlevel!"=="0" (
+        if %py.flags.blind% LSS 1 (
+            call ui_io.cmd :panelPutTile "*" "!spot!"
+        )
+    )
+    call ui_io.cmd :putQIO
+)
+goto :spellFireBallWhileLoop
+
+:spellFireBallOuterIf
+set "tile=dg.floor[%~1][%~2]"
+set "t_id=!%tile%.treasure_id!"
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monsters%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+
+if not "%t_id%"=="0" (
+    call :spellGetAreaAffectFlags "%~4" "weapon_type" "harm_type" "destroy" "game.treasure.list[%t_id%]"
+    if "!destroy!"=="0" (
+        call dungeon.cmd :dungeonDeleteObject "spot"
+    )
+
+    if !%tile%.feature_id! LEQ %MAX_OPEN_SPACE% (
+        if !%tile%.creature_id! GTR 1 (
+            set "saved_lit_status=!%tile%.permanent_light!"
+            set "%tile%.permanent_light=true"
+            call monster.cmd :monsterUpdateVisibility "%c_id%"
+
+            set /a total_hits+=1
+            set "damage=!damage_hp!"
+
+            set /a "is_weak_to_type=!harm_type! & !%creature%.defenses!"
+            set /a "is_monster_type=!weapon_type! & !%creature%.spells!"
+            if not "!is_weak_to_type!"=="0" (
+                set /a damage*=2
+                if "!%monster%.lit!"=="true" (
+                    set /a "creature_recall[%mc_id%].defenses|=!harm_type!"
+                )
+            ) else if not "!is_monster_type!"=="0" (
+                set /a damage/=4
+                if "!%monster%.lit!"=="0" (
+                    set /a "creature_recall[%mc_id%].spells|=!weapon_type!"
+                )
+            )
+
+            call dungeon.cmd :coordDistanceBetween "spot" "coord"
+            set /a "damage=(damage / (!errorlevel! + 1))"
+
+            call monster.cmd :monsterTakeHit "%c_id%" "!damage!"
+            if !errorlevel! GEQ 0 set /a total_kills+=1
+            set "%tile%.permanent_light=!saved_lit_status!"
+        ) else (
+            call ui.cmd :coordInsidePanel "!spot!"
+            if "!errorlevel!"=="0" (
+                if %py.flags.blind% LSS 1 (
+                    call ui_io.cmd :panelPutTile "*" "!spot!"
+                )
+            )
+        )
+    )
+)
 exit /b
 
 :spellBreath
