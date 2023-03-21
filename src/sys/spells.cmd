@@ -1107,7 +1107,7 @@ set "mc_id=!%monsters%.creature_id!"
 set "creature=creatures_list[%mc_id%]"
 
 if not "%t_id%"=="0" (
-    call :spellGetAreaAffectFlags "%~4" "weapon_type" "harm_type" "destroy" "game.treasure.list[%t_id%]"
+    call :spellGetAreaAffectFlags "%spell_type%" "weapon_type" "harm_type" "destroy" "game.treasure.list[%t_id%]"
     if "!destroy!"=="0" (
         call dungeon.cmd :dungeonDeleteObject "spot"
     )
@@ -1153,7 +1153,130 @@ if not "%t_id%"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: A ranged AoE attack performed by a monster against a player
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The monster_id of the monster attacking
+::            %3 - The damage done by the attack
+::            %4 - The type of spell
+::            %5 - A reference to the name of the spell
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellBreath
+set "coord=%~1"
+set "monster_id=%~2"
+set "damage_hp=%~3"
+set "spell_type=%~4"
+set "spell_name=%~5"
+
+set /a aoe_top=!coord.y!-2, aoe_bottom=!coord.y!+2, aoe_left=!coord.x!-2, aoe_right=!coord.x!+2
+for /L %%Y in (%aoe_top%,1,%aoe_bottom%) do (
+    for /L %%X in (%aoe_left%,1,%aoe_right%) do (
+        set "location=%%Y;%%X"
+        set "can_be_seen=0"
+        call dungeon.cmd :coordInBounds "location" && set /a can_be_seen+=1
+        call dungeon.cmd :coordDistanceBetween "coord" "location"
+        if !errorlevel! LEQ 2 set /a can_be_seen+=1
+        call dungeon_los.cmd :los "!coord!" "!location!" && set /a can_be_seen+=1
+        if "!can_be_seen!"=="3" call :spellBreathOuterIf "%%Y" "%%X"
+    )
+)
+
+call ui_io.cmd :putQIO
+
+for /L %%Y in (%aoe_top%,1,%aoe_bottom%) do (
+    for /L %%X in (%aoe_left%,1,%aoe_right%) do (
+        set "spot=%%Y;%%X"
+        set "can_be_seen=0"
+        call dungeon.cmd :coordInBounds "spot" && set /a can_be_seen+=1
+        call dungeon.cmd :coordDistanceBetween "coord" "spot"
+        if !errorlevel! LEQ 2 set /a can_be_seen+=1
+        call dungeon_los.cmd :los "!coord!" "!spot!" && set /a can_be_seen+=1
+        if "!can_be_seen!"=="3" call dungeon.cmd :dungeonLiteSpot "spot"
+    )
+)
+exit /b
+
+:spellBreathOuterIf
+set "tile=dg.floor[%~1][%~2]"
+set "t_id=!%tile%.treasure_id!"
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monsters%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+
+if not "%t_id%"=="0" (
+    call :spellGetAreaAffectFlags "%spell_type%" "weapon_type" "harm_type" "destroy" "game.treasure.list[%t_id%]"
+    if "!destroy!"=="0" (
+        call dungeon.cmd :dungeonDeleteObject "location"
+    )
+)
+
+if !%tile%.feature_id! LEQ %MAX_OPEN_SPACE% (
+    call dungeon.cmd :coordInBounds "location"
+    if "!errorlevel!"=="0" (
+        set /a "is_blind=%py.flags.status% & %config.player.status.py.blind%"
+        if "!is_blind!"=="0" call ui_io.cmd :panelPutTile "*" "location"
+    )
+
+    if %c_id% GTR 1 (
+        set "damage=%damage_hp%"
+        set /a "is_weak_to_type=!harm_type! & !%creature%.defenses!"
+        set /a "is_monster_type=!weapon_type! & !%creature%.spells!"
+        if not "!is_weak_to_type!"=="0" (
+            set /a damage*=2
+        ) else if not "!is_monster_type!"=="0" (
+            set /a damage/=4
+        )
+        call dungeon.cmd :coordDistanceBetween "location" "coord"
+        set /a "damage=(damage / (!errorlevel! + 1))"
+
+        set /a %monster%.hp-=!damage!
+        set "%monster%.sleep_count=0"
+
+        if !%monster%.hp! LSS 0 (
+            call monster.cmd :monsterDeath "!%monster%.pos.y!;!%monster%.pos.x!" "!%creature%.movement!"
+            set "treasure_id=!errorlevel!"
+
+            if "!%monster%.lit!"=="true" (
+                set /a "has_treasure=(!creature_recall[%mc_id%].movement! & %config.monsters.move.cm_treasure%) >> %config.monsters.move.cm_tr_shift%"
+                set /a "is_treasure=(!treasure_id! & %config.monsters.move.cm_treasure%) >> %config.monsters.move.cm_tr_shift%"
+                if !has_treasure! GTR !is_treasure! (
+                    set /a "treasure_id=((!treasure_id! & ~%config.monsters.move.cm_treasure%) | (!has_treasure! << %config.monsters.move.cm_tr_shift%))"
+                )
+                set /a "creature_recall[%mc_id%].movement=(!treasure_id! | !creature_recall[%mc_id%].movement! & ~%config.monsters.move.cm_treasure%)"
+            )
+
+            if %monster_id% LSS !%tile%.creature_id! (
+                call dungeon.cmd :dungeonDeleteMonster "!%tile%.creature_id!"
+            ) else (
+                call dungeon.cmd :dungeonRemoveMonsterFromLevel "!%tile%.creature_id!"
+            )
+        )
+    ) else (
+        if "!damage!"=="0" set "damage=1"
+
+        if "%spell_type%"=="%MagicSpellFlags.Lightning%" (
+            call inventory.cmd :damageLightningBolt "!damage!" "!%spell_name%!"
+            exit /b
+        ) else if "%spell_type%"=="%MagicSpellFlags.Lightning%" (
+            call inventory.cmd :damagePoisonedGas "!damage!" "!%spell_name%!"
+            exit /b
+        ) else if "%spell_type%"=="%MagicSpellFlags.Acid%" (
+            call inventory.cmd :damageAcid "!damage!" "!%spell_name%!"
+            exit /b
+        ) else if "%spell_type%"=="%MagicSpellFlags.Frost%" (
+            call inventory.cmd :damageCold "!damage!" "!%spell_name%!"
+            exit /b
+        ) else if "%spell_type%"=="%MagicSpellFlags.Fire%" (
+            call inventory.cmd :damageFire "!damage!" "!%spell_name%!"
+            exit /b
+        ) else (
+            exit /b
+        )
+    )
+)
 exit /b
 
 :spellRechargeItem
