@@ -1326,14 +1326,172 @@ if "!fail_chance!"=="1" (
 )
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Increase or decrease a monster's hit points
+::
+:: Arguments: %1 - The coordinates of the monster
+::            %2 - The direction that the player is moving in
+::            %3 - The damage done to the monster [negative if it's healing]
+:: Returns:   0 if a monster's HP was changed
+::            1 if there was no monster on screen in that direction
+::------------------------------------------------------------------------------
 :spellChangeMonsterHitPoints
-exit /b
+set "coord=%~1"
+set "direction=%~2"
+set "damage_hp=%~3"
 
+set "distance=0"
+set "changed=1"
+set "finished=false"
+
+:spellChangeMonsterHitPointsWhileLoop
+if "!finished!"=="true" goto :spellChangeMonsterHitPointsAfterWhileLoop
+
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+
+if %distance% GTR %config.treasure.objects_bolts_max_range% goto :spellChangeMonsterHitPointsAfterWhileLoop
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% goto :spellChangeMonsterHitPointsAfterWhileLoop
+
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monster%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+if !%tile%.creature_id! GTR 1 (
+    set "finished=true"
+
+    call :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+
+    call monster.cmd :monsterTakeHit "%c_id%" "%damage_hp%"
+    if !errorlevel! GEQ 0 (
+        call monster.cmd :printMonsterActionText "!name!" "dies in a fit of agony."
+        call ui.cmd :displayCharacterExperience
+    ) else if %damage_hp% GTR 0 (
+        call monster.cmd :printMonsterActionText "!name!" "screams in agony."
+    )
+
+    set "changed=0"
+)
+goto :spellChangeMonsterHitPointsWhileLoop
+
+:spellChangeMonsterHitPointsAfterWhileLoop
+exit /b %changed%
+
+::------------------------------------------------------------------------------
+:: It's just :changeMonsterHitPoints but it always does 75 damage and doesn't
+:: work against undead monsters
+::
+:: Arguments: %1 - The coordinates of the monster
+::            %2 - The direction to cast in
+:: Returns:   0 if HP was removed from the monster
+::            1 if the target creature is undead
+::------------------------------------------------------------------------------
 :spellDrainLifeFromMonster
-exit /b
+set "coord=%~1"
+set "direction=%~2"
 
+set "distance=0"
+set "drained=1"
+set "finished=false"
+
+:spellDrainLifeFromMonsterWhileLoop
+if "!finished!"=="true" goto :spellDrainLifeFromMonsterAfterWhileLoop
+
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+
+if %distance% GTR %config.treasure.objects_bolts_max_range% goto :spellDrainLifeFromMonsterAfterWhileLoop
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% goto :spellDrainLifeFromMonsterAfterWhileLoop
+
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monster%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+if !%tile%.creature_id! GTR 1 (
+    set "finished=true"
+
+    set /a "is_undead=!%creature%.defenses! & %config.monsters.defense.cd_undead%"
+    if "!is_undead!"=="0" (
+        call :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+        call monster.cmd :monsterTakeHit "%c_id%" 75
+        if !errorlevel! GEQ 0 (
+            call monster.cmd :printMonsterActionText "!name!" "dies in a fit of agony."
+            call ui.cmd :displayCharacterExperience
+        ) else if %damage_hp% GTR 0 (
+            call monster.cmd :printMonsterActionText "!name!" "screams in agony."
+        )
+        set "drained=0"
+    ) else (
+        set /a "creature_recall[%mc_id%].defenses|=%config.monsters.defense.cd_undead%"
+    )
+)
+:spellDrainLifeFromMonsterAfterWhileLoop
+exit /b !drained!
+
+::------------------------------------------------------------------------------
+:: Changes the speed of a monster [other than the Balrog]
+::
+:: Arguments: %1 - The coordinates of the monster
+::            %2 - The direction the spell is cast in
+::            %3 - The amount to increase the speed by [can be negative]
+:: Returns:   0 if the monster speeds up or if a random number between 1 and 40
+::              is less than the monster's level
+::            1 if the monster's speed does not change
+::------------------------------------------------------------------------------
 :spellSpeedMonster
-exit /b
+set "coord=%~1"
+set "direction=%~2"
+set "speed=%~3"
+
+set "distance=0"
+set "changed=1"
+set "finished=false"
+
+:spellSpeedMonsterWhileLoop
+if "!finished!"=="true" exit /b !changed!
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+
+if %distance% GTR %config.treasure.objects_bolts_max_range% exit /b !changed!
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b !changed!
+
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monster%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+if !%tile%.creature_id! GTR 1 (
+    set "finished=true"
+    call :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+
+    if %speed% GTR 0 (
+        set /a %monster%.speed+=%speed%
+        set "%monster%.sleep_count=0"
+        set "changed=true"
+        call monster.cmd :printMonsterActionText "!name!" "starts moving faster."
+    ) else (
+        call rng.cmd :randomNumber %MON_MAX_LEVELS%
+        if !errorlevel! GTR !%creature%.level! (
+            set /a %monster%.speed+=%speed%
+            set "%monster%.sleep_count=0"
+            set "changed=true"
+            call monster.cmd :printMonsterActionText "!name!" "starts moving slower."
+        ) else (
+            set "%monster%.sleep_count=0"
+            call monster.cmd :printMonsterActionText "!name!" "is unaffected."
+        )
+    )
+)
+goto :spellSpeedMonsterWhileLoop
 
 :spellConfuseMonster
 exit /b
