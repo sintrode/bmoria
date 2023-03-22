@@ -1278,9 +1278,53 @@ if !%tile%.feature_id! LEQ %MAX_OPEN_SPACE% (
     )
 )
 exit /b
-
+::------------------------------------------------------------------------------
+:: Recharges a wand, staff, or rod
+::
+:: Arguments: %1 - The maximum number of charges to add to the item
+:: Returns:   0 if an item is successfully selected for recharge
+::            1 if there is nothing to charge or the user backs out
+::------------------------------------------------------------------------------
 :spellRechargeItem
-exit /b
+call inventory.cmd :inventoryFindRange "%TV_STAFF%" "%TV_WAND%" "item_pos_start" "item_pos_end"
+if "!errorlevel!"=="1" (
+    call ui_io.cmd :printMessage "You have nothing to recharge."
+    exit /b 1
+)
+
+call ui_inventory.cmd :inventoryGetInputForItemId "item_id" "Recharge which item?" "%item_pos_start%" "%item_pos_end%" "CNIL" "CNIL"
+if "!errorlevel!"=="1" exit /b 1
+
+set "item=py.inventory[%item_id%]"
+
+:: Recharge  I - recharge (20) - 1/6  failure for empty 10th level wand
+:: Recharge II - recharge (60) - 1/10 failure for empty 10th level wand
+:: recharging a high level wand that already has many charges is difficult
+set /a fail_chance=%~1 + 50 - !%item%.depth_first_found! - !%item%.misc_use!
+
+if %fail_chance% LSS 19 (
+    set "fail_chance=1"
+) else (
+    set /a fail_chance/=10
+    call rng.cmd :randomNumber !fail_chance!
+    set "fail_chance=!errorlevel!"
+)
+
+if "!fail_chance!"=="1" (
+    call ui_io.cmd :printMessage "There is a bright flash of light."
+    call inventory.cmd :inventoryDestroyItem "%item_id%"
+) else (
+    set /a "number_of_charges=(!number_of_charges! / (!%item%.depth_first_found! + 2)) + 1"
+    call rng.cmd :randomNumber !number_of_charges!
+    set /a %item%.misc_use+=2 + !errorlevel!
+
+    call identification.cmd :spellItemIdentified "item"
+    if "!errorlevel!"=="0" (
+        call identification.cmd :spellItemRemoveIdentification "item"
+    )
+    call identification.cmd :itemIdentificationClearEmpty "item"
+)
+exit /b 0
 
 :spellChangeMonsterHitPoints
 exit /b
