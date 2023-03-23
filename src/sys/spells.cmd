@@ -1493,14 +1493,224 @@ if !%tile%.creature_id! GTR 1 (
 )
 goto :spellSpeedMonsterWhileLoop
 
+::------------------------------------------------------------------------------
+:: Confuses a monster
+::
+:: Arguments: %1 - The coordinates of the monster
+::            %2 - The direction to cast the spell in
+:: Returns:   0 if a monster is confused
+::            1 if no monster is present or it can't sleep
+::------------------------------------------------------------------------------
 :spellConfuseMonster
-exit /b
+set "coord=%~1"
+set "direction=%~2"
 
+set "distance=0"
+set "confused=1"
+set "finished=false"
+
+:spellConfuseMonsterWhileLoop
+if "!finished!"=="true" exit /b !confused!
+
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+if !distance! GTR %config.treasure.objects_bolts_max_range% exit /b !confused!
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b !confused!
+
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monster%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+if !%tile%.creature_id! GTR 1 (
+    set "finished=true"
+    call :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+
+    set "is_unaffected=0"
+    call rng.cmd :randomNumber %MON_MAX_LEVELS%
+    if !errorlevel! LSS !%creature%.level! set "is_unaffected=1"
+    set /a "cant_sleep=!%creature%.defenses! & %config.monsters.defense.cd_no_sleep%"
+    if not "!cant_sleep!"=="0" set "is_unaffected=1"
+    if "!is_unaffected!"=="1" (
+        if "!%monster%.lit!"=="true" (
+            if not "!cant_sleep!"=="0" (
+                set /a "creature_recall[%mc_id%].defenses|=%config.monsters.defense.cd_no_sleep%"
+            )
+
+            if "!cant_sleep!"=="0" set "%monster%.sleep_count=0"
+            call monster.cmd :printMonsterActionText "!name!" "is unaffected."
+        )
+    ) else (
+        if not "!%monster%.confused_amount!"=="0" (
+            set /a %monster%.confused_amount+=3
+        ) else (
+            call rng.cmd :randomNumber 16
+            set /a %monster%.confused_amount=2+!errorlevel!
+        )
+        set "%monster%.sleep_count=0"
+        set "confused=1"
+        call monster.cmd :printMonsterActionText "!name!" "appears confused."
+    )
+)
+goto :spellConfuseMonsterWhileLoop
+
+::------------------------------------------------------------------------------
+:: Puts a monster to sleep
+::
+:: Arguments: %1 - The coordinates of the monster
+::            %2 - The direction to cast the spell in
+:: Returns:   0 if the monster is put to sleep
+::            1 if the monster remains awake
+::------------------------------------------------------------------------------
 :spellSleepMonster
-exit /b
+set "coord=%~1"
+set "direction=%~2"
 
+set "distance=0"
+set "asleep=1"
+set "finished=false"
+
+:spellSleepMonsterWhileLoop
+if "!finished!"=="true" exit /b !asleep!
+
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+
+if !distance! GTR %config.treasure.objects_bolts_max_range% exit /b !asleep!
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b !asleep!
+
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monster%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+if !%tile%.creature_id! GTR 1 (
+    set "finished=true"
+    call :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+
+    set "is_unaffected=0"
+    call rng.cmd :randomNumber %MON_MAX_LEVELS%
+    if !errorlevel! LSS !%creature%.level! set "is_unaffected=1"
+    set /a "cant_sleep=!%creature%.defenses! & %config.monsters.defense.cd_no_sleep%"
+    if not "!cant_sleep!"=="0" set "is_unaffected=1"
+    if "!is_unaffected!"=="1" (
+        if "!%monster%.lit!"=="true" (
+            if not "!cant_sleep!"=="0" (
+                set /a "creature_recall[%mc_id%].defenses|=%config.monsters.defense.cd_no_sleep%"
+            )
+            call monster.cmd :printMonsterActionText "!name!" "is unaffected."
+        )
+    ) else (
+        set "%monster%.sleep_count=500"
+        set "asleep=0"
+        call monster.cmd :printMonsterActionText "!name!" "falls asleep."
+    )
+)
+goto :spellSleepMonsterWhileLoop
+
+::------------------------------------------------------------------------------
+:: Turns stone into mud and deletes any nearby walls
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction the spell is cast in
+:: Returns:   0 if any walls turned into mud
+::            1 if there were no walls to convert
+::------------------------------------------------------------------------------
 :spellWallToMud
-exit /b
+set "coord=%~1"
+set "direction=%~2"
+
+set "distance=0"
+set "turned=1"
+set "finished=false"
+
+:spellWallToMudWhileLoop
+if "!finished!"=="true" exit /b !turned!
+
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+set "t_id=!%tile%.treasure_id!"
+
+if "!distance!"=="%config.treasure.objects_bolts_max_range%" set "finished=true"
+
+set "hit_wall=0"
+if !%tile%.feature_id! GEQ %MIN_CAVE_WALL% set /a hit_wall+=1
+if not "!%tile%.feature_id!"=="%TILE_BUONDARY_WALL%" set /a hit_wall+=1
+if "!hit_wall!"=="2" (
+    call player.cmd :playerTunnelWall "!coord!" 1 0
+
+    call dungeon.cmd :caveTileVisible "coord"
+    if "!errorlevel!"=="0" (
+        set "turned=0"
+        call ui_io.cmd :printMessage "The wall turns into mud."
+    )
+) else (
+    set "hit_item=0"
+    if not "!%tile%.treasure_id!"=="0" set /a hit_item+=1
+    if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% set /a hit_item+=1
+    if "!hit_item!"=="2" (
+        set "finished=true"
+
+        set "on_screen=0"
+        call ui.cmd :coordInsidePanel "!coord!" && set /a on_screen+=1
+        call dungeon.cmd :caveTileVisible "coord" && set /a on_screen+=1
+        if "!on_screen!"=="2" (
+            set "turned=0"
+            call identification.cmd :itemDescription "description" "game.treasure.list[%t_id%]" "false"
+            call ui_io.cmd :printMessage "The !description! turns into mud."
+        )
+
+        if "!game.treasure.list[%t_id%].category_id!"=="%TV_RUBBLE%" (
+            call dungeon.cmd :dungeonDeleteObject "coord"
+            call rng.cmd :randomNumber 10
+            if "!errorlevel!"=="1" (
+                call dungeon.cmd :dungeonPlaceRandomObjectAt "coord" "false"
+                call dungeon.cmd :caveTileVisible "coord"
+                if "!errorlevel!"=="0" (
+                    call ui_io.cmd :printMessage "You have found something."
+                )
+            )
+        ) else (
+            call dungeon.cmd :dungeonDeleteObject "coord"
+        )
+    )
+)
+
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monster%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+if !%tile%.creature_id! GTR 1 (
+    set /a "is_stone=!%creature%.defenses! & %config.monsters.defense.cd_stone%"
+    if "!is_stone!"=="0" (
+        call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+
+        call monster.cmd :monsterTakeHit "!%tile%.creature_id!" 100
+        set "creature_id=!errorlevel!"
+        if !creature_id! GEQ 0 (
+            REM wtf why is this a separate thing from %c_id% and %mc_id%?
+            for /f "delims=" %%A in ("!creature_id!") do (
+                set /a "creature_recall[%%~A].defenses|=%config.monsters.defense.cd_stone%"
+            )
+            call monster.cmd :printMonsterActionText "!name!" "dissolves."
+            call ui.cmd :displayCharacterExperience
+        ) else (
+            set /a "creature_recall[%mc_id%].defenses|=%config.monsters.defense.cd_stone%"
+            call monster.cmd :printMonsterActionText "!name!" "grunts in pain."
+        )
+        set "finished=true"
+    )
+)
+goto :spellWallToMudWhileLoop
 
 :spellDestroyDoorsTrapsInDirection
 exit /b
