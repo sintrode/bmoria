@@ -1826,8 +1826,80 @@ if !%tile%.creature_id! GTR 1 (
 )
 goto :spellPolymorphMonsterWhileLoop
 
+::------------------------------------------------------------------------------
+:: Creates a wall
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction to cast the spell in
+:: Returns:   0 if a wall was built
+::            1 if the target is out of range
+::------------------------------------------------------------------------------
 :spellBuildWall
-exit /b
+set "coord=%~1"
+set "direction=%~2"
+
+set "distance=0"
+set "built=1"
+set "finished=false"
+
+:spellBuildWallWhileLoop
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+
+if !distance! GTR %config.treasure.objects_bolts_max_range% exit /b !built!
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b !built!
+
+if not "!%tile%.treasure_id!"=="0" call dungeon.cmd :dungeonDeleteObject "coord"
+
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monster%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+if %c_id% GTR 1 (
+    set "finished=true"
+
+    set /a "can_phase=!%creature%.movement! & %config.monsters.move.cm_phase%"
+    if "!can_phase!"=="0" (
+        set /a "is_attack_only=!%creature%.movement! & %config.monsters.move.cm_attack_only%"
+        if not "!is_attack_only!"=="0" (
+            set "damage=3000"
+        ) else (
+            call dice.cmd :diceRoll 4 8
+            set "damage=!errorlevel!"
+        )
+
+        call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+        call monster.cmd :printMonsterActionText "!name!" "wails out in pain."
+
+        call monster.cmd :monsterTakeHit "!%tile%.creature_id!" "!damage!"
+        if !errorlevel! GEQ 0 (
+            call monster.cmd :printMonsterActionText "!name!" "is embedded in the rock."
+            call ui.cmd :displayCharacterExperience
+        )
+    ) else (
+        set "is_earth_monster=0"
+        if "!%creature%.sprite!"=="E" set "is_earth_monster=1"
+        if "!%creature%.sprite!"=="X" set "is_earth_monster=1"
+        if "!is_earth_monster!"=="1" (
+            call dice.cmd :diceRoll 4 8
+            set /a %monster%.hp+=!errorlevel!
+        )
+    )
+)
+
+set "%tile%.feature_id=%TILE_MAGMA_WALL%"
+set "%tile%.field_mark=false"
+set "has_light=false"
+if "!%tile%.temporary_light!"=="true" set "has_light=true"
+if "!%tile%.permanent_light!"=="true" set "has_light=true"
+set "%tile%.permanent_light=!has_light!"
+call dungeon.cmd :dungeonLiteSpot "coord"
+set "built=0"
+goto :spellBuildWallWhileLoop
 
 :spellCloneMonster
 exit /b
