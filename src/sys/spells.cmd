@@ -2042,8 +2042,39 @@ call ui.cmd :dungeonResetView
 call monster.cmd :updateMonsters "false"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Teleport all creatures in a given direction away
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction to move the monsters in
+:: Returns:   0 if any monsters were teleported away
+::            1 if there was nothing to teleport
+::------------------------------------------------------------------------------
 :spellTeleportAwayMonsterInDirection
-exit /b
+set "coord=%~1"
+set "direction=%~2"
+
+set "distance=0"
+set "teleported=1"
+set "finished=false"
+
+:spellTeleportAwayMonsterInDirectionWhileLoop
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+if !distance! GTR %config.treasure.objects_bolts_max_range% exit /b !teleported!
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b !teleported!
+
+set "t_id=!%tile%.creature_id!"
+if %t_id% GTR 1 (
+    set "monsters[%t_id%].sleep_count=0"
+    call :spellTeleportAwayMonster "!%tile%.creature_id!" "%config.monsters.mon_max_sight%"
+    set "teleported=0"
+)
+goto :spellTeleportAwayMonsterInDirectionWhileLoop
 
 :spellMassGenocide
 exit /b
