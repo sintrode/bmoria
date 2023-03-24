@@ -1937,8 +1937,58 @@ if %c_id% GTR 1 (
 )
 goto :spellCloneMonsterWhileLoop
 
+::------------------------------------------------------------------------------
+:: Moves the creature to a new location
+::
+:: Arguments: %1 - The monster_id of the monster being teleported
+::            %2 - The maximum distance from the player to put the monster
+::------------------------------------------------------------------------------
 :spellTeleportAwayMonster
+set "monster_id=%~1"
+set "distance_from_player=%~2"
+set "counter=0"
+set "monster=monsters[%monster_id%]"
+
+:spellTeleportAwayMonsterOuterWhileLoop
+call :spellTeleportAwayMonsterGetRndCoords
+set /a counter+=1
+if !counter! GTR 9 (
+    set "counter=0"
+    set /a distance_from_player+=5
+)
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    if !dg.floor[%%~A][%%~B].feature_id! LSS %MIN_CLOSED_SPACE% goto :spellTeleportAwayMonsterAfterOuterWhileLoop
+    if "!dg.floor[%%~A][%%~B].creature_id!"=="0" goto :spellTeleportAwayMonsterAfterOuterWhileLoop
+)
+goto :spellTeleportAwayMonsterOuterWhileLoop
+
+:spellTeleportAwayMonsterAfterOuterWhileLoop
+set "%monster%.pos=!%monster%.pos.y!;!%monster%.pos.x!"
+call dungeon.cmd :dungeonMoveCreatureRecord "%monster%.pos" "coord"
+call dungeon.cmd :dungeonLiteSpot "%monster%.pos"
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "%monster%.pos.y=%%~A"
+    set "%monster%.pos.x=%%~B"
+)
+
+set "%monster%.lit=false"
+call dungeon.cmd :coordDistanceBetween "py.pos" "coord"
+call monster.cmd :monsterUpdateVisibility "%monster_id%"
 exit /b
+
+:: The original equation was (2*distance_from_player+1)-(distance_from_player+1)
+:: but this just equals distance_from_player so idk what was going on there
+:spellTeleportAwayMonsterGetRndCoords
+call rng.cmd :randomNumber %distance_from_player%
+set "rnd_dist=!errorlevel!"
+set /a coord.y=!%monster%.pos.y!+!rnd_dist!
+set /a coord.x=!%monster%.pos.x!+!rnd_dist!
+set "coord=!coord.y!;!coord.x!"
+call ui.cmd :coordInBounds "coord"
+if "!errorlevel!"=="1" goto :spellTeleportAwayMonsterGetRndCoords
+exit /b
+
 
 :spellTeleportPlayerTo
 exit /b
