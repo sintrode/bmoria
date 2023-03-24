@@ -2076,7 +2076,34 @@ if %t_id% GTR 1 (
 )
 goto :spellTeleportAwayMonsterInDirectionWhileLoop
 
+::------------------------------------------------------------------------------
+:: Delete all creatures within max sight distance except the Balrog
+::
+:: Arguments: None
+:: Returns:   0 if any monster is killed
+::            1 if there is no monster on screen that can be killed this way
+::------------------------------------------------------------------------------
 :spellMassGenocide
+set "killed=1"
+
+set mon_dec=%next_free_monster_id%-1
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    call :spellMassGenocideIfStatement "%%~A"
+)
+exit /b !killed!
+
+:spellMassGenocideIfStatement
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+if !%monster%.distance_from_player! LEQ %config.monsters.mon_max_sight% (
+    set /a "is_balrog=!%creature%.movement! & %config.monsters.move.cm_win%"
+    if "!is_balrog!"=="0" (
+        set "killed=0"
+        call dungeon.cmd :dungeonDeleteMonster "%~1"
+    )
+)
 exit /b
 
 :spellGenocide
