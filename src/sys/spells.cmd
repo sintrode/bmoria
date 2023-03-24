@@ -1901,8 +1901,41 @@ call dungeon.cmd :dungeonLiteSpot "coord"
 set "built=0"
 goto :spellBuildWallWhileLoop
 
+::------------------------------------------------------------------------------
+:: Replicating a monster
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction to cast the spell in
+:: Returns:   0 if a monster was able to be replicated
+::            1 if there is no room for a new monster
+::------------------------------------------------------------------------------
 :spellCloneMonster
-exit /b
+set "coord=%~1"
+set "direction=%~2"
+
+set "distance=0"
+set "finished=false"
+
+:spellCloneMonsterWhileLoop
+if "!finished!"=="true" exit /b 1
+
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+
+if !distance! GTR %config.treasure.objects_bolts_max_range% exit /b 1
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b 1
+
+set "c_id=!%tile%.creature_id!"
+if %c_id% GTR 1 (
+    set "mosnters[%c_id%].sleep_count=0"
+    call monster.cmd :monsterMultiply "!coord!" "!monseters[%c_id%].creature_id!" 0
+    exit /b !errorlevel!
+)
+goto :spellCloneMonsterWhileLoop
 
 :spellTeleportAwayMonster
 exit /b
