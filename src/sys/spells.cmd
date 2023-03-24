@@ -1989,8 +1989,57 @@ call ui.cmd :coordInBounds "coord"
 if "!errorlevel!"=="1" goto :spellTeleportAwayMonsterGetRndCoords
 exit /b
 
-
+::------------------------------------------------------------------------------
+:: Teleports the player adjacent to the spellcasting creature
+::
+:: Arguments: %1 - The coordinates of the monster
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellTeleportPlayerTo
+set "coord=%~1"
+set "distance=1"
+set "counter=0"
+
+:spellTeleportPlayerToWhileLoop
+call rng.cmd :randomNumber !distance!
+set "rnd_dist=!errorlevel!"
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set /a rnd_coord.y=%%~A+!rnd_dist!
+    set /a rnd_coord.x=%%~B+!rnd_dist!
+)
+set "rnd_coord=!rnd_coord.y!;!rnd_coord.x!"
+
+set /a counter+=1
+if !counter! GTR 9 (
+    set "counter=0"
+    set /a distance+=1
+)
+
+set "break_while=0"
+call dungeon.cmd :coordInBounds "rnd_coord" && set "break_while=1"
+if !dg.floor[%rng_coord.y%][%rng_coord.x%].feature_id! LSS %MIN_CLOSED_SPACE% set "break_while=1"
+if !dg.floor[%rng_coord.y%][%rng_coord.x%].creature_id! LSS 2 set "break_while=1"
+if "!break_while!"=="1" goto :spellTeleportPlayerToAfterWhileLoop
+goto :spellTeleportPlayerToWhileLoop
+
+:spellTeleportPlayerToAfterWhileLoop
+call dungeon.cmd :dungeonMoveCreatureRecord "py.pos" "rnd_coord"
+
+call helpers.cmd :expandCoordName "py.pos"
+for /L %%Y in (%py.pos.y_dec%,1,%py.pos.y_inc%) do (
+    for /L %%X in (%py.pos.x_dec%,1,%py.pos.x_inc%) do (
+        set "spot=%%Y;%%X"
+        set "dg.floor[%%Y][%%X].temporary_light=false"
+        call dungeon.cmd :dungeonLiteSpot "spot"
+    )
+)
+call dungeon.cmd :dungeonLiteSpot "py.pos"
+set "py.pos.y=%rng_coord.y%"
+set "py.pos.x=%rng_coord.x%"
+set "py.pos=%py.pos.y%;%py.pos.x%"
+
+call ui.cmd :dungeonResetView
+call monster.cmd :updateMonsters "false"
 exit /b
 
 :spellTeleportAwayMonsterInDirection
