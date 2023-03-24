@@ -2106,7 +2106,39 @@ if !%monster%.distance_from_player! LEQ %config.monsters.mon_max_sight% (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Deletes all creatures of a specified type from the level except the Balrog
+::
+:: Arguments: None
+:: Returns:   0 if any monster is killed
+::            1 if there is no monster on screen that can be killed this way
+::------------------------------------------------------------------------------
 :spellGenocide
+call ui_io.cmd :getTileCharacter "Which type of creature do you wish exterminated?" "creature_char"
+if "!errorlevel!"=="1" exit /b 1
+
+set "killed=1"
+
+set /a mon_dec=%next_free_monster_id%-1
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    call :spellGenocideIfStatement "%%~A"
+)
+exit /b !killed!
+
+:spellGenocideIfStatement
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+if "!creature_char!"=="!%creature%.sprite!" (
+    set /a "is_balrog=!%creature%.movement! & %config.monsters.move.cm_win%"
+    if "!is_balrog!"=="0" (
+        set "killed=0"
+        call dungeon.cmd :dungeonDeleteMonster "%~1"
+    ) else (
+        call ui_io.cmd :printMessage "The !%creature%.name! is unaffected."
+    )
+)
 exit /b
 
 :spellSpeedAllMonsters
