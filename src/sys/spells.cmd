@@ -1712,8 +1712,61 @@ if !%tile%.creature_id! GTR 1 (
 )
 goto :spellWallToMudWhileLoop
 
+::------------------------------------------------------------------------------
+:: Destroys all traps and doors in a specified direction
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction to cast the spell in
+:: Returns:   0 if a door or trap was destroyed
+::            1 if nothing was hit
+::------------------------------------------------------------------------------
 :spellDestroyDoorsTrapsInDirection
-exit /b
+set "coord=%~1"
+set "direction=%~2"
+
+set "destroyed=1"
+set "distance=0"
+
+:spellDestroyDoorsTrapsInDirectionWhileLoop
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+
+set "t_id=!%tile%.treasure_id!"
+if not "%t_id%"=="0" (
+    set "item=game.treasure.list[%t_id%]"
+
+    set "is_trapdoor=0"
+    if "!%item%.category_id!"=="%TV_INVIS_TRAP%" set "is_trapdoor=1"
+    if "!%item%.category_id!"=="%TV_VIS_TRAP%" set "is_trapdoor=1"
+    if "!%item%.category_id!"=="%TV_CLOSED_DOOR%" set "is_trapdoor=1"
+    if "!%item%.category_id!"=="%TV_OPEN_DOOR%" set "is_trapdoor=1"
+    if "!%item%.category_id!"=="%TV_SECRET_DOOR%" set "is_trapdoor=1"
+    if "!is_trapdoor!"=="1" (
+        call dungeon.cmd :dungeonDeleteObject "coord"
+        if "!errorlevel!"=="0" (
+            set "destroyed=0"
+            call ui_io.cmd :printMessage "There is a bright flash of light."
+        )
+    ) else (
+        if "!%item%.category_id!"=="%TV_CHEST%" (
+            if not "!%item%.flags!"=="0" (
+                set "destroyed=0"
+                call ui_io.cmd :printMessage "CLICK"
+
+                set /a "%item%.flags&=~(%config.treasure.chests.ch_trapped%|%config.treasure.chests.ch_locked%)"
+                set "%item%.special_name_id=%SpecialNameIds.sn_unlocked%"
+                call identification.cmd :spellItemIdentifyAndRemoveRandomInscription "%item%"
+            )
+        )
+    )
+)
+
+if !distance! LEQ %config.treasure.objects_bolts_max_range% exit /b !destroyed!
+if !%tile%.feature_id! LEQ %MAX_OPEN_SPACE% exit /b !destroyed!
+goto :spellDestroyDoorsTrapsInDirectionWhileLoop
 
 :spellPolymorphMonster
 exit /b
