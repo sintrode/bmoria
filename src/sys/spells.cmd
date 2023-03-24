@@ -1768,8 +1768,63 @@ if !distance! LEQ %config.treasure.objects_bolts_max_range% exit /b !destroyed!
 if !%tile%.feature_id! LEQ %MAX_OPEN_SPACE% exit /b !destroyed!
 goto :spellDestroyDoorsTrapsInDirectionWhileLoop
 
+::------------------------------------------------------------------------------
+:: Turn a monster into a different monster, except the Balrog
+::
+:: Arguments: %1 - The coordinates of the player
+::            %2 - The direction to cast the spell in
+:: Returns:   0 if a monster was successfully turned into another monster
+::              and it was onscreen and the tile with the monster was lit
+::            1 if none of those things happened
+::------------------------------------------------------------------------------
 :spellPolymorphMonster
-exit /b
+set "coord=%~1"
+set "direction=%~2"
+
+set "distance=0"
+set "morphed=1"
+set "finished=false"
+
+:spellPolymorphMonsterWhileLoop
+if "!finished!"=="true" exit /b !morphed!
+
+call player.cmd :playerMovePosition "%direction%" "coord"
+set /a distance+=1
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor.[%%~A][%%~B]"
+)
+if !distance! GTR %config.treasure.objects_bolts_max_range% exit /b !morphed!
+if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b !morphed!
+
+set "c_id=!%tile%.creature_id!"
+set "monster=monsters[%c_id%]"
+set "mc_id=!%monster%.creature_id!"
+set "creature=creatures_list[%mc_id%]"
+if !%tile%.creature_id! GTR 1 (
+    call rng.cmd %MON_MAX_LEVELS%
+    if !errorlevel! GTR !%creature%.level! (
+        set "finished=true"
+        call dungeon.cmd :dungeonDeleteMonster "!%tile%.creature_id!"
+
+        set /a mon_level_range=!monster_levels[%MON_MAX_LEVELS%]! - !monster_levels[0]!
+        call rng.cmd :randomNumber !mon_level_range!
+        set /a rnd_level=!errorlevel! - 1 + !monster_levels[0]!
+        call monster_manager.cmd :monsterPlaceNew "!coord!" "!rnd_level!" "false"
+        set "morphed=!errorlevel!"
+
+        set "morphin_time=0"
+        if "!morphed!"=="0" set /a morphin_time+=1
+        call ui.cmd :coordInsidePanel "!coord!" && set /a morphin_time+=1
+        if "!%tile%.permanent_light!"=="true" set /a morphin_time+=1
+        if "!%tile%.temporary_light!"=="true" set /a morphin_time+=1
+        if !morphin_time! GEQ 3 set "morphed=0"
+    )
+) else (
+    call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+    call monster.cmd :printMonsterActionText "!name!" "is unaffected."
+)
+goto :spellPolymorphMonsterWhileLoop
 
 :spellBuildWall
 exit /b
