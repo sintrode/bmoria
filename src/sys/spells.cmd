@@ -2857,6 +2857,24 @@ for /L %%A in (%PlayerEquipment.Wield%,1,%PlayerEquipment.Outer%) do (
 )
 exit /b !removed!
 
+::------------------------------------------------------------------------------
+:: Restores any drained experience
+::
+:: Arguments: None
+:: Returns:   0 if EXP is restored
+::            1 if max_exp is currently equal to exp
+::------------------------------------------------------------------------------
 :spellRestorePlayerLevels
-exit /b
+if %py.misc.max_exp% GTR %py.misc.exp% (
+    call ui_io.cmd :printMessage "You feel your life energies returning."
+    call :spellRestorePlayerLevelsWhileLoop
+    exit /b 0
+)
+exit /b 1
 
+:: This is necessary because ptr_exp may reduce the exp level
+:spellRestorePlayerLevelsWhileLoop
+if %py.misc.exp% GEQ %py.misc.max_exp% exit /b
+set "py.misc.exp=%py.misc.max_exp%"
+call ui.cmd :displayCharacterExperience
+goto :spellRestorePlayerLevelsWhileLoop
