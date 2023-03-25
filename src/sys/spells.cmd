@@ -1932,7 +1932,7 @@ if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b 1
 
 set "c_id=!%tile%.creature_id!"
 if %c_id% GTR 1 (
-    set "mosnters[%c_id%].sleep_count=0"
+    set "monsters[%c_id%].sleep_count=0"
     call monster.cmd :monsterMultiply "!coord!" "!monsters[%c_id%].creature_id!" 0
     exit /b !errorlevel!
 )
@@ -2468,7 +2468,48 @@ call dungeon.cmd :dungeonPlaceRandomObjectAt "py.pos" "false"
 call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_mush%" "game.treasure.list[%t_id%]"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Destroys a creature
+::
+:: Arguments: %1 - The creature's defense flags
+::            %2 - The maximum damage done to the creature
+:: Returns:   0 if a monster is visible and weak to the type being dispelled
+::            1 if the spell is the wrong type or no monster is visible
+::------------------------------------------------------------------------------
 :spellDispelCreature
+set "dispelled=1"
+set /a mon_dec=%next_free_monster_id%-1
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    call :spellDispelCreatureForLoop %* "%%~A"
+)
+exit /b !dispelled!
+
+:spellDispelCreatureForLoop
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+set "palpable_hit=0"
+if !%monster%.distance_from_player! LEQ %config.monsters.MON_MAX_SIGHT% set /a palpable_hit+=1
+set /a "strong_against=%~2 & !creatures_list[%c_id%].defenses!"
+if not "!strong_against!"=="0" set /a palpable_hit+=1
+call dungeon_los.cmd :los "%py.pos%" "!%monster%.pos!" && set /a palpable_hit+=1
+if "!palpable_hit!"=="3" (
+    set /a "creature_recall[%c_id%].defenses|=%~1"
+    set "dispelled=0"
+    call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+    call rng.cmd :randomNumber %~2
+    call monster.cmd :monsterTakeHit "%~3" "!errorlevel!"
+    set "hit=!errorlevel!"
+
+    if !hit! GEQ 0 (
+        call monster.cmd :printMonsterActionText "!name!" "dissolves."
+        call ui.cmd :displayCharacterExperience
+    ) else (
+        call monster.cmd :printMonsterActionText "!name!" "shudders."
+    )
+
+)
 exit /b
 
 :spellTurnUndead
