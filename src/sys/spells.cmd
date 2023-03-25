@@ -2578,7 +2578,20 @@ if "!dg.floor[%py.pos.y%][%py.pos.x%].treasure_id!"=="0" (
 )
 exit /b
 
+:: TODO: Replace all of the :spellLose____ subroutines with a general wrapper
+::------------------------------------------------------------------------------
+:: Lose a Strength point
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellLoseSTR
+if "%py.flags.sustain_str%"=="false" (
+    call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_str%"
+    call ui_io.cmd :printMessage "You feel very sick."
+) else (
+    call ui_io.cmd :printMessage "You feel sick for a moment, but it passes."
+)
 exit /b
 
 :spellLoseINT
