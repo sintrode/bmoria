@@ -2192,7 +2192,50 @@ if %~1 GTR 0 (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Puts all creatures on screen to sleep unless they are sleepless
+::
+:: Arguments: None
+:: Returns:   0 if a monster was put to sleep
+::            1 if the monster has the cd_no_sleep flag set
+::------------------------------------------------------------------------------
 :spellSleepAllMonsters
+set "asleep=1"
+
+set /a mon_dec=%next_free_monster_id%-1
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    call :spellSleepAllMonstersForLoop "%%~A"
+)
+exit /b !asleep!
+
+:spellSleepAllMonstersForLoop
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+if !%monster%.distance_from_player! GTR %config.monsters.mon_max_sight% exit /b
+call dungeon_los.cmd :los "!py.pos!" "!%monster%.pos!" || exit /b
+
+set "is_unaffected=0"
+call rng.cmd :randomNumber %MON_MAX_LEVELS%
+if !errorlevel! LSS !%creature_level! set "is_unaffected=1"
+set /a "is_sleepless=!%creature%.defenses! & %config.monsters.defense.cd_no_sleep%"
+if not "!is_sleepless!"=="0" set "is_unaffected=1"
+if "!is_unaffected!"=="1" (
+    if "!%monster%.lit!"=="true" (
+        if not "!is_sleepless!"=="0" (
+            set /a "creature_recall[%c_id%].defenses|=%config.monsters.defense.cd_no_sleep%"
+        )
+        call monster.cmd :printMonsterActionText "!name!" "is unaffected."
+    )
+) else (
+    set "%monster%.sleep_count=500"
+    if "!%monster%.lit!"=="true" (
+        set "asleep=0"
+        call monster.cmd :printMonsterActionText "!name!" "falls asleep."
+    )
+)
 exit /b
 
 :spellMassPolymorph
