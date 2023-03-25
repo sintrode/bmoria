@@ -2594,7 +2594,19 @@ if "%py.flags.sustain_str%"=="false" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Lose an Intelligence point
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellLoseINT
+if "%py.flags.sustain_int%"=="false" (
+    call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_int%"
+    call ui_io.cmd :printMessage "You feel very dizzy."
+) else (
+    call ui_io.cmd :printMessage "You feel dizzy for a moment, but it passes."
+)
 exit /b
 
 :spellLoseWIS
