@@ -2838,8 +2838,24 @@ if !errorlevel! GTR !chance! (
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Removes curses from items in the inventory
+::
+:: Arguments: None
+:: Returns:   0 if any items had curses removed
+::            1 if no item in the inventory was cursed
+::------------------------------------------------------------------------------
 :spellRemoveCurseFromAllWornItems
-exit /b
+set "removed=1"
+for /L %%A in (%PlayerEquipment.Wield%,1,%PlayerEquipment.Outer%) do (
+    call player.cmd :playerWornItemIsCursed "%%A"
+    if "!errorlevel!"=="0" (
+        call player.cmd :playerWornItemRemoveCurse "%%A"
+        call player.cmd :playerRecalculateBonuses
+        set "removed=0"
+    )
+)
+exit /b !removed!
 
 :spellRestorePlayerLevels
 exit /b
