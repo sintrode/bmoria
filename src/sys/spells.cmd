@@ -2277,7 +2277,41 @@ if !%monster%.distance_from_player! LEQ %config.monsters.MON_MAX_SIGHT% (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Detects creatures with the cd_evil flag on the current panel
+::
+:: Arguments: None
+:: Returns:   0 if evil is detected
+::            1 if there is nothing to find
+::------------------------------------------------------------------------------
 :spellDetectEvil
+set "detected=1"
+set /a mon_dec=%next_free_monster_id%-1
+
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    call :spellDetectEvilForLoop
+)
+
+if "!detected!"=="0" (
+    call ui_io.cmd :printMessage "You sense the presence of evil."
+    call ui_io.cmd :printMessage "CNIL"
+    call monster.cmd :updateMonsters "false"
+)
+exit /b !detected!
+
+:spellDetectEvilForLoop
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+call ui.cmd :coordInsidePanel "!%monster%.pos.y!;!%monster%.pos.x!"
+if "!errorlevel!"=="0" (
+    set /a "is_evil=!%creatures%.defenses! & %config.monsters.defense.cd_evil%"
+    if not "!is_evil!"=="0" (
+        set "%monster%.lit=true"
+        set "detected=0"
+        call ui_io.cmd :panelPutTile "!%creature%.sprite!" "!%monster%.pos.y!;!%monster%.pos.x!"
+    )
+)
 exit /b
 
 :spellChangePlayerHitPoints
