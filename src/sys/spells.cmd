@@ -30,7 +30,7 @@ set "str=(Spells %disp_first_spell_id%-%disp_last_spell_id%, *=List, Z=exit) %~5
 set "spell_found=false"
 set "redraw=false"
 
-if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.spell_type_mage%" (
+if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.SPELL_TYPE_MAGE%" (
     set "offset=%config.spells.name_offset_spells%"
 ) else (
     set "offset=%config.spells.name_offset_prayers%"
@@ -155,7 +155,7 @@ if "!errorlevel!"=="0" set "result=1"
 
 if not "!result!"=="0" (
     if !magic_spells[%class_dec%][%spell_id%].mana_required! GTR %py.misc.current_mana% (
-        if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.spell_type_mage%" (
+        if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.SPELL_TYPE_MAGE%" (
             call ui_io.cmd :getInputConfirmation "You summon your limited strength to cast this one. Confirm?"
             set "result=!errorlevel!"
         ) else (
@@ -2669,7 +2669,45 @@ if "%py.flags.sustain_chr%"=="false" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Lose experience points
+::
+:: Arguments: %1 - The number of experience points to lose
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellLoseEXP
+set "adjustment=%~1"
+
+if %adjustment% GTR %py.misc.exp% (
+    set "py.misc.exp=0"
+) else (
+    set /a py.misc.exp-=%adjustment%
+)
+call ui.cmd :displayCharacterExperience
+
+set "exp=0"
+:loseExpWhileLoop
+set /a new_exp=py.base_exp_levels[!exp!] * %py.misc.experience_factor / 100
+if !new_exp! LEQ %py.misc.exp% (
+    set /a exp+=1
+    goto :loseExpWhileLoop
+)
+
+if not "%py.misc.level%"=="!exp!" (
+    set "py.misc.level=!exp!"
+    call player_stats.cmd :playerCalculateHitPoints
+
+    if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.SPELL_TYPE_MAGE%" (
+        call player.cmd :playerCalculateAllowedSpellsCount "%PlayerAttr.a_int%"
+        call player.cmd :playerGainMana "%PlayerAttr.a_int%"
+    ) else if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.SPELL_TYPE_PRIEST%" (
+        call player.cmd :playerCalculateAllowedSpellsCount "%PlayerAttr.a_wis%"
+        call player.cmd :playerGainMana "%PlayerAttr.a_wis%"
+    )
+
+    call ui.cmd :printCharacterLevel
+    call ui.cmd :printCharacterTitle
+)
 exit /b
 
 :spellSlowPoison
