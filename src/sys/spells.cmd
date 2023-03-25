@@ -2562,7 +2562,20 @@ if "!valid_target!"=="3" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Create a glyph of warding that monsters can not pass over
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellWardingGlyph
+if "!dg.floor[%py.pos.y%][%py.pos.x%].treasure_id!"=="0" (
+    call game_objects.cmd :popt
+    set "free_id=!errorlevel!"
+    set "dg.floor[%py.pos.y%][%py.pos.x%].treasure_id=!free_id!"
+
+    call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.OBJ_SCARE_MON%" "game.treasure.list[!free_id!]"
+)
 exit /b
 
 :spellLoseSTR
