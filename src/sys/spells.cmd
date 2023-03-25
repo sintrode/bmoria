@@ -2765,7 +2765,47 @@ if !%tile%.creature_id! GTR 1 (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Destroys everything in a 31x31 square around the player except the town
+::
+:: Arguments: %1 - The coordinates of the player
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellDestroyArea
+set "coord=%~1"
+call helpers.cmd :expandCoordName "coord"
+set /a coord.x_dec-=15, coord.x_inc+=15
+set /a coord.y_dec-=15, coord.y_inc+=15
+
+if %dg.current_level% GTR 0 (
+    for /L %%Y in (%coord.y_dec%,1,%coord.y_inc%) do (
+        for /L %%X in (%coord.x_dec%,1,%coord.x_inc%) do (
+            set "spot=%%Y;%%X"
+            call dungeon.cmd :coordInBounds "spot"
+            if "!errorlevel!"=="0" (
+                if not "!dg.floor[%%Y][%%X].feature_id!"=="%TILE_BOUNDARY_WALL%" (
+                    call dungeon.cmd :coordDistanceBetween "spot" "coord"
+                    set "distance=!errorlevel!"
+
+                    if "!distance!"=="0" (
+                        call :replaceSpot "!spot!" 1
+                    ) else if !distance! LSS 13 (
+                        call rng.cmd :randomNumber 6
+                        call :replaceSpot "!spot!" "!errorlevel!"
+                    ) else if !distance! LSS 16 (
+                        call rng.cmd :randomNumber 9
+                        call :replaceSpot "!spot!" "!errorlevel!"
+                    )
+                )
+            )
+        )
+    )
+)
+
+:: "Did it say our vision would come back?" "Box said two days." "Totally worth it."
+call ui_io.cmd :printMessage "There is a searing blast of light."
+call rng.cmd :randomNumber 10
+set /a py.flags.blind+=10+!errorlevel!
 exit /b
 
 :spellEnchantItem
