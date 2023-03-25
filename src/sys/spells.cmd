@@ -1932,7 +1932,7 @@ if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b 1
 set "c_id=!%tile%.creature_id!"
 if %c_id% GTR 1 (
     set "mosnters[%c_id%].sleep_count=0"
-    call monster.cmd :monsterMultiply "!coord!" "!monseters[%c_id%].creature_id!" 0
+    call monster.cmd :monsterMultiply "!coord!" "!monsters[%c_id%].creature_id!" 0
     exit /b !errorlevel!
 )
 goto :spellCloneMonsterWhileLoop
@@ -2141,7 +2141,55 @@ if "!creature_char!"=="!%creature%.sprite!" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Changes the speed of all monsters on the screen except the Balrog
+::
+:: Arguments: %1 - The difference between original speed and desired speed
+:: Returns:   0 if a visible monster was affected
+::            1 if a monster that would have been affected was not visible
+::              or if there is no monster to affect
+::------------------------------------------------------------------------------
 :spellSpeedAllMonsters
+set "speedy=1"
+
+set /a mon_dec=%next_free_monster_id%-1
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    call :spellSpeedAllMonstersForLoop "%~1" "%%~A"
+)
+exit /b
+
+:spellSpeedAllMonstersForLoop
+set "monster=monsters[%~2]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+if !%monster%.distance_from_player! GTR %config.monsters.mon_max_sight% exit /b
+call dungeon_los.cmd :los "!py.pos!" "!%monster%.pos!" || exit /b
+
+if %~1 GTR 0 (
+    set /a %monster%.speed+=%~1
+    set "%monster%.sleep_count=0"
+
+    if "!%monster%.lit!"=="true" (
+        set "speedy=0"
+        call monster.cmd :printMonsterActionText "!name!" "starts moving faster."
+    )
+) else (
+    call rng.cmd :randomNumber %MON_MAX_LEVELS%
+    if !errorlevel! GTR !%creature%.level! (
+        set /a %monster%.speed+=%~1
+        set "%monster%.sleep_count=0"
+
+        if "!%monster%.lit!"=="true" (
+            set "speedy=0"
+            call monster.cmd :printMonsterActionText "!name!" "starts moving slower."
+        )
+    ) else (
+        set "%monster%.sleep_count=0"
+        call monster.cmd :printMonsterActionText "!name!" "is unaffected."
+    )
+)
 exit /b
 
 :spellSleepAllMonsters
