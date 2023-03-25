@@ -2071,7 +2071,7 @@ if !%tile%.feature_id! GEQ %MIN_CLOSED_SPACE% exit /b !teleported!
 set "t_id=!%tile%.creature_id!"
 if %t_id% GTR 1 (
     set "monsters[%t_id%].sleep_count=0"
-    call :spellTeleportAwayMonster "!%tile%.creature_id!" "%config.monsters.mon_max_sight%"
+    call :spellTeleportAwayMonster "!%tile%.creature_id!" "%config.monsters.MON_MAX_SIGHT%"
     set "teleported=0"
 )
 goto :spellTeleportAwayMonsterInDirectionWhileLoop
@@ -2097,7 +2097,7 @@ set "monster=monsters[%~1]"
 set "c_id=!%monster%.creature_id!"
 set "creature=creatures_list[%c_id%]"
 
-if !%monster%.distance_from_player! LEQ %config.monsters.mon_max_sight% (
+if !%monster%.distance_from_player! LEQ %config.monsters.MON_MAX_SIGHT% (
     set /a "is_balrog=!%creature%.movement! & %config.monsters.move.cm_win%"
     if "!is_balrog!"=="0" (
         set "killed=0"
@@ -2164,7 +2164,7 @@ set "c_id=!%monster%.creature_id!"
 set "creature=creatures_list[%c_id%]"
 
 call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
-if !%monster%.distance_from_player! GTR %config.monsters.mon_max_sight% exit /b
+if !%monster%.distance_from_player! GTR %config.monsters.MON_MAX_SIGHT% exit /b
 call dungeon_los.cmd :los "!py.pos!" "!%monster%.pos!" || exit /b
 
 if %~1 GTR 0 (
@@ -2214,7 +2214,7 @@ set "c_id=!%monster%.creature_id!"
 set "creature=creatures_list[%c_id%]"
 
 call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
-if !%monster%.distance_from_player! GTR %config.monsters.mon_max_sight% exit /b
+if !%monster%.distance_from_player! GTR %config.monsters.MON_MAX_SIGHT% exit /b
 call dungeon_los.cmd :los "!py.pos!" "!%monster%.pos!" || exit /b
 
 set "is_unaffected=0"
@@ -2238,7 +2238,43 @@ if "!is_unaffected!"=="1" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Polymorph all visible creatures except the Balrog into other monsters
+::
+:: Arguments: None
+:: Returns:   0 if new monsters are able to be placed
+::            1 if no creatures other than the Balrog are visible
+::------------------------------------------------------------------------------
 :spellMassPolymorph
+set "morphed=1"
+set /a mon_dec=%next_free_monster_id%-1
+
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    call :spellMassPolymorphForLoop "%%~A"
+)
+exit /b !morphed!
+
+:spellMassPolymorphForLoop
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+if !%monster%.distance_from_player! LEQ %config.monsters.MON_MAX_SIGHT% (
+    set /a "is_winning=!%creature%.movement! & %config.monsters.move.cm_win%"
+    if "!is_winning!"=="0" (
+        set "coord.y=!%monster%.pos.y!"
+        set "coord.x=!%monster%.pos.x!"
+        set "coord=!coord.y!;!coord.x!"
+
+        call dungeon.cmd :dungeonDeleteMonster "%~1"
+
+        set /a mon_level_range=!monster_levels[%MON_MAX_LEVELS%]! - !monster_levels[0]!
+        call rng.cmd :randomNumber !mon_level_range!
+        set /a rnd_level=!errorlevel! - 1 + !monster_levels[0]!
+        call monster_manager.cmd :monsterPlaceNew "!coord!" "!rnd_level!" "false"
+        set "morphed=!errorlevel!"
+    )
+)
 exit /b
 
 :spellDetectEvil
