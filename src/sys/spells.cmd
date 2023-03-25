@@ -2512,7 +2512,54 @@ if "!palpable_hit!"=="3" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Confuses undead creatures
+::
+:: Arguments: None
+:: Returns:   0 if a visible undead monster is hit
+::            1 if no valid target is affected
+::------------------------------------------------------------------------------
 :spellTurnUndead
+set "turned=1"
+
+set /a mon_dec=%next_free_monster_id%-1
+for /L %%A in (%mon_dec%,-1,%config.monsters.mon_min_index_id%) do (
+    call :spellTurnUndeadForLoop "%%~A"
+)
+exit /b !turned!
+
+:spellTurnUndeadForLoop
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+set "valid_target=0"
+if !%monster%.distance_from_player! LEQ %config.monsters.MON_MAX_SIGHT% set /a valid_target+=1
+set /a "is_undead=!%creature%.defenses! & %config.monsters.defense.cd_undead%"
+if not "!is_undead!"=="0" set /a valid_target+=1
+call dungeon_los.cmd :los "%py.pos%" "!%monster%.pos!" && set /a valid_target+=1
+
+if "!valid_target!"=="3" (
+    call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+
+    set /a level_inc=%py.misc.level%+1
+    set "palpable_hit=0"
+    if !level_inc! GTR !%creature%.level! set "palpable_hit=1"
+    call rng.cmd :randomNumber 5
+    if "!errorlevel!"=="1" set "palpable_hit=1"
+    if "!palpable_hit!"=="1" (
+        if "!%monster%.lit!"=="true" (
+            set /a "creature_recall[%c_id%].defenses|=%config.monsters.defense.cd_undead%"
+            set "turned=0"
+            set monster.cmd :printMonsterActionText "!name!" "runs frantically."
+        )
+        set "%monster%.confused_amount=%py.misc.level%"
+    ) else (
+        if "!%monster%.lit!"=="true" (
+            call monster.cmd :printMonsterActionText "!name!" "is unaffected."
+        )
+    )
+)
 exit /b
 
 :spellWardingGlyph
