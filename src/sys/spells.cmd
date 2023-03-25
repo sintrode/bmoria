@@ -2447,7 +2447,25 @@ if !%tile%.feature_id! LEQ %MAX_CAVE_FLOOR% (
 call dungeon.cmd :dungeonLiteSpot "%~2"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Create food underneath the player
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellCreateFood
+set "tile=dg.floor[%py.pos.y%][%py.pos.x%]"
+set "t_id=!%tile%.treasure_id!"
+
+:: Don't create food if the player is already standing on something
+if not "%t_id%"=="0"  (
+    set "game.player_free_turn=true"
+    call ui_io.cmd :printMessage "There is already an object under you."
+    exit /b
+)
+
+call dungeon.cmd :dungeonPlaceRandomObjectAt "py.pos" "false"
+call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.obj_mush%" "game.treasure.list[%t_id%]"
 exit /b
 
 :spellDispelCreature
