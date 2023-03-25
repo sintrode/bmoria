@@ -2654,7 +2654,19 @@ if "%py.flags.sustain_con%"=="false" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Lose a Charisma point
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellLoseCHR
+if "%py.flags.sustain_chr%"=="false" (
+    call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_chr%"
+    call ui_io.cmd :printMessage "You feel very ugly."
+) else (
+    call ui_io.cmd :printMessage "You feel ugly for a moment, but it passes."
+)
 exit /b
 
 :spellLoseEXP
