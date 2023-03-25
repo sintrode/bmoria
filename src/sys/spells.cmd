@@ -1644,7 +1644,7 @@ if "!distance!"=="%config.treasure.objects_bolts_max_range%" set "finished=true"
 
 set "hit_wall=0"
 if !%tile%.feature_id! GEQ %MIN_CAVE_WALL% set /a hit_wall+=1
-if not "!%tile%.feature_id!"=="%TILE_BUONDARY_WALL%" set /a hit_wall+=1
+if not "!%tile%.feature_id!"=="%TILE_BOUNDARY_WALL%" set /a hit_wall+=1
 if "!hit_wall!"=="2" (
     call player.cmd :playerTunnelWall "!coord!" 1 0
 
@@ -1986,7 +1986,7 @@ set "rnd_dist=!errorlevel!"
 set /a coord.y=!%monster%.pos.y!+!rnd_dist!
 set /a coord.x=!%monster%.pos.x!+!rnd_dist!
 set "coord=!coord.y!;!coord.x!"
-call ui.cmd :coordInBounds "coord"
+call dungeon.cmd :coordInBounds "coord"
 if "!errorlevel!"=="1" goto :spellTeleportAwayMonsterGetRndCoords
 exit /b
 
@@ -2389,7 +2389,62 @@ if "!can_phase!"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: The effect of the spell Earthquake on the nearby walls
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellEarthquake
+call helpers.cmd :expandCoordName "py.pos"
+set /a py.pos.x_dec-=7, py.pos.x_inc+=7
+set /a py.pos.y_dec-=7, py.pos.y_inc+=7
+
+for /L %%Y in (%py.pos.y_dec%,1,%py.pos.y_inc%) do (
+    for /L %%X in (%py.pos.x_dec%,1,%py.pos.x_inc%) do (
+        set "coord=%%Y;%%X"
+        set "is_unaligned=0"
+        if not "%py.pos.y%"=="%%Y" set "is_unaligned=1"
+        if not "%py.pos.x%"=="%%X" set "is_unaligned=1"
+
+        set "shake_it=0"
+        if "!is_unaligned!"=="1" set /a shake_it+=1
+        call dungeon.cmd :coordInBounds "coord" && set /a shake_it+=1
+        call rng.cmd :randomNumber 8
+        if "!errorlevel!"=="1" set /a shake_it+=1
+        if "!shake_it!"=="3" (
+            set "tile=dg.floor[%%Y][%%X]"
+            call :spellEarthquakeIfStatement "!tile!" "coord"
+        )
+    )
+)
+exit /b
+
+:spellEarthquakeIfStatement
+if not "!%~1.treasure_id!"=="0" call dungeon.cmd :dungeonDeleteObject "%~2"
+if !%tile%.creature_id! GTR 1 call :earthquakeHitsMonster "!%tile%.creature_id!"
+
+if !%tile%.feature_id! LEQ %MAX_CAVE_FLOOR% (
+    call rng.cmd :randomNumber 10
+    set "rng_tmp=!errorlevel!"
+    if !rng_tmp! LSS 6 (
+        set "%tile%.feature_id=%TILE_QUARTZ_WALL%"
+    ) else if !rnd_tmp! LSS 9 (
+        set "%tile%.feature_id=%TILE_MAGMA_WALL%"
+    ) else (
+        set "%tile%.feature_id=%TILE_GRANITE_WALL%"
+    )
+    set "%tile%.field_mark=false"
+) else (
+    if !%tile%.feature_id! GEQ %MIN_CAVE_WALL% (
+        if not "!%tile.feature_id!"=="%TILE_BOUNDARY_WALL%" (
+            set "%tile%.feature_id=%TILE_CORR_FLOOR%"
+            set "%tile%.permanent_light=false"
+            set "%tile%.field_mark=false"
+        )
+    )
+)
+call dungeon.cmd :dungeonLiteSpot "%~2"
 exit /b
 
 :spellCreateFood
