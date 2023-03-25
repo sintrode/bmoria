@@ -2624,7 +2624,19 @@ if "%py.flags.sustain_wis%"=="false" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Lose a Dexterity point
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellLoseDEX
+if "%py.flags.sustain_dex%"=="false" (
+    call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_dex%"
+    call ui_io.cmd :printMessage "You feel very sore."
+) else (
+    call ui_io.cmd :printMessage "You feel sore for a moment, but it passes."
+)
 exit /b
 
 :spellLoseCON
