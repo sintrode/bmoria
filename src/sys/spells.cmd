@@ -1862,6 +1862,7 @@ set "creature=creatures_list[%mc_id%]"
 if %c_id% GTR 1 (
     set "finished=true"
 
+    REM TODO: Try replacing this segment with :earthquakeHitsMonster
     set /a "can_phase=!%creature%.movement! & %config.monsters.move.cm_phase%"
     if "!can_phase!"=="0" (
         set /a "is_attack_only=!%creature%.movement! & %config.monsters.move.cm_attack_only%"
@@ -2348,7 +2349,44 @@ if %adjustment% LSS 3 (
 )
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Cast Earthquake on a monster
+::
+:: Arguments: %1 - The monster_id of the monster being targeted
+:: Returns:   None
+::------------------------------------------------------------------------------
 :earthquakeHitsMonster
+set "monster=monsters[%~1]"
+set "c_id=!%monster%.creature_id!"
+set "creature=creatures_list[%c_id%]"
+
+set /a "can_phase=!%creature%.movement! & %config.monsters.move.cm_phase%"
+if "!can_phase!"=="0" (
+    set /a "is_attack_only=!%creature%.movement! & %config.monsters.move.cm_attack_only%"
+    if not "!is_attack_only!"=="0" (
+        set "damage=3000"
+    ) else (
+        call dice.cmd :diceRoll 4 8
+        set "damage=!errorlevel!"
+    )
+
+    call monster.cmd :monsterNameDescription "!%creature%.name!" "!%monster%.lit!" "name"
+    call monster.cmd :printMonsterActionText "!name!" "wails out in pain."
+
+    call monster.cmd :monsterTakeHit "!%tile%.creature_id!" "!damage!"
+    if !errorlevel! GEQ 0 (
+        call monster.cmd :printMonsterActionText "!name!" "is embedded in the rock."
+        call ui.cmd :displayCharacterExperience
+    )
+) else (
+    set "is_earth_monster=0"
+    if "!%creature%.sprite!"=="E" set "is_earth_monster=1"
+    if "!%creature%.sprite!"=="X" set "is_earth_monster=1"
+    if "!is_earth_monster!"=="1" (
+        call dice.cmd :diceRoll 4 8
+        set /a %monster%.hp+=!errorlevel!
+    )
+)
 exit /b
 
 :spellEarthquake
