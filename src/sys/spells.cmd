@@ -2808,8 +2808,35 @@ call rng.cmd :randomNumber 10
 set /a py.flags.blind+=10+!errorlevel!
 exit /b
 
+::------------------------------------------------------------------------------
+:: Enchants a bonus onto an item
+::
+:: Arguments: %1 - A reference to the property to increase
+::            %2 - The maximum bonus allowed
+:: Returns:   0 if the property was successfully enchanted
+::            1 if the enchantment failed
+::------------------------------------------------------------------------------
 :spellEnchantItem
-exit /b
+if %~2 LEQ 0 exit /b 1
+
+set "chance=0"
+if !%~1! GTR 0 (
+    set "chance=!%~1!"
+
+    REM 1 percent chance of bonus enchantment
+    call rng.cmd :randomNumber 100
+    if "!errorlevel!"=="1" (
+        call rng.cmd :randomNumber !chance!
+        set /a chance=!errorlevel!-1
+    )
+)
+
+call rng.cmd :randomNumber %~2
+if !errorlevel! GTR !chance! (
+    set /a %~1+=1
+    exit /b 0
+)
+exit /b 1
 
 :spellRemoveCurseFromAllWornItems
 exit /b
