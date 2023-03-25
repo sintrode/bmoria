@@ -2726,7 +2726,43 @@ if %py.flags.poisoned% GTR 0 (
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Replace a tile with a random wall or floor tile
+::
+:: Arguments: %1 - The coordinates of the target tile
+::            %2 - The type of tile to replace the current tile with
+:: Returns:   None
+::------------------------------------------------------------------------------
 :replaceSpot
+set "coord=%~1"
+set "typ=%~2"
+set "tile_counter=0"
+
+:: TILE_CORR_FLOOR   =  3
+:: TILE_GRANITE_WALL = 12
+:: TILE_MAGMA_WALL   = 13
+:: TILE_QUARTZ_WALL  = 14
+for %%T in (3 3 3 12 13 14 12 13 14 12 13 14) do (
+    set "new_tile[!tile_counter!]=%%T"
+    set /a tile_counter+=1
+)
+
+for /f "tokens=1,2 delims=;" %%A in ("!coord!") do (
+    set "tile=dg.floor[%%~A][%%~B]"
+)
+set "%tile%.feature_id=!new_file[%typ%]!"
+
+set "%tile%.permanent_light=false"
+set "%tile%.field_mark=false"
+set "%tile%.perma_lit_room=false"
+
+if not "!%tile%.treasure_id!"=="0" (
+    call dungeon.cmd :dungeonDeleteObject "coord"
+)
+
+if !%tile%.creature_id! GTR 1 (
+    call dungeon.cmd :dungeonDeleteMonster !%tile%.creature_id!
+)
 exit /b
 
 :spellDestroyArea
