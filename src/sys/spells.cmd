@@ -2314,8 +2314,39 @@ if "!errorlevel!"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Adjusts the player's hit points
+::
+:: Arguments: %1 - The amount to adjust the player's HP by
+:: Returns:   0 if the player's HP is adjusted
+::            1 if the player is already at or above max HP
+::------------------------------------------------------------------------------
 :spellChangePlayerHitPoints
-exit /b
+if %py.misc.current_hp% GEQ %py.misc.max_hp% exit /b 1
+
+set "adjustment=%~1"
+set /a py.misc.current_hp+=%adjustment%
+if %py.misc.current_hp% GEQ %py.misc.max_hp% (
+    set "py.misc.current_hp=%py.misc.max_hp%"
+    set "py.misc.current_hp_fraction=0"
+)
+call ui.cmd :printCharacterCurrentHitPoints
+
+set /a adjustment/=5
+if %adjustment% LSS 3 (
+    if "%adjustment%"=="0" (
+        call ui_io.cmd :printMessage "You feel a little better."
+    ) else (
+        call ui_io.cmd :printMessage "You feel better."
+    )
+) else (
+    if %adjustment% LSS 7 (
+        call ui_io.cmd :printMessage "You feel much better."
+    ) else (
+        call ui_io.cmd :printMessage "You feel very good."
+    )
+)
+exit /b 0
 
 :earthquakeHitsMonster
 exit /b
