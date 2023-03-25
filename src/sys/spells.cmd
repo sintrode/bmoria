@@ -2710,8 +2710,21 @@ if not "%py.misc.level%"=="!exp!" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Slows poison
+::
+:: Arguments: None
+:: Returns:   0 if the player was poisoned
+::            1 if there was no poison to slow
+::------------------------------------------------------------------------------
 :spellSlowPoison
-exit /b
+if %py.flags.poisoned% GTR 0 (
+    set /a py.flags.poisoned/=2
+    if !py.flags.poisoned! LSS 1 set "py.flags.poisoned=1"
+    call ui_io.cmd :printMessage "The effect of the poison has been reduced."
+    exit /b 0
+)
+exit /b 1
 
 :replaceSpot
 exit /b
