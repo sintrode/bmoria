@@ -2609,7 +2609,19 @@ if "%py.flags.sustain_int%"=="false" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Lose a Wisdom point
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :spellLoseWIS
+if "%py.flags.sustain_wis%"=="false" (
+    call player_stats.cmd :playerStatRandomDecrease "%PlayerAttr.a_wis%"
+    call ui_io.cmd :printMessage "You feel very naive."
+) else (
+    call ui_io.cmd :printMessage "You feel naive for a moment, but it passes."
+)
 exit /b
 
 :spellLoseDEX
