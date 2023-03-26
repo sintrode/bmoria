@@ -196,7 +196,38 @@ if "!staff_switch!"=="%StaffSpellTypes.StaffLight%" (
 )
 goto :staffDischargeWhileLoop
 
+::------------------------------------------------------------------------------
+:: Wrapper subroutine for using a staff
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :staffUse
+set "game.player_free_turn=true"
+
+call :staffPlayerIsCarrying "item_pos_start" "item_pos_end" || exit /b
+call inventory.cmd :inventoryGetInputForItemId "item_id" "Use which staff?" "%item_pos_start%" "%item_pos_end%" "CNIL" "CNIL" || exit /b
+
+set "game.player_free_turn=false"
+set "item=py.inventory[%item_id%]"
+call :staffPlayerCanUse "item" || exit /b
+call :staffDischarge "item"
+set "identified=!errorlevel!"
+
+if "!identified!"=="0" (
+    call identification.cmd :itemSetColorlessAsIdentified "!%item%.category_id!" "!%item%.sub_category_id!" "!%item%.identification!"
+    if "!errorlevel!"=="1" (
+        set /a "py.misc.exp+=(!%item%.depth_first_found! + (%py.misc.level% >> 1)) / %py.misc.level%"
+        call ui.cmd :displayCharacterExperience
+        call identification.cmd :itemIdentify "py.inventory[%item_id%]" "item_id"
+    )
+) else (
+    call identification.cmd :itemSetColorlessAsIdentified "!%item%.category_id!" "!%item%.sub_category_id!" "!%item%.identification!"
+    if "!errorlevel!"=="1" (
+        call identification.cmd :itemSetAsTried "item"
+    )
+)
+call identification.cmd :itemChargesRemainingDescription "%item_id%"
 exit /b
 
 :wandDischarge
