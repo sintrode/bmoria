@@ -35,7 +35,7 @@ set "chance=%py.misc.saving_throw%"
 call player_stats.cmd :playerStatAdjustmentWisdomIntelligence "%PlayerAttr.a_int%"
 set /a chance+=!errorlevel!
 set /a chance-=!%~1.depth_first_found! - 5
-set /a chance+=!class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.device%]! * %py.misc.level% / 3
+set /a chance+=!class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.DEVICE%]! * %py.misc.level% / 3
 
 if %py.flags.confused% GTR 0 set a chance/=2
 if %chance% LSS %config.player.player_use_device_difficulty% (
@@ -366,6 +366,84 @@ if "!wand_switch!"=="%WandSpellTypes.WandLight%" (
 )
 goto :wandDischargeWhileLoop
 
+::------------------------------------------------------------------------------
+:: Wrapper subroutine for firing a wand
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wandAim
-exit /b
+set "game.player_free_turn=true"
 
+if "%py.pack.unique_items%"=="0" (
+    call ui_io.cmd :printMessage "But you are not carrying anything."
+    exit /b
+)
+
+call inventory.cmd :inventoryFindRange "%TV_WAND%" "%TV_NEVER%" "item_pos_start" "item_pos_end"
+if "!errorlevel!"=="1" (
+    call ui_io.cmd :printMessage "You are not carrying any wands."
+    exit /b
+)
+call inventory.cmd :inventoryGetInputForItemId "item_id" "Aim which wand?" "%item_pos_start%" "%item_pos_end%" "CNIL" "CNIL" || exit /b
+
+set "game.player_free_turn=false"
+
+call game.cmd :getDirectionWithMemory "CNIL" "direction" || exit /b
+
+if %py.flags.confused% GTR 0 (
+    call ui_io.cmd :printMessage "You are confused."
+    call game.cmd :getRandomDirection
+    set "direction=!errorlevel!"
+)
+
+set "item=py.inventory[%item_id%]"
+set /a player_class_lev_adj=!class_level_adj[%py.misc.class_id%][5PlayerClassLevelAdj.DEVICE%]! * %py.misc.level% / 3
+call player_stats.cmd :playerStatAdjustmentWisdomIntelligence "%PlayerAttr.a_int%"
+set /a chance=%py.misc.saving_throw% + !errorlevel! - !%item%.depth_first_found! + %player_class_lev_adj%
+
+if %py.flags.confused% GTR 0 set /a chance/=2
+
+if %chance% LSS %config.player.player_use_device_difficulty% (
+    set /a difficulty_diff=%config.player.player_use_device_difficulty% - %chance% + 1
+    call rng.cmd :randomNumber "!difficulty_diff!"
+    if "!errorlevel!"=="1"(
+        set "chance=%config.player.player_use_device_difficulty%"
+    )
+)
+
+if %chance% LSS 1 set "chance=1"
+
+call rng.cmd :randomNumber "%chance%"
+if !errorlevel! LSS %config.player.player_use_device_difficulty% (
+    call ui_io.cmd :printMessage "You failed to use the wand properly."
+    exit /b
+)
+
+if !%~1.misc_use! LSS 1 (
+    call ui_io.cmd :printMessage "The wand has no charges left."
+    call identification.cmd :spellItemId "%~1"
+    if "!errorlevel!"=="1" (
+        call identification.cmd :itemAppendToInscription "%~1" "%config.identification.ID_EMPTY%"
+    )
+    exit /b
+)
+
+call :wandDischarge "item" "%direction%"
+set "identified=!errorlevel!"
+
+if "!identified!"=="0" (
+    call identification.cmd :itemSetColorlessAsIdentified "!%item%.category_id!" "!%item%.sub_category_id!" "!%item%.identification!"
+    if "!errorlevel!"=="1" (
+        set /a "py.misc.exp+=(!%item%.depth_first_found! + (%py.misc.level% >> 1)) / %py.misc.level%"
+        call ui.cmd :displayCharacterExperience
+        call identification.cmd :itemIdentify "py.inventory[%item_id%]" "item_id"
+    )
+) else (
+    call identification.cmd :itemSetColorlessAsIdentified "!%item%.category_id!" "!%item%.sub_category_id!" "!%item%.identification!"
+    if "!errorlevel!"=="1" (
+        call identification.cmd :itemSetAsTried "item"
+    )
+)
+call identification.cmd :itemChargesRemainingDescription "%item_id%"
+exit /b
