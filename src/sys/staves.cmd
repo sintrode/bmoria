@@ -78,6 +78,7 @@ set /a "%~1.misc_use-=1"
 set "flags=!%~1.flags!"
 
 :staffDischargeWhileLoop
+set "staff_switch="
 if "!flags!"=="0" exit /b !identified!
 set /a flag_inc=!flags!+1
 call helpers.cmd :getAndClearFirstBit "!flag_inc!"
@@ -230,8 +231,140 @@ if "!identified!"=="0" (
 call identification.cmd :itemChargesRemainingDescription "%item_id%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determine which spell to cast based on which wand is used
+::
+:: Arguments: %1 - A reference to the wand being fired
+::            %2 - The direction that the spell is being cast in
+:: Returns:   0 if the spell was successfully cast
+::            1 if the spell failed
+::------------------------------------------------------------------------------
 :wandDischarge
-exit /b
+set /a "%~1.misc_use-=1"
+set "direction=%~2"
+set "identified=1"
+set "flags=!%~1.flags!"
+
+:wandDischargeWhileLoop
+set "wand_switch="
+if "!flags!"=="0" exit /b !identified!
+
+set "coord.y=!py.pos.y!"
+set "coord.x=!py.pos.x!"
+set "coord=!coord.y!;!coord.x!"
+
+set /a flag_inc=!flags!+1
+call helpers.cmd :getAndClearFirstBit "!flag_inc!"
+set "wand_switch=!errorlevel!"
+
+if "!wand_switch!"=="%WandSpellTypes.WandLight%" (
+    REM Unlike the Staff of Light, the Wand of Light is visible even if the player is blind
+    call ui_io.cmd :printMessage "A line of blue shimmering light appears."
+    call spells.cmd :spellLightLine "!py.pos!" "%direction%"
+    set "identified=0"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.WandMagicMissile%" (
+    call dice.cmd :diceRoll 2 6
+    call spells.cmd :spellFireBolt "!coord!" "%direction%" "!errorlevel!" "%MagicSpellFlags.MagicMissile%" "!spell_names[0]!"
+    set "identified=0"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.LightningBolt%" (
+    call dice.cmd :diceRoll 4 8
+    call spells.cmd :spellFireBolt "!coord!" "%direction%" "!errorlevel!" "%MagicSpellFlags.Lightning%" "!spell_names[8]!"
+    set "identified=0"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.FrostBolt%" (
+    call dice.cmd :diceRoll 4 8
+    call spells.cmd :spellFireBolt "!coord!" "%direction%" "!errorlevel!" "%MagicSpellFlags.Frost%" "!spell_names[14]!"
+    set "identified=0"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.FireBolt%" (
+    call dice.cmd :diceRoll 4 8
+    call spells.cmd :spellFireBolt "!coord!" "%direction%" "!errorlevel!" "%MagicSpellFlags.Fire%" "!spell_names[22]!"
+    set "identified=0"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.StoneToMud%" (
+    call spells.cmd :spellWallToMud "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.Polymorph%" (
+    call spells.cmd :spellPolymorphMonster "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.HealMonster%" (
+    call dice.cmd :diceRoll 4 6
+    call spells.cmd :spellChangeMonsterHitPoints "!coord!" "%direction%" "-!errorlevel!"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.HasteMonster%" (
+    call spells.cmd :spellSpeedMonster "!coord!" "%direction%" 1
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.SlowMonster%" (
+    call spells.cmd :spellSpeedMonster "!coord!" "%direction%" -1
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.ConfuseMonster%" (
+    call spells.cmd :spellConfuseMonster "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.SleepMonster%" (
+    call spells.cmd :spellSleepMonster "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.DrainLife%" (
+    call spells.cmd :spellDrainLifeFromMonster "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.TrapDoorDestruction%" (
+    call spells.cmd :spellWallToMud "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.WallBuilding%" (
+    call spells.cmd :spellBuildWall "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.CloneMonster%" (
+    call spells.cmd :spellCloneMonster "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.TeleportAway%" (
+    call spells.cmd :spellTeleportAwayMonsterInDirection "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.Disarming%" (
+    call spells.cmd :spellDisarmAllInDirection "!coord!" "%direction%"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.LightningBall%" (
+    call spells.cmd :spellFireBall "!coord!" "%direction%" 32 "%MagicSpellFlags.Lightning%" "Lightning Ball"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.ColdBall%" (
+    call spells.cmd :spellFireBall "!coord!" "%direction%" 48 "%MagicSpellFlags.Frost%" "Cold Ball"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.FireBall%" (
+    REM No idea why some spell names are in spell_names and others aren't
+    call spells.cmd :spellFireBall "!coord!" "%direction%" 72 "%MagicSpellFlags.Fire%" "!spell_names[28]!"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.StinkingCloud%" (
+    call spells.cmd :spellFireBall "!coord!" "%direction%" 12 "%MagicSpellFlags.Lightning%" "!spell_names[6]!"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.AcidBall%" (
+    call spells.cmd :spellFireBall "!coord!" "%direction%" 32 "%MagicSpellFlags.Lightning%" "Acid Ball"
+    set "identified=!errorlevel!"
+    goto :wandDischargeWhileLoop
+) else if "!wand_switch!"=="%WandSpellTypes.Wonder%" (
+    call rng.cmd :randomNumber 23
+    set /a "flags=1 << (!errorlevel! - 1)"
+    goto :wandDischargeWhileLoop
+) else (
+    call ui_io.cmd :printMessage "Internal error in :wands"
+)
+goto :wandDischargeWhileLoop
 
 :wandAim
 exit /b
