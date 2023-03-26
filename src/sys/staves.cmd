@@ -64,8 +64,137 @@ if !%~1.misc_use! LSS 1 (
 )
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Determine which spell to cast based on the type of staff that is used
+::
+:: Arguments: %1 - A reference to the staff being fired
+:: Returns:   0 if the player knows what staff was used
+::            1 if the spell fails, keeping the player from learning about it
+::------------------------------------------------------------------------------
 :staffDischarge
-exit /b
+set "identified=1"
+set /a "%~1.misc_use-=1"
+
+set "flags=!%~1.flags!"
+
+:staffDischargeWhileLoop
+if "!flags!"=="0" exit /b !identified!
+set /a flag_inc=!flags!+1
+call helpers.cmd :getAndClearFirstBit "!flag_inc!"
+set "staff_switch=!errorlevel!"
+
+if "!staff_switch!"=="%StaffSpellTypes.StaffLight%" (
+    call spells.cmd :spellLightArea "!py.pos!"
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.DetectDoorsStairs%" (
+    call spells.cmd :spellDetectSecretDoorssWithinVicinity
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.TrapLocation%" (
+    call spells.cmd :spellDetectTrapsWithinVicinity
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.TreasureLocation%" (
+    call spells.cmd :spellDetectTreasureWithinVicinity
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.ObjectLocation%" (
+    call spells.cmd :spellDetectObjectsWithinVicinity
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.Teleportation%" (
+    call player.cmd :playerTeleport 100
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.Earthquakes%" (
+    call spells.cmd :spellEarthquake
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.Summoning%" (
+    set "identified=1"
+    call rng.cmd :randomNumber 4
+    for /L %%A in (1,1,!errorlevel!) do (
+        set "coord=!py.pos!"
+        call monster_manager.cmd :monsterSummon "coord" "false"
+        set "identified=!errorlevel!"
+    )
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.Destruction%" (
+    set "identified=0"
+    call spells.cmd :spellDestroyArea "!py.pos!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.Starlight%" (
+    set "identified=0"
+    call spells.cmd :spellStarlite "!py.pos!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.HasteMonsters%" (
+    call spells.cmd :spellSpeedAllMonsters 1
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.SlowMonsters%" (
+    call spells.cmd :spellSpeedAllMonsters -1
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.SleepMonsters%" (
+    call spells.cmd :spellSleepAllMonsters
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.CureLightWounds%" (
+    call rng.cmd :randomNumber 8
+    call spells.cmd :spellChangePlayerHitPoints !errorlevel!
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.DetectInvisible%" (
+    call spells.cmd :spellDetectInvisibleCreaturesWithinVicinity
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.Speed%" (
+    if "%py.flags.fast%"=="0" (
+        set "identified=0"
+    )
+    call rng.cmd :randomNumber 30
+    set /a py.flags.fast+=!errorlevel!+15
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.Slowness%" (
+    if "%py.flags.slow%"=="0" (
+        set "identified=0"
+    )
+    call rng.cmd :randomNumber 30
+    set /a py.flags.slow+=!errorlevel!+15
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.MassPolymorph%" (
+    call spells.cmd :spellMassPolymorph
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.RemoveCurse%" (
+    call spells.cmd :spellRemoveCurseFromAllWornItems
+    if "!errorlevel!"=="0" (
+        if %py.flags.blind% LSS 1 (
+            call ui_io.cmd :printMessage "The staff glows blue for a moment..."
+        )
+        set "identified=0"
+    )
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.DetectEvil%" (
+    call spells.cmd :spellDetectEvil
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.Curing%" (
+    call player_magic.cmd :spellCureBlindness && set "identified=0"
+    call player_magic.cmd :spellCurePoison && set "identified=0"
+    call player_magic.cmd :spellCureConfusion && set "identified=0"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.DispelEvil%" (
+    call spells.cmd :spellDispelCreature "%config.monsters.defense.CD_EVIL%" 60
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+) else if "!staff_switch!"=="%StaffSpellTypes.Darkness%" (
+    call spells.cmd :spellDarkenArea "!py.pos!"
+    set "identified=!errorlevel!"
+    goto :staffDischargeWhileLoop
+)
+goto :staffDischargeWhileLoop
 
 :staffUse
 exit /b
