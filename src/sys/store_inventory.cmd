@@ -102,10 +102,36 @@ if not "!is_cursed!"=="0" (
 :: Multiply value by number of items if it is a group stack item
 :: Not torches, since those are bundled
 if !%~1.sub_category_id! GTR %ITEM_GROUP_MIN% set /a value*=!%~1.items_count!
+for %%A in (is_weapon is_ammo is_potion is_food is_jewelry is_magic is_dig) do set "%%A="
 exit /b !value!
 
+::------------------------------------------------------------------------------
+:: Gets the price for weapons and armor
+::
+:: Arguments: %~1 - A reference to the item being sold
+:: Returns:   The price of the weapon or armor
+::------------------------------------------------------------------------------
 :getWeaponArmorBuyPrice
-exit /b
+call identification.cmd :spellItemIdentified "%~1"
+if "!errorlevel!"=="1" (
+    for /f "delims=" %%A in ("!%~1.id!") do exit /b !game_objects[%%~A].cost!
+)
+
+if !%~1.category_id! GEQ %TV_BOW% (
+    if !%~1.category_id! LEQ %TV_SWORD% (
+        if !%~1.to_hit! LSS 0 exit /b 0
+        if !%~1.to_to_damage! LSS 0 exit /b 0
+        if !%~1.to_ac! LSS 0 exit /b 0
+    )
+
+    set /a "real_cost=!%~1.cost! + (!%~1.to_hit! + !%~1.to_damage! + !%~1.to_ac!) * 100"
+    exit /b !real_cost!
+)
+
+if !%~1.to_ac! LSS 0 exit /b 0
+
+set /a real_cost=!%~1.cost! + !%~1.to_ac! * 100
+exit /b !real_cost!
 
 :getAmmoBuyPrice
 exit /b
