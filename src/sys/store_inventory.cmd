@@ -142,8 +142,16 @@ for %%A in (to_hit to_damage to_ac) do if !%~1.%%A! LSS 0 exit /b 0
 set /a real_cost=!%~1.cost! + (!%~1.to_hit! + !%~1.to_damage! + !%~1.to_ac!) * 5
 exit /b !real_cost!
 
+::------------------------------------------------------------------------------
+:: Gets the price for potions and scrolls
+::
+:: Arguments: %1 - A reference to the item being sold
+:: Returns:   The price of the potion or scroll
+::------------------------------------------------------------------------------
 :getPotionScrollBuyPrice
-exit /b
+call identification.cmd :itemSetColorlessAsIdentified "!%~1.category_id!" "!%~1.sub_category_id!" "!%~1.identification!"
+if "!errorlevel!"=="1" exit /b 20
+exit /b !%~1.cost!
 
 :getFoodBuyPrice
 exit /b
