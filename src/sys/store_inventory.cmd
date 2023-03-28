@@ -170,7 +170,7 @@ exit /b !%~1.cost!
 :: Gets the price for a ring or amulet
 ::
 :: Arguments: %1 - A reference to the item being sold
-:: Returns:   The price of the rign or amulet
+:: Returns:   The price of the ring or amulet
 ::------------------------------------------------------------------------------
 :getRingAmuletBuyPrice
 call identification.cmd :itemSetColorlessAsIdentified "!%~1.category_id!" "!%~1.sub_category_id!" "!%~1.identification!"
@@ -180,8 +180,25 @@ set "i_id=!%~1.id!"
 call identification.cmd :spellItemIdentified "%~1" || exit !game_objects[%i_id%].cost!
 exit /b !%~1.cost!
 
+::------------------------------------------------------------------------------
+:: Gets the price for wands and staffs
+::
+:: Arguments: %1 - A reference to the item being sold
+:: Returns:   The price of the wand or staff
+::------------------------------------------------------------------------------
 :getWandStaffBuyPrice
-exit /b
+call identification.cmd :itemSetColorlessAsIdentified "!%~1.category_id!" "!%~1.sub_category_id!" "!%~1.identification!"
+if "!errorlevel!"=="1" (
+    if "!%~1.category_id!"=="%TV_WAND%" exit /b 50
+    exit /b 70
+)
+
+call identification.cmd :spellItemIdentified "%~1" 
+if "!errorlevel!"=="0" (
+    set /a "real_cost=!%~1.cost! + (!%~1.cost! / 20) * !%~1.misc_use!"
+    exit /b !real_cost!
+)
+exit /b !%~1.cost!
 
 :getPickShovelBuyPrice
 exit /b
