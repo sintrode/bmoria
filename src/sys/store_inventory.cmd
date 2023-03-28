@@ -153,8 +153,18 @@ call identification.cmd :itemSetColorlessAsIdentified "!%~1.category_id!" "!%~1.
 if "!errorlevel!"=="1" exit /b 20
 exit /b !%~1.cost!
 
+::------------------------------------------------------------------------------
+:: Gets the price for food
+::
+:: Arguments: %1 - A reference to the item being sold
+:: Returns:   The price of the food
+::------------------------------------------------------------------------------
 :getFoodBuyPrice
-exit /b
+if !%~1.sub_category_id! LSS 86 (
+    call identification.cmd :itemSetColorlessAsIdentified "!%~1.category_id!" "!%~1.sub_category_id!" "!%~1.identification!"
+    if "!errorlevel!"=="1" exit /b 1
+)
+exit /b !%~1.cost!
 
 :getRingAmuletBuyPrice
 exit /b
