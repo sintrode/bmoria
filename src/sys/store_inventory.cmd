@@ -48,8 +48,61 @@ for /L %%A in (0,1,%store_dec%) do (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Returns the value for a specified item
+::
+:: Arguments: A reference to the item being priced
+:: Returns:   The cost of the item
+::------------------------------------------------------------------------------
 :storeItemValue
-exit /b
+set /a "is_cursed=!%~1.identification! & %config.identification.ID_DAMD%"
+set /a is_weapon=0, is_ammo=0, is_potion=0, is_food=0, is_jewelry=0, is_magic=0, is_dig=0
+
+if !%~1.category_id! GEQ %TV_BOW% if !%~1.category_id! LEQ %TV_SWORD% set "is_weapon=1"
+if !%~1.category_id! GEQ %TV_BOOTS% if !%~1.category_id! LEQ %TV_SOFT_ARMOR% set "is_weapon=1"
+if !%~1.category_id! GEQ %TV_SLING_AMMO% if !%~1.category_id! KEQ %TV_SPIKE% set "is_armor=1"
+if "!%~1.category_id!"=="%TV_SCROLL1%" set "is_potion=1"
+if "!%~1.category_id!"=="%TV_SCROLL2%" set "is_potion=1"
+if "!%~1.category_id!"=="%TV_POTION1%" set "is_potion=1"
+if "!%~1.category_id!"=="%TV_POTION2%" set "is_potion=1"
+if "!%~1.category_id!"=="%TV_FOOD%" set "is_food=1"
+if "!%~1.category_id!"=="%TV_AMULET%" set "is_jewelry=1"
+if "!%~1.category_id!"=="%TV_RING%" set "is_jewelry=1"
+if "!%~1.category_id!"=="%TV_STAFF%" set "is_magic=1"
+if "!%~1.category_id!"=="%TV_WAND%" set "is_magic=1"
+if "!%~1.category_id!"=="%TV_DIGGING%" set "is_dig=1"
+
+if not "!is_cursed!"=="0" (
+    set "value=0"
+) else if "!is_weapon!"=="1" (
+    call :getWeaponArmorBuyPrice "%~1"
+    set "value=!errorlevel!"
+) else if "!is_ammo!"=="1" (
+    call :getAmmoBuyPrice "%~1"
+    set "value=!errorlevel!"
+) else if "!is_potion!"=="1" (
+    call :getPotionScrollBuyPrice "%~1"
+    set "value=!errorlevel!"
+) else if "!is_food!"=="1" (
+    call :getFoodBuyPrice "%~1"
+    set "value=!errorlevel!"
+) else if "!is_jewelry!"=="1" (
+    call :getRingAmuletBuyPrice "%~1"
+    set "value=!errorlevel!"
+) else if "!is_magic!"=="1" (
+    call :getWandStaffBuyPrice "%~1"
+    set "value=!errorlevel!"
+) else if "!is_dig!"=="1" (
+    call :getPickShovelBuyPrice "%~1"
+    set "value=!errorlevel!"
+) else (
+    set "value=!%~1.cost!"
+)
+
+:: Multiply value by number of items if it is a group stack item
+:: Not torches, since those are bundled
+if !%~1.sub_category_id! GTR %ITEM_GROUP_MIN% set /a value*=!%~1.items_count!
+exit /b !value!
 
 :getWeaponArmorBuyPrice
 exit /b
