@@ -112,18 +112,12 @@ exit /b !value!
 :: Returns:   The price of the weapon or armor
 ::------------------------------------------------------------------------------
 :getWeaponArmorBuyPrice
-call identification.cmd :spellItemIdentified "%~1"
-if "!errorlevel!"=="1" (
-    for /f "delims=" %%A in ("!%~1.id!") do exit /b !game_objects[%%~A].cost!
-)
+set "i_id=!%~1.id!"
+call identification.cmd :spellItemIdentified "%~1" || exit /b !game_objects[%i_id%].cost!
 
-if !%~1.category_id! GEQ %TV_BOW% (
-    if !%~1.category_id! LEQ %TV_SWORD% (
-        if !%~1.to_hit! LSS 0 exit /b 0
-        if !%~1.to_to_damage! LSS 0 exit /b 0
-        if !%~1.to_ac! LSS 0 exit /b 0
-    )
-
+if !%~1.category_id! GEQ %TV_BOW% if !%~1.category_id! LEQ %TV_SWORD% (
+    for %%A in (to_hit to_damage to_ac) do if !%~1.%%A! LSS 0 exit /b 0
+    
     set /a "real_cost=!%~1.cost! + (!%~1.to_hit! + !%~1.to_damage! + !%~1.to_ac!) * 100"
     exit /b !real_cost!
 )
@@ -133,8 +127,20 @@ if !%~1.to_ac! LSS 0 exit /b 0
 set /a real_cost=!%~1.cost! + !%~1.to_ac! * 100
 exit /b !real_cost!
 
+::------------------------------------------------------------------------------
+:: Gets the price for ammo like arrows and bolts
+::
+:: Arguments: %1 - A reference to the item being sold
+:: Returns:   The price of the ammo
+::------------------------------------------------------------------------------
 :getAmmoBuyPrice
-exit /b
+set "i_id=!%~1.id!"
+call identification.cmd :spellItemIdentified "%~1" || exit /b !game_objects[%i_id%].cost!
+for %%A in (to_hit to_damage to_ac) do if !%~1.%%A! LSS 0 exit /b 0
+
+:: Multiply by 5 instead of 100 because ammo comes in packs of 20
+set /a real_cost=!%~1.cost! + (!%~1.to_hit! + !%~1.to_damage! + !%~1.to_ac!) * 5
+exit /b !real_cost!
 
 :getPotionScrollBuyPrice
 exit /b
