@@ -215,8 +215,35 @@ set /a real_cost=!%~1.cost!+(!%~1.misc_use! * !game_objects[%i_id%].misc_use!) *
 if !real_cost! LSS 0 set "real_cost=0"
 exit /b !real_cost!
 
+::------------------------------------------------------------------------------
+:: Gets the price range for an item
+::
+:: Arguments: %1 - The store that the player is at
+::            %2 - A variable to store the min valid price of the item
+::            %3 - A variable to store the max valid price of the item
+::            %4 - A reference to the item being sold
+:: Returns:   The initial asking price for the item
+::------------------------------------------------------------------------------
 :storeItemSellPrice
-exit /b
+call :storeItemValue "%~1"
+set "price=!errorlevel!"
+
+:: Cursed and damaged items will not be sold
+if !%item%.cost! LSS 1 exit /b 0
+if %price% LSS 1 exit /b 0
+
+set "s_id=!%~1.owner_id!"
+set "owner=store_owners[%s_id%]"
+set "owner_race=!%owner!.race!"
+
+set /a price=%price% * !race_gold_adjustments[%owner_race%][%py.misc.race_id%]! / 100
+if %price% LSS 1 set "price=1"
+
+set /a %~2=%price% * !%owner%.min_inflate! / 100
+set /a %~3=%price% * !%owner%.max_inflate! / 100
+
+if !%~2! GTR !%~3! set "%~2=!%~3!"
+exit /b !price!
 
 :storeCheckPlayerItemsCount
 exit /b
