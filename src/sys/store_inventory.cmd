@@ -200,8 +200,20 @@ if "!errorlevel!"=="0" (
 )
 exit /b !%~1.cost!
 
+::------------------------------------------------------------------------------
+:: Gets the price of picks and shovels
+::
+:: Arguments: %1 - A reference to the item being sold
+:: Returns:   The price of the picks and shovels
+::------------------------------------------------------------------------------
 :getPickShovelBuyPrice
-exit /b
+set "i_id=!%~1.id!"
+call identification.cmd :spellItemIdentified "%~1" || exit /b !game_objects[%i_id%].cost!
+if !%~1.misc_use! LSS 0 exit /b 0
+
+set /a real_cost=!%~1.cost!+(!%~1.misc_use! * !game_objects[%i_id%].misc_use!) * 100
+if !real_cost! LSS 0 set "real_cost=0"
+exit /b !real_cost!
 
 :storeItemSellPrice
 exit /b
