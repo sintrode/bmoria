@@ -166,8 +166,19 @@ if !%~1.sub_category_id! LSS 86 (
 )
 exit /b !%~1.cost!
 
+::------------------------------------------------------------------------------
+:: Gets the price for a ring or amulet
+::
+:: Arguments: %1 - A reference to the item being sold
+:: Returns:   The price of the rign or amulet
+::------------------------------------------------------------------------------
 :getRingAmuletBuyPrice
-exit /b
+call identification.cmd :itemSetColorlessAsIdentified "!%~1.category_id!" "!%~1.sub_category_id!" "!%~1.identification!"
+if "!errorlevel!"=="1" exit /b 45
+
+set "i_id=!%~1.id!"
+call identification.cmd :spellItemIdentified "%~1" || exit !game_objects[%i_id%].cost!
+exit /b !%~1.cost!
 
 :getWandStaffBuyPrice
 exit /b
