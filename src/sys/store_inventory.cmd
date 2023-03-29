@@ -293,7 +293,63 @@ set /a %store%.inventory[%~2].cost=%~3*-1
 set /a %store%.unique_items_counter+=1
 exit /b
 
+::------------------------------------------------------------------------------
+:: Adds an item to the store's inventory
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - A variable to store the index of the item in the store's
+::                 inventory
+::            %3 - A reference to the item being sold
+:: Returns:   None
+::------------------------------------------------------------------------------
 :storeCarryItem
+set "index_id=-1"
+set "store=stores[%~1]"
+
+call :storeItemSellPrice "%store%" "dummy" "item_cost" "%~4" && exit /b
+
+set "item_id=0"
+set "flag=false"
+
+:storeCarryItemWhileLoop
+set "store_item=store.inventory[%item_id%].item"
+
+if "!%~3.category_id!"=="!%store_item%.category_id!" (
+    if "!%~3.sub_category_id!"=="!%store_item%.sub_category_id!" (
+        if !%~3.sub_category_id! GEQ %ITEM_SINGLE_STACK_MIN% (
+            set "itemable=0"
+            if !%~3.sub_category_id! LSS %ITEM_GROUP_MIN% set "itemable=1"
+            if "!%store_item%.misc_use!"=="!%~3.misc_use!" set "itemable=1"
+            if "!itemable!"=="1" (
+                set "index_id=%item_id%"
+                set /a %store_item%.items_count+=!%~3.items_count!
+
+                if !%~3.sub_category_id! GTR %ITEM_GROUP_MIN% (
+                    call :storeItemSellPrice "%store%" "dummy" "item_cost" "%store_item%"
+                    set /a %store%.inventory[%item_id%]=!item_cost!*-1
+                ) else if !%store_item%.items_count! GTR 24 (
+                    set "%store_item%.items_count=24"
+                )
+                set "flag=true"
+            )
+        )
+    )
+) else if !%~3.category_id! GTR !%store_item%.category_id! (
+    call :storeItemInsert "%~1" "%item_id%" "!item_cost!" "%~3"
+    set "flag=true"
+    set "index_id=!item_id!"
+)
+set /a item_id+=1
+if !item_id! LSS !%store%.unique_items_counter! (
+    if "!flag!"=="false" (
+        goto :storeCarryItemWhileLoop
+    )
+)
+
+if "!flag!"=="false" (
+    call :storeItemInsert "%~1" "!%store%.unique_items_counter!" "!item_cost!" "%~3"
+    set /a index_id=!%store%.unique_items_counter!-1
+)
 exit /b
 
 :storeDestroyItem
