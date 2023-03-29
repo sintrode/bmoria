@@ -352,7 +352,43 @@ if "!flag!"=="false" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Destroys one item in the store's inventory or the entire slot if %3 is false
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - The item_id of the item being destroyed
+::            %3 - True if only one instance of the item should be destroyed
+::                 False if all instances of the item should be destroyed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :storeDestroyItem
+set "store=stores[%~1]"
+set "store_item=%store%.inventory[%~2].item"
+
+call inventory.cmd :inventoryItemSingleStackable "%store_item%"
+if "!errorlevel!"=="0" (
+    if "%~3"=="true" (
+        set "number=1"
+    ) else (
+        call rng.cmd :randomNumber !%store_item%.items_count!
+        set "number=!errorlevel!"
+    )
+) else (
+    set "number=!%store_item%.items_count!"
+)
+
+if not "!number!"=="!%store_item%.items_count!" (
+    set /a %store_item%.items_count-=!number!
+) else (
+    set /a item_dec=!%store%.unique_items_counter!-1
+    for /L %%A in (%~2,1,!item_dec!) do (
+        set /a item_inc=%%A+1
+        call :copyStoreInventoryItem "%store%.inventory[%%A]" "%store%.inventory[!item_inc!]"
+    )
+    call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.OBJ_NOTHING%" "%store%.inventory[!item_dec!].item"
+    set /a %store%.inventory[!item_dec!].cost=0
+    set /a %store%.unique_items_counter-=1
+)
 exit /b
 
 :storeItemCreate
