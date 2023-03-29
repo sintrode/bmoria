@@ -272,7 +272,25 @@ for /L %%A in (0,1,%store_dec%) do (
 )
 exit /b !store_check!
 
+::------------------------------------------------------------------------------
+:: Insert an item into the store's inventory at a specified location
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - The position to store the item at
+::            %3 - The value of the item
+::            %4 - The item being sold
+:: Returns:   None
+::------------------------------------------------------------------------------
 :storeItemInsert
+set "store=stores[%~1]"
+set /a item_dec=!%store%.unique_items_counter!-1
+for /L %%A in (%item_dec%,-1,%~2) do (
+    set /a item_inc=%%A+1
+    call :copyStoreInventoryItem "%store%.inventory[!item_inc!]" "%store%.inventory[%%A]"
+)
+call inventory.cmd :inventoryCopyItem "%store%.inventory[%~2].item" "%~4"
+set /a %store%.inventory[%~2].cost=%~3*-1
+set /a %store%.unique_items_counter+=1
 exit /b
 
 :storeCarryItem
@@ -284,3 +302,18 @@ exit /b
 :storeItemCreate
 exit /b
 
+::------------------------------------------------------------------------------
+:: Copies one Store_Inventory item into another one
+::
+:: Arguments: %1 - The inventory item to copy values into
+::            %2 - The inventory item to copy values from
+:: Returns:   None
+::------------------------------------------------------------------------------
+:copyStoreInventoryItem
+for %%T in (id special_name_id inscription flags category_id sprite misc_use
+            cost sub_category_id items_count weight to_hit to_damage ac to_ac
+            damage.dice damage.sides depth_first_found identification) do (
+    set "%~1.item.%%T=!%~2.item.%%T"
+)
+set "%~1.cost=!%~2.cost!"
+exit /b
