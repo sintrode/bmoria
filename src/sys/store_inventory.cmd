@@ -391,7 +391,37 @@ if not "!number!"=="!%store_item%.items_count!" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Creates an item and inserts it into the store's inventory
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - The maximum cost of the item
+:: Returns:   None
+::------------------------------------------------------------------------------
 :storeItemCreate
+call game_objects.cmd :popt
+set "free_id=!errorlevel!"
+
+for /L %%A in (0,1,3) do (
+    call rng.cmd :randomNumber %STORE_MAX_ITEM_TYPES%
+    set /a rnd_dec=!errorlevel!-1
+    for /f "delims=" %%B in ("!rnd_dec!") do set "id=!store_choices[%~1][%%~B]!"
+    call inventory.cmd :inventoryItemCopyTo "!id!" "game.treasure.list[%free_id%]"
+    call treasure.cmd :magicTreasureMagicalAbility "%free_id%" "%config.treasure.LEVEL_TOWN_OBJECTS%"
+
+    call :storeCheckPlayerItemsCount "stores[%~1]" "game.treasure.list[%free_id%]"
+    if !game.treasure.list[%free_id%].cost! GTR 0 (
+        if !game.treasure.list[%free_id%].cost! LSS %~2 (
+            call identification.cmd :itemIdentifyAsStoreBought "game.treasure.list[%free_id%]"
+            call :storeCarryItem "%~1" "dummy" "game.treasure.list[%free_id%]"
+            
+            goto :storeItemCreateAfterForLoop
+        )
+    )
+)
+
+:storeItemCreateAfterForLoop
+call game_objects.cmd :pusht "%free_id%"
 exit /b
 
 ::------------------------------------------------------------------------------
