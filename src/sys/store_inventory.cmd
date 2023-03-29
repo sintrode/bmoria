@@ -245,8 +245,32 @@ set /a %~3=%price% * !%owner%.max_inflate! / 100
 if !%~2! GTR !%~3! set "%~2=!%~3!"
 exit /b !price!
 
+::------------------------------------------------------------------------------
+:: Prevent the player from becoming overencumbered as a result of a purchase
+::
+:: Arguments: %1 - A reference to the store that the player is in
+::            %2 - A reference to the item being bought
+:: Returns:   0 if the player can hold the new item
+::            1 if there is no more room at the inn-ventory
+::------------------------------------------------------------------------------
 :storeCheckPlayerItemsCount
-exit /b
+if !%~1.unique_items_counter! LSS %STORE_MAX_DISCRETE_ITEMS% exit /b 0
+call inventory.cmd :inventoryItemStackable "%~2" || exit /b 1
+
+set "store_check=1"
+set /a store_dec=!%~1.unique_items_counter!-1
+for /L %%A in (0,1,%store_dec%) do (
+    if "!%~1.inventory[%%A].item.category_id!"=="!%~2.category_id!" (
+        if "!%~1.inventory[%%A].item.sub_category_id!"=="!%~2.sub_category_id!" (
+            set /a potential_total_items=!%~1.inventory[%%A].items_count!+!%~2.items_count!
+            if !potential_total_items! LSS 256 (
+                if !%~2.sub_category_id! LSS %ITEM_GROUP_MIN% set "store_check=0"
+                if "!%~1.inventory[%%A].item.misc_use!"=="!%~2.misc_use!" set "store_check=0"
+            )
+        )
+    )
+)
+exit /b !store_check!
 
 :storeItemInsert
 exit /b
