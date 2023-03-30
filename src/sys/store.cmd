@@ -246,7 +246,22 @@ exit /b
 call ui_io.cmd :putStringClearToEOL "Gold Remaining: %py.misc.au%" "18;17"
 exit /b
 
+::------------------------------------------------------------------------------
+:: A wrapper for the store's main gameplay loop
+::
+:: Arguments: %1 - A reference to the current store
+::            %2 - The name of the store owner
+::            %3 - The item_id of the first item in the inventory
+:: Returns:   None
+::------------------------------------------------------------------------------
 :displayStore
+call ui_io.cmd :clearScreen
+call ui_io.cmd :putString "%~2" "3;9"
+call ui_io.cmd :putString "Item" "4;3"
+call ui_io.cmd :putString "Asking Price" "4;60"
+call :displayPlayerRemainingGold
+call :displayStoreCommands
+call :displayStoreInventory "%~1" "%~3"
 exit /b
 
 :storeGetItemId
