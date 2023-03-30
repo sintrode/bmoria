@@ -2,7 +2,29 @@
 call %*
 exit /b
 
+::------------------------------------------------------------------------------
+:: Sets up stores and owners
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :storeInitializeOwners
+set /a count=%MAX_OWNERS%/%MAX_STORES%, store_dec=%MAX_STORES%-1
+
+for /L %%A in (0,1,%store_dec%) do (
+    set "store=stores[%%A]"
+    call rng.cmd :randomNumber %count%
+    set /a "%store%.owner_id=%MAX_STORES% * (!errorlevel! - 1) + %%A"
+    for %%B in (insults_counter turns_left_before_closing
+                unique_items_counter good_purchases bad_purchases) do (
+        set "%store%.%%~B=0"
+    )
+
+    for /L %%A in (0,1,23) do (
+        call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.OBJ_NOTHING%" "%store%.inventory[%%A].item"
+        set "%store%.inventory[%%A].cost=0"
+    )
+)
 exit /b
 
 :printSpeechFinishedHaggling
