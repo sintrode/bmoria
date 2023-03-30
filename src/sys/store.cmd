@@ -125,7 +125,17 @@ set /a comment_index=!errorlevel!-1
 call ui_io.cmd :printMessage "!speech_sorry[%comment_index%]!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Displays the store menu
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :displayStoreCommands
+call ui_io.cmd :putStringClearToEOL "You may:" "20;0"
+call ui_io.cmd :putStringClearToEOL " p) Purchase an item.           b) Browse store's inventory." "21;0"
+call ui_io.cmd :putStringClearToEOL " s) Sell an item.               i/e/t/w/x) Inventory/Equipment Lists." "22;0"
+call ui_io.cmd :putStringClearToEOL " Q) Exit from Building.        R) Redraw the screen." "23;0"
 exit /b
 
 :displayStoreHaggleCommands
