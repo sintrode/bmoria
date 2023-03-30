@@ -155,7 +155,62 @@ call ui_io.cmd :putStringClearToEOL "Q) Quit Haggling." "22;0"
 call ui_io.cmd :eraseLine "23;0"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display the store's inventory
+::
+:: Arguments: %1 - A reference to the current store
+::            %2 - The first item in the inventory
+:: Returns:   None
+::------------------------------------------------------------------------------
 :displayStoreInventory
+set "item_pos_start=%~2"
+set /a item_pos_end=((%item_pos_start% / 12) + 1) * 12
+if %item_pos_end% GTR !%~1.unique_items_counter! (
+    set "item_pos_end=!%~1.unique_items_counter!"
+)
+
+set /a loop_end=%item_pos_end%-1
+for /L %%A in (%item_pos_start%,1,%loop_end%) do (
+    set /a item_line_num=%%A %% 12
+    set "current_item_count=!%store%.inventory[%item_pos_start%].item.items_count!"
+    call inventory.cmd :inventoryItemSingleStackable "%store%.inventory[%item_pos_start%].item"
+    if "!errorlevel!"=="0" set "%store%.inventory[%item_pos_start%].item.items_count=1"
+
+    call identification.cmd :itemDescription "description" "%store%.inventory[%item_pos_start%].item" "true"
+    set "%store%.inventory[%item_pos_start%].item.items_count=!current_item_count!"
+
+    set /a item_letter=!item_line_num!+97, item_y_coord=!item_line_num!+5
+    cmd /c exit /b !item_letter!
+    set "msg=!=ExitCodeAscii!) !description!"
+    call ui_io.cmd putStringClearToEOL "!msg!" "!item_y_coord!;0"
+
+    set "current_item_count=!%store%.inventory[%item_pos_start%].cost!"
+    if !current_item_count! LEQ 0 (
+        set /a value=!current_item_count! * -1
+        call player_stats.cmd :playerStatAdjustmentCharisma
+        set /a value=!value! * !errorlevel! / 100
+        if !value! LEQ 0 set "value=1"
+        call scores.cmd :sprintf "msg" "!value!" 9
+    ) else (
+        call scores.cmd :sprintf "msg" "!current_item_count!" 9
+        set "msg=!msg! [fixed]"
+    )
+
+    call ui_io.cmd putStringClearToEOL "!msg!" "!item_y_coord!;59"
+)
+if !item_line_num! LSS 12 (
+    set /a i_max=11-!item_line_num!
+    for /L %%A in (0,1,!i_max!) do (
+        set /a line_index=%%A + !item_line_num! + 5
+        call ui_io.cmd :eraseLine "!line_index!;0"
+    )
+)
+
+if !%store%.unique_items_counter! GTR 12 (
+    call ui_io.cmd :putString "- cont. -" "17;60"
+) else (
+    call ui_io.cmd :eraseLine "17;60"
+)
 exit /b
 
 :displaySingleCost
