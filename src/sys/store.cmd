@@ -113,7 +113,16 @@ set /a comment_index=!errorlevel!-1
 call ui_io.cmd :printMessage "!speech_haggling_try_again[%comment_index%]!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Don't let the player offer more than is asked for some reason
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printSpeechSorry
+call rng.cmd :randomNumber 5
+set /a comment_index=!errorlevel!-1
+call ui_io.cmd :printMessage "!speech_sorry[%comment_index%]!"
 exit /b
 
 :displayStoreCommands
