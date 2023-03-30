@@ -138,7 +138,21 @@ call ui_io.cmd :putStringClearToEOL " s) Sell an item.               i/e/t/w/x) 
 call ui_io.cmd :putStringClearToEOL " Q) Exit from Building.        R) Redraw the screen." "23;0"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Displays the set of commands
+::
+:: Arguments: %1 -  1 if the player is buying
+::                 -1 if the player is selling
+:: Returns:   None
+::------------------------------------------------------------------------------
 :displayStoreHaggleCommands
+if "%~1"=="-1" (
+    call ui_io.cmd :putStringClearToEOL "Specify an asking price in gold pieces." "21;0"
+) else (
+    call ui_io.cmd :putStringClearToEOL "Specify an offer in gold pieces." "21;0"
+)
+call ui_io.cmd :putStringClearToEOL "Q) Quit Haggling." "22;0"
+call ui_io.cmd :eraseLine "23;0"
 exit /b
 
 :displayStoreInventory
