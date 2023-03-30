@@ -236,7 +236,14 @@ set /a item_y_coord=(%~2 %% 12) + 5
 call ui_io.cmd putStringClearToEOL "!msg!" "!item_y_coord!;59"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Displays the player's remaining gold
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :displayPlayerRemainingGold
+call ui_io.cmd :putStringClearToEOL "Gold Remaining: %py.misc.au%" "18;17"
 exit /b
 
 :displayStore
