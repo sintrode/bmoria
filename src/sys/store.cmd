@@ -213,7 +213,27 @@ if !%store%.unique_items_counter! GTR 12 (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Displays a single cost
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - The item_id of the item whose cost is being displayed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :displaySingleCost
+set "cost=!stores.[%~1].inventory[%~2].cost!"
+
+if !cost! LSS 0 (
+    set /a c=!cost!*-1
+    call player_stats.cmd :playerStatAdjustmentCharisma
+    set /a c=!c! * !errorlevel! / 100
+    set "msg=!c!"
+) else (
+    call scores.cmd :sprintf "msg" "!current_item_count!" 9
+    set "msg=!msg! [fixed]"
+)
+set /a item_y_coord=(%~2 %% 12) + 5
+call ui_io.cmd putStringClearToEOL "!msg!" "!item_y_coord!;59"
 exit /b
 
 :displayPlayerRemainingGold
