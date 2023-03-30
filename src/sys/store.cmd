@@ -27,7 +27,16 @@ for /L %%A in (0,1,%store_dec%) do (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Print a statement at the end of haggling
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printSpeechFinishedHaggling
+call rng.cmd :randomNumber 14
+set /a final_speech=!errorlevel!-1
+call ui_io.cmd :printMessage "!speech_sale_accepted[%final_speech%]!"
 exit /b
 
 :printSpeechSellingHaggle
