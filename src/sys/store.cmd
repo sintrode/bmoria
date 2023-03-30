@@ -101,7 +101,16 @@ call ui_io.cmd :printMessage "!speech_insulted_haggling_done[%comment_index%]!"
 call ui_io.cmd :printMessage "!speech_get_out_of_my_store[%comment_index%]!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Tells the player to try again
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printSpeechTryAgain
+call rng.cmd :randomNumber 10
+set /a comment_index=!errorlevel!-1
+call ui_io.cmd :printMessage "!speech_haggling_try_again[%comment_index%]!"
 exit /b
 
 :printSpeechSorry
