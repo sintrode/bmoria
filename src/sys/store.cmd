@@ -40,7 +40,7 @@ call ui_io.cmd :printMessage "!speech_sale_accepted[%final_speech%]!"
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Respond to a haggle offer with a response
+:: Respond to a sell haggle offer with a response
 ::
 :: Arguments: %1 - The amount offered by the player
 ::            %2 - The amount requested by the owner
@@ -63,7 +63,29 @@ call helpers.cmd :insertNumberIntoString "comment" "_A2" "%~2" "false"
 call ui_io.cmd :printMessage "!comment!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Respond to a buy haggle offer with a response
+:: TODO: Merge the two subroutines into a single one
+::
+:: Arguments: %1 - The amount offered by the player
+::            %2 - The amount requested by the owner
+::            %3 - The number of times that the owner has been insulted
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printSpeechBuyingHaggle
+if %~3 GTR 0 (
+    call rng.cmd :randomNumber 3
+    set /a comment_index=!errorlevel!-1
+    for /f "delims=" %%A in ("!comment_index!") do set "comment=!speech_buying_haggle_final[%%~A]!"
+) else (
+    call rng.cmd :randomNumber 15
+    set /a comment_index=!errorlevel!-1
+    for /f "delims=" %%A in ("!comment_index!") do set "comment=!speech_buying_haggle[%%~A]!"
+)
+
+call helpers.cmd :insertNumberIntoString "comment" "_A1" "%~1" "false"
+call helpers.cmd :insertNumberIntoString "comment" "_A2" "%~2" "false"
+call ui_io.cmd :printMessage "!comment!"
 exit /b
 
 :printSpeechGetOutOfMyStore
