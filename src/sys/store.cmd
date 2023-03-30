@@ -88,7 +88,17 @@ call helpers.cmd :insertNumberIntoString "comment" "_A2" "%~2" "false"
 call ui_io.cmd :printMessage "!comment!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Kick the player out after they insult the owner too many times
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printSpeechGetOutOfMyStore
+call rng.cmd :randomNumber 5
+set /a comment_index=!errorlevel!-1
+call ui_io.cmd :printMessage "!speech_insulted_haggling_done[%comment_index%]!"
+call ui_io.cmd :printMessage "!speech_get_out_of_my_store[%comment_index%]!"
 exit /b
 
 :printSpeechTryAgain
