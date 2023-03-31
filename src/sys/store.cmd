@@ -320,7 +320,14 @@ call rng.cmd :randomNumber 2500
 set %store%.turns_left_before_closing=%dg.game_turn% + 2500 + !errorlevel!
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Decrease the insult counter
+::
+:: Arguments: %1 - The store_id of the current store
+:: Returns:   None
+::------------------------------------------------------------------------------
 :storeDecreaseInsults
+if not "!stores[%~1].insults_counter!"=="0" set /a stores[%~1].insults_counter-=1
 exit /b
 
 :storeHaggleInsults
