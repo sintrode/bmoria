@@ -300,8 +300,25 @@ if !key_char! GEQ %~3 (
 call ui_io.cmd :messageLineClear
 exit /b !item_found!
 
+::------------------------------------------------------------------------------
+:: Increase the insult counter and kick the player out if necessary
+::
+:: Arguments: %1 - The store_id of the current store
+:: Returns:   0 if the owner is insulted
+::            1 if the player is on thin ice
+::------------------------------------------------------------------------------
 :storeIncreaseInsults
-exit /b
+set "store=stores[%~1]"
+
+set /a %store%.insults_counter+=1
+if !%store%.insults_counter! LEQ !store_owners[%~1].max_insults! exit /b 1
+
+call :printSpeechGetOutOfMyStore
+set "%store%.insults_counter=0"
+set /a %store%.bad_purchases+=1
+call rng.cmd :randomNumber 2500
+set %store%.turns_left_before_closing=%dg.game_turn% + 2500 + !errorlevel!
+exit /b 0
 
 :storeDecreaseInsults
 exit /b
