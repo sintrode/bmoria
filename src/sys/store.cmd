@@ -330,8 +330,19 @@ exit /b 0
 if not "!stores[%~1].insults_counter!"=="0" set /a stores[%~1].insults_counter-=1
 exit /b
 
+::------------------------------------------------------------------------------
+:: Check to see if the owner was insulted while haggling
+::
+:: Arguments: %1 - The store_id of the current store
+:: Returns:   0 if the owner was insulted
+::            1 if the player has not yet insulted the owner
+::------------------------------------------------------------------------------
 :storeHaggleInsults
-exit /b
+call :storeIncreaseInsults %~1 && exit /b 0
+
+call :printSpeechTryAgain
+call ui_io.cmd :printMessage "CNIL"
+exit /b 1
 
 :storeGetHaggle
 exit /b
