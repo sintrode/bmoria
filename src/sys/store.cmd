@@ -264,8 +264,41 @@ call :displayStoreCommands
 call :displayStoreInventory "%~1" "%~3"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Gets the ID of a store item
+::
+:: Arguments: %1 - A variable to store the item_id of the selected item
+::            %2 - A prompt to display when selecting an item
+::            %3 - The index of the first valid item in the range
+::            %4 - The index of the last valid item in the range
+:: Returns:   0 if an item was found
+::            1 if no valid item was selected
+::------------------------------------------------------------------------------
 :storeGetItemId
-exit /b
+set "%~1=-1"
+set "item_found=1"
+
+set /a disp_index_start=%~3+97, disp_index_end=%~4+97
+cmd /c exit /b %disp_index_start%
+set "disp_start=!=ExitCodeAscii!"
+cmd /c exit /b %disp_index_end%
+set "disp_end=!=ExitCodeAscii!"
+set "msg=(Items !disp_start!-!disp_end!, Q to exit) %~2"
+
+:storeGetItemIdWhileLoop
+call ui_io.cmd :getMenuItemId "msg" "key_char"
+set /a key_char-=97
+if !key_char! GEQ %~3 (
+    if !key_char! LEQ %~4 (
+        set "item_found=0"
+        set item_id=!key_char!
+        goto :storeGetItemIdAfterWhileLoop
+    )
+    call ui_io.cmd :terminalBellSound
+)
+:storeGetItemIdAfterWhileLoop
+call ui_io.cmd :messageLineClear
+exit /b !item_found!
 
 :storeIncreaseInsults
 exit /b
