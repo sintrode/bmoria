@@ -468,7 +468,21 @@ if "!errorlevel!"=="0" (
 )
 goto :storeReceiveOfferWhileLoop
 
+::------------------------------------------------------------------------------
+:: Tweak the prices based on the player's Charisma stat
+::
+:: Arguments: %1 - A reference to the minimum sale price
+::            %2 - A reference to the maximum sale price
+::------------------------------------------------------------------------------
 :storePurchaseCustomerAdjustment
+call player_stats.cmd :playerStatAdjustmentCharisma
+set "charisma=!errorlevel!"
+set /a %~2=!%~2! * !charisma! / 100
+if !%~2! LEQ 0 set "%~2=1"
+set /a %~3=!%~3! * !charisma! / 100
+if !%~3! LEQ 0 set "%~3=1"
+
+set "charisma="
 exit /b
 
 :storePurchaseHaggle
