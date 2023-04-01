@@ -344,8 +344,89 @@ call :printSpeechTryAgain
 call ui_io.cmd :printMessage "CNIL"
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Checks to see if the customer made a valid offer while haggling
+::
+:: Arguments: %1 - The prompt to display at the beginning of the haggle
+::            %2 - A variable to store the amount of the new offer
+::            %3 - The numer of times that the player has made an offer
+:: Returns:   0 if the offer is valid
+::            1 if the player aborts before making an offer
+::------------------------------------------------------------------------------
 :storeGetHaggle
-exit /b
+set "offer_count=%~3"
+set "valid_offer=0"
+
+if "%offer_count%"=="0" set "store_last_increment=0"
+set "increment=false"
+set "adjustment=0"
+
+call helpers.cmd :getLength "%~1" "prompt_len"
+set "start_len=%prompt_len%"
+
+set "msg="
+set "last_offer_str="
+
+:storeGetHaggleWhileLoop
+if "!valid_offer!"=="false" goto :storeGetHaggleAfterWhileLoop
+if not "!adjustment!"=="0" goto :storeGetHaggleAfterWhileLoop
+call ui_io.cmd :putStringClearToEOL "%~1" "0;0"
+
+if not "%offer_count%"=="0" (
+    if not "!store_last_increment!"=="0" (
+        set "abs_store_last_increment=!store_last_increment!"
+        if !abs_store_last_increment! LSS 0 set /a store_last_increment*=-1
+
+        if !store_last_increment! LSS 0 (
+            set "c=-"
+        ) else (
+            set "c=+"
+        )
+        set "last_offer_str=[!c!!abs_store_last_increment!]"
+        call ui_io.cmd :putStringClearToEOL "!last_offer_str!" "0;!start_len!"
+
+        call helpers.cmd :getLength "!last_offer_str!" "last_offer_str_len"
+        set /a prompt_len=!start_len!+!last_offer_str_len!
+    )
+)
+
+call ui_io.cmd :getStringInput "msg" "0;!prompt_len!" 40
+if "!errorlevel!"=="1" set "valid_offer=false"
+
+:: Check to see if we're in Increment mode rather than Full Offer mode
+:: TODO: check to see if we need to strip leading spaces
+if "!msg:-0,1!"=="-" set "increment=true"
+if "!msg:-0,1!"=="+" set "increment=true"
+
+if not "!offer_count!"=="0" (
+    if "!increment!"=="true" (
+        if "!adjustment!"=="0" (
+            set "increment=false"
+        ) else (
+            set "store_last_increment=!adjustment!"
+        )
+    )
+
+    if not defined msg (
+        set "adjustment=!store_last_increment!"
+        set "increment=true"
+    )
+) else (
+    set "msg=!adjustment!"
+)
+goto :storeGetHaggleWhileLoop
+
+:storeGetHaggleAfterWhileLoop
+if "!valid_offer!"=="true" (
+    if "!increment!"=="true" (
+        set /a new_offer+=!adjustment!
+    ) else (
+        set "new_offer=!adjustment!"
+    )
+) else (
+    call ui_io.cmd :messageLineClear
+)
+exit /b !valid_offer!
 
 :storeReceiveOffer
 exit /b
