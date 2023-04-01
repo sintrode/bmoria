@@ -428,8 +428,45 @@ if "!valid_offer!"=="true" (
 )
 exit /b !valid_offer!
 
+::------------------------------------------------------------------------------
+:: Process a haggle offer from the player
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - The prompt to display while haggling
+::            %3 - A variable to store the new offer
+::            %4 - The previous offer given by the player
+::            %5 - The number of times the player has haggled
+::            %6 - A multiplier for whether the player is buying or selling
+:: Returns:   0 if the bid was successful
+::            1 if the bid was rejected or cancelled by the customer
+::            2 if the customer tried to sell something broken or cursed
+::            3 if the store owner was insulted too many times by the bid
+::------------------------------------------------------------------------------
 :storeReceiveOffer
-exit /b
+set "status=%BidState.Received%"
+set "done=false"
+
+:storeReceiveOfferWhileLoop
+if "!done!"=="true" exit /b !status!
+call :storeGetHaggle "%~2" "%~3" "%~5"
+if "!errorlevel!"=="0" (
+    set /a new_adj=!%~3!*%~6, old_adj=%~4*%~6
+    if !new_adj! GTR !old_adj! (
+        set "done=true"
+    ) else (
+        call :storeHaggleInsults "%~1"
+        if "!errorlevel!"=="0" (
+            set "status=%BidState.Insulted%"
+            set "done=true"
+        ) else (
+            set "new_offer=%~4"
+        )
+    )
+) else (
+    set "status=%BidState.Rejected%"
+    set "done=true"
+)
+goto :storeReceiveOfferWhileLoop
 
 :storePurchaseCustomerAdjustment
 exit /b
