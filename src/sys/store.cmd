@@ -631,7 +631,35 @@ if "!status!"=="%BidState.Received%" (
 set "%~2=!new_price!"
 exit /b !status!
 
+::------------------------------------------------------------------------------
+:: Tweaks prices based on the customer's Charisma
+::
+:: Arguments: %1 - A reference to the store owner
+::            %2 - A reference to the cost of the item
+::            %3 - A variable to store the minimum that the owner will pay
+::            %4 - A variable to store the maximum that the owner will pay
+::            %5 - A variable to store the maximum that the player can sell for
+:: Returns:   None
+::------------------------------------------------------------------------------
 :storeSellCustomerAdjustment
+set "owner_race=!%~1.race!"
+call player_stats.cmd :playerStatAdjustmentCharisma
+set /a cost=!%~2! * (200 - !errorlevel!) / 100
+set /a cost=!cost! * (200 - !race_gold_adjustments[%owner_race%][%py.misc.race_id%]!) / 100
+if !cost! LSS 1 set "cost=1"
+set "%~2=!cost!"
+
+set /a %~5=!cost! * !%~1.max_inflate! / 100
+
+set /a max_buy=!cost! * (200 - !%~1.max_inflate!) / 100
+set /a min_buy=!cost! * (200 - !%~1.min_inflate!) / 100
+if !min_buy! LSS 1 set "min_buy=1"
+if !max_buy! LSS 1 set "max_buy=1"
+if !min_buy! LSS !max_buy! set "min_buy=!max_buy!"
+
+set "%~3=!min_buy!"
+set "%~4=!max_buy!"
+set "%~5=!max_sell!"
 exit /b
 
 :storeSellHaggle
