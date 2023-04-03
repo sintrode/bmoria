@@ -486,10 +486,10 @@ set "charisma="
 exit /b
 
 ::------------------------------------------------------------------------------
-:: The actual subroutine for haggling
+:: The actual subroutine for haggling while buying
 ::
 :: Arguments: %1 - The store_id of the current store
-::            %2 - A variable to store the final price
+::            %2 - A variable to store the agreed-upon price
 ::            %3 - A reference to the item being bought or sold
 :: Returns:   0 if the bid was successful
 ::            1 if the bid was rejected or cancelled by the customer
@@ -519,7 +519,7 @@ set "current_asking_price=%max_sell%"
 
 set "comment=Asking"
 set "accepted_without_haggle=false"
-set "offers_count=0"
+set "offer_count=0"
 
 call :storeNoNeedToBargain "%store%" "%final_asking_price%"
 if "!errorlevel!"=="0" (
@@ -529,7 +529,7 @@ if "!errorlevel!"=="0" (
     set "accepted_without_haggle=true"
 
     set "store_last_increment=%min_sell%"
-    set "offers_count=1"
+    set "offer_count=1"
 )
 
 set "min_offer=%max_buy%"
@@ -549,7 +549,7 @@ if "!rejected!"=="true" goto :storePurchaseHaggleAfterWhileLoop
 :storePurchaseHaggleInnerWhileLoop
 set "bidding_open=true"
 call ui_io.cmd :putString "!comment! : !current_asking_price!" "1;0"
-call :storeReceiveOffer "%~1" "What do you offer? " "new_offer" "%last_offer%" "%offers_count%" 1
+call :storeReceiveOffer "%~1" "What do you offer? " "new_offer" "%last_offer%" "%offer_count%" 1
 set "status=!errorlevel!"
 if not "!status!"=="%BidState.Received%" (
     set "rejected=true"
@@ -572,8 +572,12 @@ if "!rejected!"=="false" (
     set /a "adjustment=(!new_offer! - !last_offer!) * 100 / (!current_asking_price! - !last_offer!)"
     if !adjustment! LSS %min_per% (
         call :storeHaggleInsults "%~1"
-        set "rejected=!errorlevel!"
-        if "!rejected!"=="0" set "status=%BidState.Insulted%"
+        if "!errorlevel!"=="0" (
+            set "rejected=true"
+        ) else (
+            set "rejected=false"
+        )
+        if "!rejected!"=="true" set "status=%BidState.Insulted%"
     ) else if !adjustment! GTZR %max_per% (
         set /a adjustment=!adjustment! * 75 / 100
         if !adjustment! LSS %max_per% set "adjustment=%max_per%"
@@ -607,7 +611,7 @@ if "!rejected!"=="false" (
 
     if "!rejected!"=="false" (
         set "last_offer=!new_offer!"
-        set /a offers_count+=1
+        set /a offer_count+=1
 
         call ui_io.cmd :eraseLine "1;0"
         call ui_io.cmd :putString "Your last offer : !last_offer!" "1;39"
@@ -662,7 +666,180 @@ set "%~4=!max_buy!"
 set "%~5=!max_sell!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: The actual subroutine for haggling while selling
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - A variable to store the price
+::            %3 - A reference to the item being sold
+:: Returns:   0 if the bid was successful
+::            1 if the bid was rejected or cancelled by the customer
+::            2 if the customer tried to sell something broken or cursed
+::            3 if the store owner was insulted too many times by the bid
+::------------------------------------------------------------------------------
 :storeSellHaggle
+set "status=%BidState.Received%"
+set "new_price=0"
+
+set "store_id=%~1"
+set "store=stores[%~1]"
+call store_inventory.cmd :storeItemValue "%~3"
+set "cost=!errorlevel!"
+set "o_id=!%store%.owner_id!"
+
+set "rejected=false"
+set "max_gold=0"
+set "min_per=0"
+set "max_per=0"
+set "max_sell=0"
+set "min_buy=0"
+set "max_buy=0"
+
+if %cost% LSS 1 (
+    set "status=%BidState.Offended%"
+    set "rejected=true"
+) else (
+    set "owner=store_owner[%o_id%]"
+    call :storeSellCustomerAdjustment "%owner%" "cost" "min_buy" "max_buy" "max_sell"
+
+    set "min_per=!%owner%.haggles_per!"
+    set /a max_per=!min_per! * 3
+    set "max_gold=!%owner%.max_cost!"
+)
+
+set "final_asking_price=0"
+set "current_asking_price=0"
+set "final_flag=0"
+set "comment="
+set "accepted_without_haggle=false"
+
+if "!rejected!"=="false" (
+    call :displayStoreHaggleCommands -1
+    set "offer_count=0"
+
+    if !max_buy! GTR !max_gold! (
+        set "final_flag=1"
+        set "comment=Final Offer"
+
+        set "store_last_increment=0"
+        set "current_asking_price=!max_gold!"
+        set "final_asking_price=!max_gold!"
+        call ui_io.cmd :printMessage "I am sorry, but I have not the money to afford such a fine item."
+        set "accepted_without_haggle=true"
+    ) else (
+        set "current_asking_price=!max_buy!"
+        set "final_asking_price=!min_buy!"
+        if !final_asking_price! GTR !max_gold! set "final_asking_price=!max_gold!"
+        set "comment=Offer"
+
+        call :storeNoNeedToBargain "%store%" "!final_asking_price!"
+        if "!errorlevel!"=="0" (
+            call ui_io.cmd :printMessage "After a long bargaining session, you agree upon the price."
+            set "current_asking_price=!final_asking_price!"
+            set "comment=Final Offer"
+            set "accepted_without_haggle=true"
+            set "store_last_increment=!final_asking_price!"
+            set "offer_count=1"
+        )
+    )
+
+    set "min_offer=!max_sell!"
+    set "last_offer=!min_offer!"
+    set "new_offer=0"
+    if !current_asking_price! LSS 1 set "current_asking_price=1"
+
+    call :storeSellHaggleWhileLoop
+)
+
+if "!status!"=="%BidState.Received%" (
+    if "!accepted_without_haggle!"=="false" (
+        call :storeUpdateBargainingSkills "%store%" "!new_price!" "!final_asking_price!"
+    )
+)
+set "%~2=!new_price!"
+exit /b !status!
+
+:storeSellHaggleWhileLoop
+set "bidding_open=true"
+call ui_io.cmd :putString "!comment! : !current_asking_price!"
+call :storeReceiveOffer "%store_id%" "What price do you ask? " "new_offer" "!last_offer!" "!offer_count!" -1
+set "status=!errorlevel!"
+
+if not "!status!"=="%BidState.Received%" (
+    set "rejected=true"
+) else (
+    if !new_offer! LSS !current_asking_price! (
+        call :printSpeechSorry
+        set "new_offer=!last_offer!"
+        set last_total=!last_offer!+!store_last_increment!
+        if !last_offer! LSS !current_asking_price! set "store_last_increment=0"
+    ) else if "!new_offer!"=="!current_asking_price!" (
+        set "rejected=true"
+        set "new_price=!new_offer!"
+    ) else (
+        set "bidding_open=false"
+    )
+)
+if "!rejected!"=="false" (
+    if "!bidding_open!"=="true" goto :storeSellHaggleWhileLoop
+
+    set /a "adjustment=(!last_offer! - !new_offer!) * 100 / (!last_offer! - !current_asking_price!)"
+    if !adjustment! LSS !min_per! (
+        call :storeHaggleInsults "%store_id%"
+        if "!errorlevel!"=="0" (
+            set "rejected=true"
+        ) else (
+            set "rejected=false"
+        )
+        if "!rejected!"=="true" (
+            set "status=%BidState.Insulted%"
+        )
+    ) else if !adjustment! GTR !max_per! (
+        set /a adjustment=!adjustment! * 75 / 100
+        if !adjustment! LSS !max_per! set "adjustment=!max_per!"
+    )
+
+    call rng.cmd :randomNumber 5
+    set /a "adjustment=((!new_offer! - !current_asking_price!) * (!adjustment! + !errorlevel! - 3) /  100) + 1"
+
+    if !adjustment! GTR 0 set /a current_asking_price+=!adjustment!
+    if !current_asking_price! GTR !final_asking_price! (
+        set "current_asking_price=!final_asking_price!"
+        set "comment=Final Offer"
+        
+        set /a store_last_increment=!final_asking_price! - !new_offer!
+        set /a final_flag+=1
+
+        if !final_flag! GTR 3 (
+            call :storeIncreaseInsults %store_id%
+            if "!errorlevel!"=="0" (
+                set "status=%BidState.Insult%"
+            ) else (
+                set "status=%BidState.Rejected%"
+            )
+            set "rejected=true"
+        )
+    ) else if !new_offer! LEQ !current_asking_price! (
+        set "rejected=true"
+        set "new_price=!new_offer!"
+    )
+
+    REM If it's still false after all that...
+    if "!rejected!"=="false" (
+        set "last_offer=!new_offer!"
+        set /a offer_count+=1
+        
+        call ui_io.cmd :eraseLine "1;0"
+        call ui_io.cmd :putString "Your last bid !last_offer!" "1;39"
+        call :printSpeechBuyingHaggle "!current_asking_price!" "!last_offer!" "!final_flag!"
+
+        set /a last_total=!current_asking_price! - !last_offer!
+        if !last_total! GTR !store_last_increment! (
+            set /a store_last_increment=!current_asking_price!-!last_offer!
+        )
+    )
+)
+if "!rejected!"=="false" goto :storeSellHaggleWhileLoop
 exit /b
 
 :storeItemsToDisplay
