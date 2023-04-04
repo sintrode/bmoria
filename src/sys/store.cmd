@@ -983,8 +983,17 @@ for %%A in (TV_SLING_AMMO TV_BOLT TV_ARROW TV_BOW TV_HAFTED TV_POLEARM TV_SWORD)
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Determines if a specified item would be sold in the Temple
+:: Arguments: %1 - The item_id of the item being sold
+:: Returns:   0 for Temple items
+::            1 for everything else
+::------------------------------------------------------------------------------
 :setTempleItems
-exit /b
+for %%A in (TV_HAFTED TV_SCROLL1 TV_SCROLL2 TV_POTION1 TV_POTION2 TV_PRAYER_BOOK ) do (
+    if "%~1"=="!%%~A!" exit /b 0
+)
+exit /b 1
 
 :setAlchemistItems
 exit /b
