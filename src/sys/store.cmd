@@ -842,8 +842,23 @@ if "!rejected!"=="false" (
 if "!rejected!"=="false" goto :storeSellHaggleWhileLoop
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determines how many items to list per page on a buy/sell screen
+::
+:: Arguments: %1 - The number of unique items in the store
+::            %2 - The item_id of the topmost item
+:: Returns:   The number of items to display in the store
+::------------------------------------------------------------------------------
 :storeItemsToDisplay
-exit /b
+if "%~2"=="12" (
+    set /a ret_val=%~1-13
+    exit /b !ret_val!
+)
+
+if %~1 GTR 11 exit /b 11
+
+set /a ret_val=%~1-1
+exit /b !ret_val!
 
 :storePurchaseAnItem
 exit /b
