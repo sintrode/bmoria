@@ -1231,6 +1231,20 @@ if !record! GTR 0 (
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Increment haggling stats
+::
+:: Arguments: %1 - A reference to the current store
+::            %2 - The player's asking price for the item
+::            %3 - The store's asking price for the item
+:: Returns:   None
+::------------------------------------------------------------------------------
 :storeUpdateBargainingSkills
-exit /b
+if %~3 LSS 10 exit /b
 
+if "%~2"=="%~3" (
+    if !%store%.good_purchases! LSS 32767 set /a %store%.good_purchases+=1
+) else (
+    if !%store%.bad_purchases! LSS 32767 set /a %store%.bad_purchases+=1
+)
+exit /b
