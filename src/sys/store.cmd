@@ -860,8 +860,91 @@ if %~1 GTR 11 exit /b 11
 set /a ret_val=%~1-1
 exit /b !ret_val!
 
+::------------------------------------------------------------------------------
+:: The wrapper for actually buying something from the store
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - A variable to store the item_id of the topmost item
+:: Returns:   0 if the player is kicked out of the store
+::            1 if the player is allowed to go through with their purchase
+::------------------------------------------------------------------------------
 :storePurchaseAnItem
-exit /b
+set "kick_customer=1"
+set "store=stores[%~1]"
+if !%store%.unique_items_counter! LSS 1 (
+    call ui_io.cmd :printMessage "I am currently out of stock."
+    exit /b 1
+)
+
+call :storeItemsToDisplay "!%store%.unique_items_counter!" "!%~2!"
+set "item_count=!errorlevel!"
+call :storeGetItemId "item_id" "Which item are you interested in? " 0 "!item_count!" || exit /b 1
+
+set /a item_id+=!%~2!
+
+call inventory.cmd :inventoryTakeOneItem "sell_item" "%store%.inventory[%item_id%].item"
+call inventory.cmd :inventoryCanCarryItemCount "sell_item"
+if "!errorlevel!"=="1" (
+    call ui_io.cmd :putStringClearToEOL "You cannot carry that many different items." "0;0"
+    exit /b 1
+)
+
+set "status=%BidState.Received%"
+if !%store%.inventory[%item_id%].cost! GTR 0 (
+    set "price=!%store%.inventory[%item_id%].cost!"
+) else (
+    call :storePurchaseHaggle "%~1" "price" "sell_item"
+    set "status=!errorlevel!"
+)
+
+if "!status!"=="%BidState.Insulted%" (
+    set "kick_customer=0"
+) else if "!status!"=="%BidState.Received%" (
+    if %py.misc.au% GEQ !price! (
+        call :printSpeechFinishedHaggling
+        call :storeDecreaseInsults "%~1"
+        set /a py.misc.au-=!price!
+
+        call :inventoryCarryItem "sell_item"
+        set "new_item_id=!errorlevel!"
+        set "saved_store_counter=!%store%.unique_items_counter!"
+
+        call :storeDestroyItem "%~1" "%item_id%" "true"
+        call identification.cmd :itemDescription "description" "py.inventory[!new_item_id!]" "true"
+        set /a item_letter=!new_item_id!+97
+        cmd /c exit /b !item_letter!
+        call ui_io.cmd :putStringClearToEOL "You have !description! (!=ExitCodeAscii!)" "0;0"
+
+        call player.cmd :playerStrength
+
+        if !%~2! GEQ !%store%.unique_items_counter! (
+            set "%~2=0"
+            call :displayStoreInventory "%store%" "%item_id%"
+        ) else (
+            if "!saved_store_counter!"=="!%store%.unique_items_counter!" (
+                if !%store%.inventory[%item_id%].cost! LSS 0 (
+                    set "%store%.inventory[%item_id%].cost=!price!"
+                    call :displaySingleCost "%~1" "%item_id%"
+                )
+            ) else (
+                call :displayStoreInventory "%store%" "%item_id%"
+            )
+        )
+        call :displayPlayerRemainingGold
+    ) else (
+        call :storeIncreaseInsults "%~1"
+        if "!errorlevel!"=="0" (
+            set "kick_customer=0"
+        ) else (
+            call :printSpeechFinishedHaggling
+            call ui_io.cmd :printMessage "You don't have the gold, liar."
+        )
+    )
+)
+
+call :displayStoreCommands
+call ui_io.cmd :eraseLine "1;0"
+exit /b !kick_customer!
 
 :setGeneralStoreItems
 exit /b
