@@ -959,8 +959,17 @@ for %%A in (TV_DIGGING TV_BOOTS TV_CLOAK TV_FOOD TV_FLASK TV_LIGHT TV_SPIKE) do 
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Determines if a specified item would be sold in the Armory
+:: Arguments: %1 - The item_id of the item being sold
+:: Returns:   0 for Armory items
+::            1 for everything else
+::------------------------------------------------------------------------------
 :setArmoryItems
-exit /b
+for %%A in (TV_BOOTS TV_GLOVES TV_HELM TV_SHIELD TV_HARD_ARMOR TV_SOFT_ARMOR) do (
+    if "%~1"=="!%%~A!" exit /b 0
+)
+exit /b 1
 
 :setWeaponsmithItems
 exit /b
