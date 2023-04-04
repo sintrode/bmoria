@@ -1209,8 +1209,27 @@ set "inv_command=!game.doing_inventory_command!"
 if not "!inv_command!"=="0" goto :inventoryExecWrapper
 exit /b
 
+::------------------------------------------------------------------------------
+:: Check to see if the player is good at haggling
+::
+:: Arguments: %1 - A reference to the current store
+::            %2 - The price of the item being bought or sold
+:: Returns:   0 if the player has a good track record of haggling
+::            1 if the player is not great at haggling
+::------------------------------------------------------------------------------
 :storeNoNeedToBargain
-exit /b
+if "!%~1.good_purchases!"=="32767" exit /b 0
+
+set /a record=!%store%.good_purchases! - 3 * !%store%.bad_purchases! - 5
+if !record! GTR 0 (
+    set /a price_check_left=!record!*!record!, price_check_right=%~2/50
+    if !price_check_left! GTR !price_check_right! (
+        exit /b 0
+    ) else (
+        exit /b 1
+    )
+)
+exit /b 1
 
 :storeUpdateBargainingSkills
 exit /b
