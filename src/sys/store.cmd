@@ -1133,7 +1133,80 @@ call ui_io.cmd :eraseLine "1;0"
 call :displayStoreCommands
 exit /b !kick_customer!
 
+::------------------------------------------------------------------------------
+:: The main wrapper for being inside of a store
+::
+:: Arguments: %1 - the store_id of the current store
+:: Returns:   None
+::------------------------------------------------------------------------------
 :storeEnter
+set "store=stores[%~1]"
+if !%store%.turns_left_before_closing! GEQ %dg.game_turn% (
+    call ui_io.cmd :printMessage "The doors are locked."
+    exit /b
+)
+
+set "current_top_item_id=0"
+set "o_id=!%store%.owner_id!"
+call :displayStore "%store%" "!store_owners[%o_id%].name!" "%current_top_item_id%"
+
+set "exit_store=1"
+:storeEnterWhileLoop
+if "!exit_store!"=="0" (
+    call ui.cmd :drawCavePanel
+    exit /b
+)
+
+call ui_io.cmd :moveCursor "20;9"
+set "message_ready_to_print=false"
+
+call ui_io.cmd :getCommand "dummy" "command"
+if "!errorlevel!"=="0" (
+    set "is_equip_button=0"
+    if /I "!command!"=="e" set "is_equip_button=1"
+    if /I "!command!"=="i" set "is_equip_button=1"
+    if /I "!command!"=="t" set "is_equip_button=1"
+    if /I "!command!"=="w" set "is_equip_button=1"
+    if /I "!command!"=="x" set "is_equip_button=1"
+
+    if "!command!"=="b" (
+        if "!current_top_item_id!"=="0" (
+            if !%store%.unique_items_counter! GTR 12 (
+                set "current_top_item_id=12"
+                call :displayStoreInventory "%store%" "!current_top_item_id!"
+            ) else (
+                call ui_io.cmd :printMessage "Entire inventory is shown."
+            )
+        ) else (
+            set "current_top_item_id=0"
+            call :displayStoreInventory "%store%" "!current_top_item_id!"
+        )
+    ) else if "!is_equip_button!"=="1" (
+        set "saved_chr=!py.stats.used[%PlayerAttr.a_chr%]!"
+        call :inventoryExecWrapper
+
+        REM Update prices if Charisma changes
+        if not "!saved_chr!"=="!py.stats.used[%PlayerAttr.a_chr%]!" (
+            call :displayStoreInventory "%store%" "!current_top_item_id!"
+        )
+
+        set "game.player_free_turn=false"
+    ) else if "!command!"=="p" (
+        call :storePurchaseAnItem "%~1" "current_top_item_id"
+    ) else if "!command!"=="s" (
+        call :storeSellAnItem "%~1" "current_top_item_id"
+    ) else (
+        call ui_io.cmd :terminalBellSound
+    )
+) else (
+    set "exit_store=0"
+)
+goto :storeEnterWhileLoop
+
+:inventoryExecWrapper
+call ui_inventory.cmd :inventoryExecuteCommand "inv_command"
+set "inv_command=!game.doing_inventory_command!"
+if not "!inv_command!"=="0" goto :inventoryExecWrapper
 exit /b
 
 :storeNoNeedToBargain
