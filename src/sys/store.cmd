@@ -990,13 +990,22 @@ exit /b 1
 ::            1 for everything else
 ::------------------------------------------------------------------------------
 :setTempleItems
-for %%A in (TV_HAFTED TV_SCROLL1 TV_SCROLL2 TV_POTION1 TV_POTION2 TV_PRAYER_BOOK ) do (
+for %%A in (TV_HAFTED TV_SCROLL1 TV_SCROLL2 TV_POTION1 TV_POTION2 TV_PRAYER_BOOK) do (
     if "%~1"=="!%%~A!" exit /b 0
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Determines if a specified item would be sold in the Alchemist
+:: Arguments: %1 - The item_id of the item being sold
+:: Returns:   0 for Alchemist items
+::            1 for everything else
+::------------------------------------------------------------------------------
 :setAlchemistItems
-exit /b
+for %%A in (TV_SCROLL1 TV_SCROLL2 TV_POTION1 TV_POTION2) do (
+    if "%~1"=="!%%~A!" exit /b 0
+)
+exit /b 1
 
 :setMagicShopItems
 exit /b
