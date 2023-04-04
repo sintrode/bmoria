@@ -946,8 +946,18 @@ call :displayStoreCommands
 call ui_io.cmd :eraseLine "1;0"
 exit /b !kick_customer!
 
+::------------------------------------------------------------------------------
+:: Determines if a specified item would be sold in the General Store
+::
+:: Arguments: %1 - The item_id of the item being sold
+:: Returns:   0 for General Store items
+::            1 for everything else
+::------------------------------------------------------------------------------
 :setGeneralStoreItems
-exit /b
+for %%A in (TV_DIGGING TV_BOOTS TV_CLOAK TV_FOOD TV_FLASK TV_LIGHT TV_SPIKE) do (
+    if "%~1"=="!%%~A!" exit /b 0
+)
+exit /b 1
 
 :setArmoryItems
 exit /b
