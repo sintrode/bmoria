@@ -1007,8 +1007,17 @@ for %%A in (TV_SCROLL1 TV_SCROLL2 TV_POTION1 TV_POTION2) do (
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Determines if a specified item would be sold in the Magic Shop
+:: Arguments: %1 - The item_id of the item being sold
+:: Returns:   0 for Magic Shop items
+::            1 for everything else
+::------------------------------------------------------------------------------
 :setMagicShopItems
-exit /b
+for %%A in (TV_AMULET TV_RING TV_STAFF TV_WAND TV_SCROLL1 TV_SCROLL2 TV_POTION1 TV_POTION2 TV_MAGIC_BOOK) do (
+    if "%~1"=="!%%~A!" exit /b 0
+)
+exit /b 1
 
 :storeSellAnItem
 exit /b
