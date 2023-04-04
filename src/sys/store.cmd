@@ -971,8 +971,17 @@ for %%A in (TV_BOOTS TV_GLOVES TV_HELM TV_SHIELD TV_HARD_ARMOR TV_SOFT_ARMOR) do
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Determines if a specified item would be sold in the Weaponsmith
+:: Arguments: %1 - The item_id of the item being sold
+:: Returns:   0 for Weaponsmith items
+::            1 for everything else
+::------------------------------------------------------------------------------
 :setWeaponsmithItems
-exit /b
+for %%A in (TV_SLING_AMMO TV_BOLT TV_ARROW TV_BOW TV_HAFTED TV_POLEARM TV_SWORD) do (
+    if "%~1"=="!%%~A!" exit /b 0
+)
+exit /b 1
 
 :setTempleItems
 exit /b
