@@ -1019,8 +1019,119 @@ for %%A in (TV_AMULET TV_RING TV_STAFF TV_WAND TV_SCROLL1 TV_SCROLL2 TV_POTION1 
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: A wrapper for the :shop____Items subroutines
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - The category_id of the item being sold
+:: Returns:   0 if the item can be sold at the current store
+::            1 if the item needs to be sold somewhere else
+::------------------------------------------------------------------------------
+:storeBuy
+set "check_items[0]=setGeneralStoreItems"
+set "check_items[1]=setArmoryItems"
+set "check_items[2]=setWeaponsmithItems"
+set "check_items[3]=setTempleItems"
+set "check_items[4]=setAlchemistItems"
+set "check_items[5]=setMagicShopItems"
+
+call :!check_items[%~1]! "%~2"
+exit /b !errorlevel!
+
+::------------------------------------------------------------------------------
+:: Sell an item to the store
+::
+:: Arguments: %1 - The store_id of the current store
+::            %2 - A reference to the topmost item in the list
+:: Returns:   0 if the player gets kicked out of the store
+::            1 if the player is allowed to sell an item
+::------------------------------------------------------------------------------
 :storeSellAnItem
-exit /b
+set "kick_customer=1"
+set "first_item=%py.pack.unique_items%"
+set "last_item=-1"
+
+set /a item_dec=%py.pack.unique_items%-1
+for /L %%A in (0,1,%item_dec%) do (
+    call :storeBuy "%~1" "!py.inventory[%%A].category_id!"
+    set "flag=!errorlevel!"
+
+    if "!flag!"=="0" (
+        set "mask[%%A]=1"
+        if %%A LSS !first_item! set "first_item=%%A"
+        if %%A GTR !last_item! set "last_item=%%A"
+    ) else (
+        set "mask[%%A]=0"
+    )
+)
+
+if "!last_item!"=="-1" (
+    call ui_io.cmd :printMessage "You have nothing to sell to this store."
+    exit /b 1
+)
+
+call ui_inventory.cmd :inventoryGetInputForItemId "item_id" "Which one? " "!first_item!" "!last_item!" "mask" "I do not buy such items."
+if "!errorlevel!"=="1" exit /b 1
+
+call inventory.cmd :inventoryTakeOneItem "sold_item" "py.inventory[%item_id%]"
+call identification.cmd :itemDescription "description" "sold_item" "true"
+set /a item_letter=%item_id%+97
+cmd /c exit /b !item_letter!
+call ui_io.cmd :printMessage "Selling !description! (!=ExitCodeAscii!)"
+
+call store_inventory.cmd :storeCheckPlayerItemsCount "stores[%~1]" "sold_item"
+if "!errorlevel!"=="1" (
+    call ui_io.cmd :printMessage "I have not the room in my store to keep it."
+    exit /b 1
+)
+
+call :storeSellHaggle "%~1" "price" "sold_item"
+set "status=!errorlevel!"
+
+if "!status!"=="%BidState.Insulted%" (
+    set "kick_customer=0"
+) else if "!status!"=="%BidState.Offended%" (
+    call ui_io.cmd :printMessage "How dare you^^!"
+    call ui_io.cmd :printMessage "I will not buy that^^!"
+    call :storeIncreaseInsults "%~1"
+    set "kick_customer=!errorlevel!"
+) else if "!status!"=="%BidState.Received%" (
+    call :printSpeechFinishedHaggling
+    call :storeDecreaseInsults "%~1"
+    set /a py.misc.au+=!price!
+
+    call identification.cmd :itemIdentify "py.inventory[%item_id%]" "item_id"
+    call inventory.cmd :inventoryTakeOneItem "sold_item" "py.inventory[%item_id%]"
+    call identification.cmd :spellItemIdentifyAndRemoveRandomInscription "sold_item"
+    call inventory.cmd :inventoryDestroyItem "%item_id%"
+
+    call identification.cmd :itemDescription "description" "sold_item" "true"
+    call ui_io.cmd :printMessage "You've sold !description!"
+
+    call store_inventory.cmd :storeCarryItem "%~1" "item_pos_id" "sold_id"
+    call player.cmd :playerStrength
+
+    if !item_pos_id! GEQ 0 (
+        if !item_pos_id! LSS 12 (
+            if !%~2! LSS 12 (
+                call :displayStoreInventory "stores[%~1]" "!item_pos_id!"
+            ) else (
+                set "%~2=0"
+                call :displayStoreInventory "stores[%~1]" "!%~2!"
+            )
+        ) else if !%~2! GTR 11 (
+            call :displayStoreInventory "stores[%~1]" "!item_pos_id!"
+        ) else (
+            set "%~2=12"
+            call :displayStoreInventory "stores[%~1]" "!%~2!"
+        )
+        call :displayPlayerRemainingGold
+    )
+)
+
+call ui_io.cmd :eraseLine "1;0"
+call :displayStoreCommands
+exit /b !kick_customer!
 
 :storeEnter
 exit /b
