@@ -86,7 +86,18 @@ if "!resist_rnd!"=="1" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Convert a set of armor to cursed armor
+::
+:: Arguments: %1 - A reference to the item being cursed
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :cursedArmor
+call :magicEnchantmentBonus 0 40 %~3
+set /a %~1.to_ac-=!errorlevel!
+set "%~1.cost=0"
+set /a "%~1.flags|=%config.treasure.flags.TR_CURSED%"
 exit /b
 
 :magicalSword
