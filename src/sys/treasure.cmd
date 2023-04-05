@@ -51,27 +51,27 @@ set /a %~1.to_ac+=!errorlevel!
 call :magicShouldBeEnchanted %~2 || exit /b
 
 call rng.cmd :randomNumber 9
-set "resist_rnd=!errorlevel!"
+set "rnd_bonus=!errorlevel!"
 set "ctf=config.treasure.flags"
-if "!resist_rnd!"=="1" (
+if "!rnd_bonus!"=="1" (
     REM Armor of Resist All
     set /a "%~1.flags|=(!%ctf%.TR_RES_LIGHT! | !%ctf%.TR_RES_COLD! | !%ctr%.TR_RES_ACID! | !%ctr%.TR_RES_FIRE!)"
     set "%~1.special_name_id=%SpecialNameIds.SN_R%"
     set /a "%~1.to_ac+=5"
     set /a "%~1.cost+=2500"
-) else if "!resist_rnd!"=="2" (
+) else if "!rnd_bonus!"=="2" (
     REM Armor of Resist Acid
     set /a "%~1.flags|=!%ctf%.TR_RES_ACID!"
     set "%~1.special_name_id=%SpecialNameIds.SN_RA"
     set /a "%~1.cost+=1000"
-) else if !resist_rnd! GEQ 3 (
-    if !resist_rnd! LEQ 4 (
+) else if !rnd_bonus! GEQ 3 (
+    if !rnd_bonus! LEQ 4 (
         REM Armor of Resist Fire
         set /a "%~1.flags|=!%ctf%.TR_RES_FIRE!"
         set "%~1.special_name_id=%SpecialNameIds.SN_RF"
         set /a "%~1.cost+=600"
     ) else (
-        if !resist_rnd! LEQ 6 (
+        if !rnd_bonus! LEQ 6 (
             REM Armor of Resist Cold
             set /a "%~1.flags|=!%ctf%.TR_RES_COLD!"
             set "%~1.special_name_id=%SpecialNameIds.SN_RC"
@@ -100,7 +100,127 @@ set "%~1.cost=0"
 set /a "%~1.flags|=%config.treasure.flags.TR_CURSED%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Convert a sword to a magical sword
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The odds of the item gaining magical resistance
+::            %3 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalSword
+set "item=%~1"
+set "special=%~2"
+set "level=%~3"
+
+call :magicEnchantmentBonus 0 40 %level%
+set /a %item%.to_hit+=!errorlevel!
+
+call dice.cmd :maxDiceRoll "!%item%.damage.dice!" "!%item%.damage.sides!"
+set "damage_bonus=!errorlevel!"
+
+set /a "enchant_std=4 * %damage_bonus%", "enchant_level=%damage_bonus% * %level% / 10"
+call :magicEnchantmentBonus 0 %enchant_std% %enchant_level%
+set /a %item%.to_damage+=!errorlevel!
+
+:: 1.5x modifier to special because weapons are not as common as armor
+set /a special=3 * %special% / 2
+call :magicShouldBeEnchanted %special% || exit /b
+call rng.cmd :randomNumber 16
+set "rnd_bonus=!errorlevel!"
+
+call :magicalSword_!rnd_bonus!
+exit /b
+
+:: Holy Avenger
+:magicalSword_1
+set /a "%item%.flags|=(%config.treasure.flags.TR_SEE_INVIS% | %config.treasure.flags.TR_SUST_STAT% | %config.treasure.flags.TR_SLAY_UNDEAD% | %config.treasure.flags.TR_SLAY_EVIL% | %config.treasure.flags.TR_STR%)"
+set /a %item%.to_hit+=5
+set /a %item%.to_damage+=5
+call rng.cmd :randomNumber 4
+set /a %item%.to_ac+=!errorlevel!
+
+call rng.cmd :randomNumber 4
+set "%item%.misc_use=!errorlevel!"
+set "%item%.special_name_id=%SpecialNameIds.SN_HA%"
+set /a %item%.cost+=!%item%.misc_use! * 500
+set /a %item%.cost+=10000
+exit /b
+
+:: Defender
+:magicalSword_2
+set /a "%item%.flags|=(%config.treasure.flags.TR_FFALL% | %config.treasure.flags.TR_RES_LIGHT% | %config.treasure.flags.TR_SEE_INVIS% | %config.treasure.flags.TR_FREE_ACT% | %config.treasure.flags.TR_RES_COLD% | %config.treasure.flags.TR_RES_ACID% | %config.treasure.flags.TR_RES_FIRE% | %config.treasure.flags.TR_REGEN% | %config.treasure.flags.TR_STEALTH%)"
+set /a %item%.to_hit+=3
+set /a %item%.to_damage+=3
+call rng.cmd :randomNumber 5
+set /a %item%.to_ac+=5 + !errorlevel!
+set "%item%.special_name_id=%SpecialNameIds.SN_DF%"
+
+call rng.cmd :randomNumber 3
+set "%item%.misc_use=!errorlevel!"
+set /a %item%.cost+=!%item%.misc_use! * 500
+set /a %item%.cost+=7500
+exit /b
+
+:: Slay Animal
+:magicalSword_3
+:magicalSword_4
+set /a "%item%.flags|=%config.treasure.flags.TR_SLAY_ANIMAL%"
+set /a %item%.to_hit+=2
+set /a %item%.to_damage+=2
+set "%item%.special_name_id=%SpecialNameIds.SN_SA%"
+set /a %item%.cost+=3000
+exit /b
+
+:: Slay Dragon
+:magicalSword_5
+:magicalSword_6
+set /a "%item%.flags|=%config.treasure.flags.TR_SLAY_DRAGON%"
+set /a %item%.to_hit+=3
+set /a %item%.to_damage+=4
+set "%item%.special_name_id=%SpecialNameIds.SN_SD%"
+set /a %item%.cost+=4000
+exit /b
+
+:: Slay Evil
+:magicalSword_7
+:magicalSword_8
+set /a "%item%.flags|=%config.treasure.flags.TR_SLAY_EVIL%"
+set /a %item%.to_hit+=3
+set /a %item%.to_damage+=4
+set "%item%.special_name_id=%SpecialNameIds.SN_SE%"
+set /a %item%.cost+=4000
+
+:: Slay Undead
+:magicalSword_9
+:magicalSword_10
+set /a "%item%.flags|=(%config.treasure.flags.TR_SEE_INVIS% | %config.treasure.flags.TR_SLAY_UNDEAD%)"
+set /a %item%.to_hit+=3
+set /a %item%.to_damage+=4
+set "%item%.special_name_id=%SpecialNameIds.SN_SU%"
+set /a %item%.cost+=4000
+exit /b
+
+:: Flame Tongue
+:magicalSword_11
+:magicalSword_12
+:magicalSword_13
+set /a "%item%.flags|=%config.treasure.flags.TR_FLAME_TONGUE%"
+set /a %item%.to_hit+=1
+set /a %item%.to_damage+=3
+set "%item%.special_name_id=%SpecialNameIds.SN_FT%"
+set /a %item%.cost+=2000
+exit /b
+
+:: Frost Brand
+:magicalSword_14
+:magicalSword_15
+:magicalSword_16
+set /a "%item%.flags|=%config.treasure.flags.TR_FROST_BRAND%"
+set /a %item%.to_hit+=1
+set /a %item%.to_damage+=2
+set "%item%.special_name_id=%SpecialNameIds.SN_FB%"
+set /a %item%.cost+=1200
 exit /b
 
 :cursedSword
