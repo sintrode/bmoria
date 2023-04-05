@@ -223,7 +223,27 @@ set "%item%.special_name_id=%SpecialNameIds.SN_FB%"
 set /a %item%.cost+=1200
 exit /b
 
+::------------------------------------------------------------------------------
+:: Convert a sword to a cursed sword
+::
+:: Arguments: %1 - A reference to the item being cursed
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :cursedSword
+set "item=%~1"
+set "level=%~2"
+
+call :magicEnchantmentBonus 1 55 %level%
+set /a %item%.to_hit-=!errorlevel!
+
+call dice.cmd :maxDiceRoll !%item%.damage.dice! !%item%.damage.sides!
+set "damage_bonus=!errorlevel!"
+
+set /a "enchant_std=11 * %damage_bonus% / 2", "enchant_level=%damage_bonus% * %level% / 10"
+call :magicEnchantmentBonus 1 %enchant_std% %enchant_level%
+set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+set "%item%.cost=0"
 exit /b
 
 :magicalBow
