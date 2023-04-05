@@ -36,7 +36,54 @@ set /a bonus=(!abs_distribution! / 10) + %~1
 if !bonus! LSS %~1 exit /b %~1
 exit /b !bonus!
 
+::------------------------------------------------------------------------------
+:: Converts a set of armor to magical armor
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The odds of the item gaining magical resistance
+::            %3 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalArmor
+call :magicEnchantmentBonus 1 30 %~3
+set /a %~1.to_ac+=!errorlevel!
+
+call :magicShouldBeEnchanted %~2 || exit /b
+
+call rng.cmd :randomNumber 9
+set "resist_rnd=!errorlevel!"
+set "ctf=config.treasure.flags"
+if "!resist_rnd!"=="1" (
+    REM Armor of Resist All
+    set /a "%~1.flags|=(!%ctf%.TR_RES_LIGHT! | !%ctf%.TR_RES_COLD! | !%ctr%.TR_RES_ACID! | !%ctr%.TR_RES_FIRE!)"
+    set "%~1.special_name_id=%SpecialNameIds.SN_R%"
+    set /a "%~1.to_ac+=5"
+    set /a "%~1.cost+=2500"
+) else if "!resist_rnd!"=="2" (
+    REM Armor of Resist Acid
+    set /a "%~1.flags|=!%ctf%.TR_RES_ACID!"
+    set "%~1.special_name_id=%SpecialNameIds.SN_RA"
+    set /a "%~1.cost+=1000"
+) else if !resist_rnd! GEQ 3 (
+    if !resist_rnd! LEQ 4 (
+        REM Armor of Resist Fire
+        set /a "%~1.flags|=!%ctf%.TR_RES_FIRE!"
+        set "%~1.special_name_id=%SpecialNameIds.SN_RF"
+        set /a "%~1.cost+=600"
+    ) else (
+        if !resist_rnd! LEQ 6 (
+            REM Armor of Resist Cold
+            set /a "%~1.flags|=!%ctf%.TR_RES_COLD!"
+            set "%~1.special_name_id=%SpecialNameIds.SN_RC"
+            set /a "%~1.cost+=600"
+        ) else (
+            REM Armor of Resist Lightning
+            set /a "%~1.flags|=!%ctf%.TR_RES_LIGHT!"
+            set "%~1.special_name_id=%SpecialNameIds.SN_RL"
+            set /a "%~1.cost+=500"
+        )
+    )
+)
 exit /b
 
 :cursedArmor
