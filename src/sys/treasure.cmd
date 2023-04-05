@@ -2,8 +2,17 @@
 call %*
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determines if an item should be enchanted
+::
+:: Arguments: %1 - The percent chance that an item is enchanted
+:: Returns:   0 if the item is enchanted
+::            1 if it is just a regular item
+::------------------------------------------------------------------------------
 :magicShouldBeEnchanted
-exit /b
+call rng.cmd :randomNumber 100
+if !errorlevel! LEQ %~1 exit /b 0
+exit /b 1
 
 :magicEnchantmentBonus
 exit /b
