@@ -264,7 +264,25 @@ call :magicEnchantmentBonus 1 20 %~2
 set /a %item%.to_damage+=!errorlevel!
 exit /b
 
+::------------------------------------------------------------------------------
+:: Convert a bow to a cursed bow
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :cursedBow
+set "item=%~1"
+set "level=%~2"
+
+call :magicEnchantmentBonus 1 50 %level%
+set /a %item%.to_hit-=!errorlevel!
+
+call :magicEnchantmentBonus 1 30 %level%
+set /a %item%.to_damage-=!errorlevel!
+
+set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+set "%item%.cost=0"
 exit /b
 
 :magicalDiggingTool
