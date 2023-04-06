@@ -458,7 +458,95 @@ set /a %item%.to_ac-=!errorlevel!
 set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Convert helms to magical helms
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The odds of the item gaining magical attributes
+::            %3 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalHelms
+set "item=%~1"
+set "special=%~2"
+set "level=%~3"
+
+call :magicEnchantmentBonus 1 20 %level%
+set /a %item%.to_ac+=!errorlevel!
+
+call :magicShouldBeEnchanted %special% || exit /b
+
+if !%item%.sub_category! LSS 6 (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+
+    call rng.cmd :randomNumber 3
+    set "magic_type=!errorlevel!"
+
+    if "!magic_type!"=="1" (
+        call rng.cmd :randomNumber 2
+        set "%item%.misc_use=!errorlevel!"
+        set /a "%item%.flags|=%config.treasure.flags.TR_INT%"
+        set "%item%.special_name_id=%SpecialNameIds.SN_INTELLIGENCE%"
+        set /a %item%.cost+=!%item%.misc_use!*500
+    ) else if "!magic_type!"=="2" (
+        call rng.cmd :randomNumber 2
+        set "%item%.misc_use=!errorlevel!"
+        set /a "%item%.flags|=%config.treasure.flags.TR_WIS%"
+        set "%item%.special_name_id=%SpecialNameIds.SN_WISDOM%"
+        set /a %item%.cost+=!%item%.misc_use!*500
+    ) else (
+        call rng.cmd :randomNumber 4
+        set /a %item%.misc_use=!errorlevel!+1
+        set /a "%item%.flags|=%config.treasure.flags.TR_INFRA%"
+        set "%item%.special_name_id=%SpecialNameIds.SN_INFRAVISION%"
+        set /a %item%.cost+=!%item%.misc_use!*250
+    )
+    exit /b
+)
+
+call rng.cmd :randomNumber 6
+set "magic_type=!errorlevel!"
+
+if "!magic_type!"=="1" (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+    call rng.cmd :randomNumber 3
+    set "%item%.misc_use=!errorlevel!"
+    set /a "%item%.flags|=(%config.treasure.flags.TR_FREE_ACT% | %config.treasure.flags.TR_CON% | %config.treasure.flags.TR_DEX% | %config.treasure.flags.TR_STR%)"
+    set "%item%.special_name_id=%SpecialNameIds.SN_MIGHT%"
+    set /a %item%.cost+=1000 + !%item%.misc_use! * 500
+) else if "!magic_type!"=="2" (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+    call rng.cmd :randomNumber 3
+    set "%item%.misc_use=!errorlevel!"
+    set /a "%item%.flags|=(%config.treasure.flags.TR_CHR% | %config.treasure.flags.TR_WIS%)"
+    set "%item%.special_name_id=%SpecialNameIds.SN_LORDLINESS%"
+    set /a %item%.cost+=1000 + !%item%.misc_use! * 500
+) else if "!magic_type!"=="3" (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+    call rng.cmd :randomNumber 3
+    set "%item%.misc_use=!errorlevel!"
+    set /a "%item%.flags|=(%config.treasure.flags.TR_RES_LIGHT% | %config.treasure.flags.TR_RES_COLD% | %config.treasure.flags.TR_RES_ACID% | %config.treasure.flags.TR_RES_FIRE% | %config.treasure.flags.TR_INT%)"
+    set "%item%.special_name_id=%SpecialNameIds.SN_MAGI%"
+    set /a %item%.cost+=3000 + !%item%.misc_use! * 500
+) else if "!magic_type!"=="4" (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+    call rng.cmd :randomNumber 3
+    set "%item%.misc_use=!errorlevel!"
+    set /a "%item%.flags|=%config.treasure.flags.TR_CHR%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_BEAUTY%"
+    set /a %item%.cost+=750
+) else if "!magic_type!"=="5" (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+    call rng.cmd :randomNumber 4
+    set /a "%item%.misc_use=(5 * (1 + !errorlevel!))"
+    set /a "%item%.flags|=(%config.treasure.flags.TR_SEE_INVIS% | %config.treasure.flags.TR_SEARCH%)"
+    set "%item%.special_name_id=%SpecialNameIds.SN_SEEING%"
+    set /a %item%.cost+=1000 + !%item%.misc_use! * 100
+) else if "!magic_type!"=="6" (
+    set /a "%item%.flags|=%config.treasure.flags.TR_REGEN%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_REGENERATION%"
+    set /a %item%.cost+=1500
+)
 exit /b
 
 :cursedHelms
