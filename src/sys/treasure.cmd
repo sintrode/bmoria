@@ -286,7 +286,7 @@ set "%item%.cost=0"
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Enchants a pickaxe or shovel
+:: Converts a pickaxe or shovel to a magical digging tool
 ::
 :: Arguments: %1 - A reference to the item being enchanted
 ::            %2 - The level of the dungeon that the player is on
@@ -300,7 +300,21 @@ call :magicEnchantmentBonus 0 25 %level%
 set /a %item%.misc_use+=!errorlevel!
 exit /b
 
+::------------------------------------------------------------------------------
+:: Converts a pickaxe or shovel to a cursed digging tool
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :cursedDiggingTool
+set "item=%~1"
+set "level=%~2"
+
+call :magicEnchantmentBonus 1 30 %level%
+set /a %item%.misc_use-=!errorlevel!
+set "%item%.cost=0"
+set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
 exit /b
 
 :magicalGloves
