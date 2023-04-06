@@ -40,7 +40,7 @@ exit /b !bonus!
 :: Converts a set of armor to magical armor
 ::
 :: Arguments: %1 - A reference to the item being enchanted
-::            %2 - The odds of the item gaining magical resistance
+::            %2 - The odds of the item gaining magical attributes
 ::            %3 - The level of the dungeon that the player is on
 :: Returns:   None
 ::------------------------------------------------------------------------------
@@ -104,7 +104,7 @@ exit /b
 :: Convert a sword to a magical sword
 ::
 :: Arguments: %1 - A reference to the item being enchanted
-::            %2 - The odds of the item gaining magical resistance
+::            %2 - The odds of the item gaining magical attributes
 ::            %3 - The level of the dungeon that the player is on
 :: Returns:   None
 ::------------------------------------------------------------------------------
@@ -321,7 +321,8 @@ exit /b
 :: Converts gloves to magical gloves
 ::
 :: Arguments: %1 - A reference to the item being enchanted
-::            %2 - The level of the dungeon that the player is on
+::            %2 - The odds of the item gaining magical attributes
+::            %3 - The level of the dungeon that the player is on
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :magicalGloves
@@ -350,7 +351,38 @@ if "!errorlevel!"=="1" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Converts gloves to cursed gloves
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The odds of the item gaining magical attributes
+::            %3 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :cursedGloves
+set "item=%~1"
+set "special=%~2"
+set "level=%~3"
+
+call :magicShouldBeEnchanted %special%
+if "!errorlevel!"=="0" (
+    call rng.cmd :randomNumber 2
+    if "!errorlevel!"=="1" (
+        set /a "%item%.flags|=%config.treasure.flags.TR_DEX%"
+        set "%item%.special_name_id=%SpecialNameIds.SN_CLUMSINESS%"
+    ) else (
+        set /a "%item%.flags|=%config.treasure.flags.TR_STR%"
+        set "%item%.special_name_id=%SpecialNameIds.SN_WEAKNESS%"
+    )
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+    call :magicEnchantmentBonus 1 10 %level%
+    set /a %item%.misc_use-=!errorlevel!
+)
+
+call :magicEnchantmentBonus 1 40 %level%
+set /a %item%.to_ac-=!errorlevel!
+set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+set "%item%.cost=0"
 exit /b
 
 :magicalBoots
