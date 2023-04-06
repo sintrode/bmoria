@@ -426,7 +426,36 @@ if !magic_type! GTR 5 (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Converts boots to cursed boots
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :cursedBoots
+set "item=%~1"
+set "level=%~2"
+
+call rng.cmd :randomNumber 3
+set "magic_type=!errorlevel!"
+if "!magic_type!"=="1" (
+    set /a "%item%.flags|=%config.treasure.flags.TR_SPEED%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_SLOWNESS%"
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+    set "%item%.misc_use=-1"
+) else if "!magic_type!"=="2" (
+    set /a "%item%.flags|=%config.treasure.flags.TR_AGGRAVATE%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_NOISE%"
+) else (
+    set "%item%.special_name_id=%SpecialNameIds.SN_GREAT_MASS%"
+    set /a %item%.weight*=5
+)
+
+set "%item%.cost=0"
+call :magicEnchantmentBonus 2 45 %level%
+set /a %item%.to_ac-=!errorlevel!
+set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
 exit /b
 
 :magicalHelms
