@@ -385,7 +385,45 @@ set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
 set "%item%.cost=0"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Converts boots to magical boots
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The odds of the item gaining magical attributes
+::            %3 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalBoots
+set "item=%~1"
+set "special=%~2"
+set "level=%~3"
+
+call :magicEnchantmentBonus 1 20 %level%
+set /a %item%.to_ac+=!errorlevel!
+
+call :magicShouldBeEnchanted %special% || exit /b
+
+call rng.cmd :randomNumber 12
+set "magic_type=!errorlevel!"
+
+if !magic_type! GTR 5 (
+    set /a "%item%.flags|=%config.treasure.flags.TR_FFALL%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_SLOW_DESCENT%"
+    set /a %item%.cost+=250
+) else if "!magic_type!"=="1" (
+    set /a "%item%.flags|=%config.treasure.flags.TR_SPEED%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_SPEED%"
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+    set "%item%.misc_use=1"
+    set /a %item%.cost+=5000
+) else (
+    set /a "%item%.flags|=%config.treasure.flags.TR_STEALTH%"
+    set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+    call rng.cmd :randomNumber 3
+    set "%item%.misc_use=!errorlevel!"
+    set "%item%.special_name_id=%SpecialNameIds.SN_STEALTH%"
+    set /a %item%.cost+=500
+)
 exit /b
 
 :cursedBoots
