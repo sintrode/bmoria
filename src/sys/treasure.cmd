@@ -317,7 +317,37 @@ set "%item%.cost=0"
 set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Converts gloves to magical gloves
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalGloves
+set "item=%~1"
+set "special=%~2"
+set "level=%~3"
+
+call :magicEnchantmentBonus 1 20 %level%
+set %item%.to_ac+=!errorlevel!
+
+call :magicShouldBeEnchanted %special% || exit /b
+
+call rng.cmd :randomNumber 2
+if "!errorlevel!"=="1" (
+    set /a "%item%.flags|=%config.treasure.flags.TR_FREE_ACT%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_FREE.ACTION%"
+    set /a %item%.cost+=1000
+) else (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_HIT_DAM%"
+    call rng.cmd :randomNumber 3
+    set /a %item%.to_hit+=1+!errorlevel!
+    call rng.cmd :randomNumber 3
+    set /a %item%.to_damage+=1+!errorlevel!
+    set "%item%.special_name_id=%SpecialNameIds.SN.SLAYING%"
+    set /a "%item%.cost+=(!%item%.to_hit! + !%item%.to_damage!) * 250"
+)
 exit /b
 
 :cursedGloves
