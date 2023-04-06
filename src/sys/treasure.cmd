@@ -549,7 +549,63 @@ if "!magic_type!"=="1" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Convert helms to cursed helms
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The odds of the item gaining magical attributes
+::            %3 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :cursedHelms
+set "item=%~1"
+set "special=%~2"
+set "level=%~3"
+
+call :magicEnchantmentBonus 1 45 %level%
+set /a %item%.to_ac-=!errorlevel!
+set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+set "%item%.cost=0"
+
+call :magicShouldBeEnchanted %special% || exit /b
+
+call rng.cmd :randomNumber 7
+set "magic_type=!errorlevel!"
+
+if "!magic_type!"=="1" (
+    set /a "%item%.identification|=%config.identification.TD_SHOW_P1%"
+    call rng.cmd :randomNumber 5
+    set /a %item%.misc_use=!errorlevel! * -1
+    set /a "%item%.flags|=%config.treasure.flags.TR_INT%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_STUPIDITY%"
+) else if "!magic_type!"=="2" (
+    set /a "%item%.identification|=%config.identification.TD_SHOW_P1%"
+    call rng.cmd :randomNumber 5
+    set /a %item%.misc_use=!errorlevel! * -1
+    set /a "%item%.flags|=%config.treasure.flags.TR_WIS%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_DULLNESS%"
+) else if "!magic_type!"=="3" (
+    set /a "%item%.flags|=%config.treasure.flags.TR_BLIND%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_BLINDNESS%"
+) else if "!magic_type!"=="4" (
+    set /a "%item%.flags|=%config.treasure.flags.TR_TIMID%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_TIMIDNESS%"
+) else if "!magic_type!"=="5" (
+    set /a "%item%.identification|=%config.identification.TD_SHOW_P1%"
+    call rng.cmd :randomNumber 5
+    set /a %item%.misc_use=!errorlevel! * -1
+    set /a "%item%.flags|=%config.treasure.flags.TR_STR%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_WEAKNESS%"
+) else if "!magic_type!"=="6" (
+    set /a "%item%.flags|=%config.treasure.flags.TR_TELEPORT%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_TELEPORTATION%"
+) else if "!magic_type!"=="7" (
+    set /a "%item%.identification|=%config.identification.TD_SHOW_P1%"
+    call rng.cmd :randomNumber 5
+    set /a %item%.misc_use=!errorlevel! * -1
+    set /a "%item%.flags|=%config.treasure.flags.TR_CHR%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_UGLINESS%"
+)
 exit /b
 
 :processRings
