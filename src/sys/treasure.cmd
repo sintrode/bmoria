@@ -285,7 +285,19 @@ set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
 set "%item%.cost=0"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Enchants a pickaxe or shovel
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalDiggingTool
+set "item=%~1"
+set "level=%~2"
+
+call :magicEnchantmentBonus 0 25 %level%
+set /a %item%.misc_use+=!errorlevel!
 exit /b
 
 :cursedDiggingTool
