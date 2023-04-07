@@ -944,7 +944,50 @@ for /f "tokens=1,2" %%A in ("!item_stat_block[%magic_type%]!") do (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Adds magical enchantments to ammo
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The odds of the item gaining magical attributes
+::            %3 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalProjectileAdjustment
+set "item=%~1"
+set "special=%~2"
+set "level=%~3"
+
+call :magicEnchantmentBonus 1 35 %level%
+set /a %item%.to_hit+=!errorlevel!
+call :magicEnchantmentBonus 1 35 %level%
+set /a %item%.to_damage+=!errorlevel!
+
+::                      flags                                     to_hit to_damage special_name_id                  cost
+set "item_stat_block[1]=0                                          5     5         %SpecialNameIds.SN_SLAYING%      20"
+set "item_stat_block[2]=0                                          5     5         %SpecialNameIds.SN_SLAYING%      20"
+set "item_stat_block[3]=0                                          5     5         %SpecialNameIds.SN_SLAYING%      20"
+set "item_stat_block[4]=%config.treasure.flags.TR_FLAME_TONGUE%    2     4         %SpecialNameIds.SN_FIRE%         25"
+set "item_stat_block[5]=%config.treasure.flags.TR_FLAME_TONGUE%    2     4         %SpecialNameIds.SN_FIRE%         25"
+set "item_stat_block[6]=%config.treasure.flags.TR_SLAY_EVIL%       3     3         %SpecialNameIds.SN_SLAY_EVIL%    25"
+set "item_stat_block[7]=%config.treasure.flags.TR_SLAY_EVIL%       3     3         %SpecialNameIds.SN_SLAY_EVIL%    25"
+set "item_stat_block[8]=%config.treasure.flags.TR_SLAY_ANIMAL%     2     2         %SpecialNameIds.SN_SLAY_ANIMAL%  30"
+set "item_stat_block[9]=%config.treasure.flags.TR_SLAY_ANIMAL%     2     2         %SpecialNameIds.SN_SLAY_ANIMAL%  30"
+set "item_stat_block[10]=%config.treasure.flags.TR_SLAY_DRAGON%    3     3         %SpecialNameIds.SN_SLAY_DRAGON%  35"
+
+call rng.cmd :randomNumber 10
+set "magic_type=!errorlevel!"
+
+set /a special=3 * %special% / 2
+call :magicShouldBeEnchanted %special%
+if "!errorlevel!"=="0" (
+    for /f "tokens=1-5" %%A in ("!item_stat_block[%magic_type%]!") do (
+        set /a "%item%.flags|=%%~A"
+        set /a %item%.to_hit+=%%~B
+        set /a %item%.to_damage+=%%~C
+        set "%item%.special_name_id=%%~D"
+        set /a %item%.cost+=%%~E
+    )
+)
 exit /b
 
 :cursedProjectileAdjustment
