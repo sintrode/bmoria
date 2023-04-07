@@ -476,7 +476,7 @@ set /a %item%.to_ac+=!errorlevel!
 
 call :magicShouldBeEnchanted %special% || exit /b
 
-if !%item%.sub_category! LSS 6 (
+if !%item%.sub_category_id! LSS 6 (
     set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
 
     call rng.cmd :randomNumber 3
@@ -739,7 +739,7 @@ if !%item%.sub_category_id! LSS 2 (
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Randomly picks a type of magic wand based on its subtype
+:: Sets a random number of charges based on the type of wand
 ::
 :: Arguments: %1 - The sub_category_id of the wand
 :: Returns:   A random number based on the sub_category_id
@@ -778,7 +778,7 @@ for /f "tokens=1,2" %%A in ("!item_stat_block[%~1]!") do (
 exit /b !magic_number!
 
 ::------------------------------------------------------------------------------
-:: Randomly picks a type of magic staff based on its subtype
+:: Sets a random number of charges based on the type of staff
 ::
 :: Arguments: %1 - The sub_category_id of the staff
 :: Returns:   A random number based on the sub_category_id
@@ -1058,6 +1058,165 @@ if "!missiles_counter!"=="32767" (
 set "%item%.misc_use=!missiles_counter!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Wrapper for creating magical and cursed items
+::
+:: Arguments: %1 - The item_id of the item being modified
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicTreasureMagicalAbility
-exit /b
+set "item_id=%~1"
+set "level=%~2"
 
+set /a chance=%config.treasure.OBJECT_BASE_MAGIC% + %level%
+if %chance% GTR %config.treasure.OBJECT_MAX_BASE_MAGIC% (
+    set "chance=%config.treasure.OBJECT_MAX_BASE_MAGIC%"
+)
+set /a special=%chance% / %config.treasure.OBJECT_CHANCE_SPECIAL%
+set /a cursed=(10 * %chance%) / %config.treasure.OBJECT_CHANCE_CURSED%
+
+set "item=game.treasure.list[%~1]"
+
+set /a "is_armor=0", "is_sword=0", "is_ammo=0"
+if "!%item%.category_id!"=="%TV_SHIELD%" set "is_armor=1"
+if "!%item%.category_id!"=="%TV_HARD_ARMOR%" set "is_armor=1"
+if "!%item%.category_id!"=="%TV_SOFT_ARMOR%" set "is_armor=1"
+if "!%item%.category_id!"=="%TV_HAFTED%" set "is_sword=1"
+if "!%item%.category_id!"=="%TV_POLEARM%" set "is_sword=1"
+if "!%item%.category_id!"=="%TV_SWORD%" set "is_sword=1"
+if "!%item%.category_id!"=="%TV_SLING_AMMO%" set "is_ammo=1"
+if "!%item%.category_id!"=="%TV_SPIKE%" set "is_ammo=1"
+if "!%item%.category_id!"=="%TV_BOLT%" set "is_ammo=1"
+if "!%item%.category_id!"=="%TV_ARROW%" set "is_ammo=1"
+
+if "!is_shield!"=="1" (
+    call :magicShouldBeEnchanted %chance%
+    if "!errorlevel!"=="0" (
+        call :magicalArmor "%item%" %special% %level%
+    ) else (
+        call :magicShouldBeEnchanted %cursed%
+        if "!errorlevel!"=="0" (
+            call :cursedArmor "%item%" %level%
+        )
+    )
+) else if "!is_sword!"=="1" (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_HIT_DAM%"
+    
+    call :magicShouldBeEnchanted %chance%
+    if "!errorlevel!"=="0" (
+        call :magicalSword "%item%" %special% %level%
+    ) else (
+        call :magicShouldBeEnchanted %cursed%
+        if "!errorlevel!"=="0" (
+            call :cursedSword "%item%" %level%
+        )
+    )
+) else if "!%item%.category_id!"=="%TV_BOW%" (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_HIT_DAM%"
+
+    call :magicShouldBeEnchanted %chance%
+    if "!errorlevel!"=="0" (
+        call :magicalBow "%item%" %level%
+    ) else (
+        call :magicShouldBeEnchanted %cursed%
+        if "!errorlevel!"=="0" (
+            call :cursedBow "%item%" %level%
+        )
+    )
+) else if "!%item%.category_id!"=="%TV_DIGGING%" (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_HIT_DAM%"
+
+    call :magicShouldBeEnchanted %chance%
+    if "!errorlevel!"=="0" (
+        call rng.cmd :randomNumber 3
+        if !errorlevel! LSS 3 (
+            call :magicalDiggingTool "%item%" %level%
+        ) else (
+            call :cursedDiggingTool "%item%" %level%
+        )
+    )
+) else if "!%item%.category_id!"=="%TV_GLOVES%" (
+    call :magicShouldBeEnchanted %chance%
+    if "!errorlevel!"=="0" (
+        call :magicalGloves "%item%" %special% %level%
+    ) else (
+        call :magicShouldBeEnchanted %cursed%
+        if "!errorlevel!"=="0" (
+            call :cursedGloves "%item%" %special% %level%
+        )
+    )
+) else if "!%item%.category_id!"=="%TV_BOOTS%" (
+    call :magicShouldBeEnchanted %chance%
+    if "!errorlevel!"=="0" (
+        call :magicalBoots "%item%" %special% %level%
+    ) else (
+        call :magicShouldBeEnchanted %cursed%
+        if "!errorlevel!"=="0" (
+            call :cursedBoots "%item%" %level%
+        )
+    )
+) else if "!%item%.category_id!"=="%TV_HELM%" (
+    if !%item%.sub_category_id! GEQ 6 (
+        if !%item%.sub_category_id! LEQ 8 (
+            set /a "chance+=(!%item%.cost! / 100)"
+            set /a special*=2
+        )
+    )
+
+    call :magicShouldBeEnchanted !chance!
+    if "!errorlevel!"=="0" (
+        call :magicalHelms "%item%" !special! %level%
+    ) else (
+        call :magicShouldBeEnchanted %cursed%
+        if "!errorlevel!"=="0" (
+            call :cursedHelms "%item%" !special! %level%
+        )
+    )
+) else if "!%item%.category_id!"=="%TV_RING%" (
+    call :processRings "%item%" %level% %cursed%
+) else if "!%item%.category_id!"=="%TV_AMULET%" (
+    call :processAmulets "%item%" %level% %cursed%
+) else if "!%item%.category_id!"=="%TV_LIGHT%" (
+    set /a found_place=!%item%.sub_category_id! %% 2
+    if "!found_place!"=="1" (
+        call rng.cmd :randomNumber !%item%.misc_use!
+        set "%item%.misc_use=!errorlevel!"
+        set /a %item%.sub_category_id-=1
+    )
+) else if "!%item%.category_id!"=="%TV_WAND%" (
+    call :wandMagic !%item%.sub_category_id!
+    set "magic_amount=!errorlevel!"
+    if not "!magic_amount!"=="-1" set "%item%.misc_use=!magic_amount!"
+) else if "!%item%.category_id!"=="%TV_STAFF%" (
+    call :staffMagic !%item%.sub_category_id!
+    set "magic_amount=!errorlevel!"
+    if not "!magic_amount!"=="-1" set "%item%.misc_use=!magic_amount!"
+    if "!%item%.sub_category_id!"=="7" set "%item%.depth_first_found=10"
+    if "!%item%.sub_category_id!"=="22" set "%item%.depth_first_found=5"
+) else if "!%item%.category_id!"=="%TV_CLOAK%" (
+    call :magicShouldBeEnchanted !chance!
+    if "!errorlevel!"=="0" (
+        call :magicalCloak "%item%" !special! %level%
+    ) else (
+        call :magicShouldBeEnchanted %cursed%
+        if "!errorlevel!"=="0" (
+            call :cursedCloak "%item%" !special! %level%
+        )
+    )
+) else if "!%item%.category_id!"=="%TV_CHEST%" (
+    call :magicalChests "%item%" %level%
+) else if "!is_ammo!"=="1" (
+    call :magicalProjectile "%item%" %special% %level% %chance% %cursed%
+) else if "!%item%.category_id!"=="%TV_FOOD%" (
+    if "!%item%.sub_category_id!"=="90" set "%item%.depth_first_found=0"
+    if "!%item%.sub_category_id!"=="92" set "%item%.depth_first_found=6"
+) else if "!%item%.category_id!"=="%TV_SCROLL1%" (
+    if "!%item%.sub_category_id!"=="67" set "%item%.depth_first_found=1"
+    if "!%item%.sub_category_id!"=="69" set "%item%.depth_first_found=0"
+    if "!%item%.sub_category_id!"=="80" set "%item%.depth_first_found=5"
+    if "!%item%.sub_category_id!"=="81" set "%item%.depth_first_found=5"
+) else if "!%item%.category_id!"=="%TV_POTION1%" (
+    if "!%item%.sub_category_id!"=="76" set "%item%.depth_first_found=0"
+)
+exit /b
