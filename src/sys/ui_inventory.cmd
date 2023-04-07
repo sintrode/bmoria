@@ -98,7 +98,7 @@ exit /b !column!
 :playerItemWearingDescription
 exit /b
 
-:char
+:equipmentPositionDescription
 exit /b
 
 :displayEquipment
@@ -178,4 +178,3 @@ exit /b
 
 :inventoryGetInputForItemId
 exit /b
-
