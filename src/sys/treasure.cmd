@@ -816,7 +816,7 @@ for /f "tokens=1,2" %%A in ("!item_stat_block[%~1]!") do (
 exit /b !magic_number!
 
 ::------------------------------------------------------------------------------
-:: Add magical enchantment to cloaks
+:: Add cloaks to magical cloaks
 ::
 :: Arguments: %1 - A reference to the item being enchanted
 ::            %2 - The odds of the item gaining magical attributes
@@ -854,7 +854,49 @@ set "%item%.special_name_id=%SpecialNameIds.SN_STEALTH%"
 set /a %item%.cost+=500
 exit /b
 
+::------------------------------------------------------------------------------
+:: Convert cloaks to cursed cloaks
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :cursedCloak
+set "item=%~1"
+set "level=%~2"
+
+call rng.cmd :randomNumber 3
+set "magic_type=!errorlevel!"
+
+if "!magic_type!"=="1" (
+    set /a "%item%.flags|=%config.treasure.flags.TR_AGGRAVATE%"
+    set "%item%.special_name_id=%SpecialNameIds.SN_IRRITATION%"
+    call :magicEnchantmentBonus 1 10 %level%
+    set /a %item%.to_ac-=!errorlevel!
+    set /a "%item%.identification|=%config.identification.ID_SHOW_HIT_DAM%"
+    call :magicEnchantmentBonus 1 10 %level%
+    set /a %item%.to_hit-=!errorlevel!
+    call :magicEnchantmentBonus 1 10 %level%
+    set /a %item%.to_damage-=!errorlevel!
+) else if "!magic_type!"=="2" (
+    set "%item%.special_name_id=%SpecialNameIds.SN_VULNERABILITY%"
+    set /a level_inc=%level%+50
+    call :magicEnchantmentBonus 10 100 !level_inc!
+    set /a %item%.to_ac-=!errorlevel!
+) else (
+    set "%item%.special_name_id=%SpecialNameIds.SN_ENVELOPING%"
+    call :magicEnchantmentBonus 1 10 %level%
+    set /a %item%.to_ac-=!errorlevel!
+    set /a "%item%.identification|=%config.identification.ID_SHOW_HIT_DAM%"
+    set /a level_inc=%level%+10
+    call :magicEnchantmentBonus 2 40 !level_inc!
+    set /a %item%.to_hit-=!errorlevel!
+    call :magicEnchantmentBonus 2 40 !level_inc!
+    set /a %item%.to_damage-=!errorlevel!
+)
+
+set "%item%.cost=0"
+set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
 exit /b
 
 :magicalChests
