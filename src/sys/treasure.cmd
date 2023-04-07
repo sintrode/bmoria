@@ -1009,7 +1009,53 @@ set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
 set "%item%.cost=0"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Counter for missiles
+::
+:: Arguments: %1 - A reference to the ammo being processed
+::            %2 - The chance of the treasure being enchanted
+::            %3 - The level of the dungeon that the player is on
+::            %4 - The chance of treasure having magical attributes
+::            %5 - The odds of the treasure being cursed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalProjectile
+set "item=%~1"
+set "special=%~2"
+set "level=%~3"
+set "chance=%~4"
+set "cursed=%~5"
+
+set "is_ammo=0"
+if "!%item%.category_id!"=="%TV_SLING_AMMO%" set "is_ammo=1"
+if "!%item%.category_id!"=="%TV_BOLT%" set "is_ammo=1"
+if "!%item%.category_id!"=="%TV_ARROW%" set "is_ammo=1"
+if "!is_ammo!"=="1" (
+    set /a "%item%.identification|=%config.identification.ID_SHOW_HIT_DAM%"
+    call :magicShouldBeEnchanted %chance%
+    if "!errorlevel!"=="0" (
+        call :magicalProjectileAdjustment "%item%" %special% %level%
+    ) else (
+        call :magicShouldBeEnchanted %cursed%
+        if "!errorlevel!"=="0" (
+            call :cursedProjectileAdjustment "%item%" %level%
+        )
+    )
+)
+
+set "%item%.items_count=0"
+for /L %%A in (0,1,6) do (
+    call rng.cmd :randomNumber 6
+    set /a %item%.items_count+=!errorlevel!
+)
+
+if "!missiles_counter!"=="32767" (
+    set "missiles_counter=-32768"
+) else (
+    set /a missiles_counter+=1
+)
+
+set "%item%.misc_use=!missiles_counter!"
 exit /b
 
 :magicTreasureMagicalAbility

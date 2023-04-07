@@ -499,6 +499,9 @@ for %%A in (Received Rejected Offended Insulted) do (
     set /a counter+=1
 )
 
+::----- treasure.cpp
+set "missiles_counter=0"
+
 ::----- ui_inventory.cpp
 set "counter=0"
 for %%A in (CloseMenu Equipment Inventory) do (
