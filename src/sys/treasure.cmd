@@ -695,7 +695,47 @@ if !%item%.sub_category_id! LEQ 3(
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Add attributes to amulets
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+::            %3 - The odds that the ring is cursed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :processAmulets
+set "item=%~1"
+set "level=%~2"
+set "cursed=%~3"
+
+if !%item%.sub_category_id! LSS 2 (
+    call :magicShouldBeEnchanted %cursed%
+    if "!errorlevel!"=="0" (
+        call :magicEnchantmentBonus 1 20 %level%
+        set /a %item%.misc_use=!errorlevel! * -1
+        set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+        set /a %item%.cost*=-1
+    ) else (
+        call :magicEnchantmentBonus 1 10 %level%
+        set "%item%.misc_use=!errorlevel!"
+        set /a %item%.cost+=!%item%.misc_use! * 100
+    )
+) else if "!%item%.sub_category_id!"=="2" (
+    call :magicEnchantmentBonus 1 25 %level%
+    set /a %item%.misc_use=!errorlevel! * 5
+    call :magicShouldBeEnchanted %cursed%
+    if "!errorlevel!"=="0" (
+        set /a %item%.misc_use=*-1
+        set /a %item%.cost=*-1
+        set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+    ) else (
+        set /a %item%.cost+=50 * !%item%.misc_use!
+    )
+) else if "!%item%.sub_category_id!"=="8" (
+    call :magicEnchantmentBonus 1 25 %level%
+    set /a %item%.misc_use=!errorlevel! * 5
+    set /a %item%.cost+=20 * !%item%.misc_use!
+)
 exit /b
 
 :wandMagic
