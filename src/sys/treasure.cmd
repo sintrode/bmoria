@@ -608,7 +608,91 @@ if "!magic_type!"=="1" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Adds attributes to rings
+:: TODO: Refactor the previous variations of this subroutine to match this
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+::            %3 - The odds that the ring is cursed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :processRings
+set "item=%~1"
+set "level=%~2"
+set "cursed=%~3"
+
+if !%item%.sub_category_id! LEQ 3(
+    call :magicShouldBeEnchanted %cursed%
+    if "!errorlevel!"=="0" (
+        call :magicEnchantmentBonus 1 20 %level%
+        set /a %item%.misc_use=!errorlevel! * -1
+        set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+        set /a %item%.cost*=-1
+    ) else (
+        call :magicEnchantmentBonus 1 10 %level%
+        set "%item%.misc_use=!errorlevel!"
+        set /a %item%.cost+=!%item%.misc_use!*100
+    )
+) else if "!%item%.sub_category_id!"=="4" (
+    call :magicShouldBeEnchanted %cursed%
+    if "!errorlevel!"=="0" (
+        call rng.cmd :randomNumber 3
+        set /a %item%.misc_use=!errorlevel! * -1
+        set "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+        set /a %item%.cost*=-1
+    ) else (
+        set "%item%.misc_use=1"
+    )
+) else if "!%item%.sub_category_id!"=="5" (
+    call :magicEnchantmentBonus 1 20 %level%
+    set /a %item%.misc_use=5 * !errorlevel!
+    set /a %item%.cost+=!%item%.misc_use! * 50
+    call :magicShouldBeEnchanted %cursed%
+    if "!errorlevel!"=="0" (
+        set /a %item%.misc_use=!%item%.misc_use! * -1
+        set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+        set /a %item%.cost*=-1
+    )
+) else if "!%item%.sub_category_id!"=="19" (
+    call :magicEnchantmentBonus 1 20 %level%
+    set /a %item%.to_damage+=!errorlevel!
+    set /a %item%.cost+=!%item%.to_damage! * 50
+    call :magicShouldBeEnchanted %cursed%
+    if "!errorlevel!"=="0" (
+        set /a %item%.to_damage=!%item%.to_damage! * -1
+        set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+        set /a %item%.cost*=-1
+    )
+) else if "!%item%.sub_category_id!"=="20" (
+    call :magicEnchantmentBonus 1 20 %level%
+    set /a %item%.to_hit+=!errorlevel!
+    set /a %item%.cost+=!%item%.to_hit! * 50
+    call :magicShouldBeEnchanted %cursed%
+    if "!errorlevel!"=="0" (
+        set /a %item%.to_hit*=-1
+        set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+        set /a %item%.cost*=-1
+    )
+) else if !%item%.sub_category_id! GEQ 24 (
+    if !%item%.sub_category_id! LEQ 29 (
+        set /a "%item%.identification|=%config.identification.ID_NO_SHOW_P1%"
+    ) else if "!%item%.sub_category_id!"=="30" (
+        set /a "%item%.identification|=%config.identification.ID_SHOW_HIT_DAM%"
+        call :magicEnchantmentBonus 1 25 %level%
+        set /a %item%.to_damage+=!errorlevel!
+        call :magicEnchantmentBonus 1 25 %level%
+        set /a %item%.to_hit+=!errorlevel!
+        set /a "%item%.cost+=(!%item%.to_hit! + !%item%.to_damage!) * 100"
+        call :magicShouldBeEnchanted %cursed%
+        if "!errorlevel!"=="0" (
+            set /a %item%.to_hit*=-1
+            set /a %item%.to_damage*=-1
+            set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+            set /a %item%.cost*=-1
+        )
+    )
+)
 exit /b
 
 :processAmulets
