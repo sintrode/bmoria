@@ -945,7 +945,7 @@ for /f "tokens=1,2" %%A in ("!item_stat_block[%magic_type%]!") do (
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Adds magical enchantments to ammo
+:: Convert ammo to magical ammo
 ::
 :: Arguments: %1 - A reference to the item being enchanted
 ::            %2 - The odds of the item gaining magical attributes
@@ -990,7 +990,23 @@ if "!errorlevel!"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Convert ammo to cursed ammo
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :cursedProjectileAdjustment
+set "item=%~1"
+set "level=%~2"
+
+call :magicEnchantmentBonus 5 55 %level%
+set /a %item%.to_hit-=!errorlevel!
+call :magicEnchantmentBonus 5 55 %level%
+set /a %item%.to_damage-=!errorlevel!
+set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
+set "%item%.cost=0"
 exit /b
 
 :magicalProjectile
