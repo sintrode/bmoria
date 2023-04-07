@@ -1069,8 +1069,8 @@ for /L %%A in (0,1,%player_inventory_size%) do (
         if "!errorlevel!"=="0" (
             call game.cmd :randomNumber !chance!
             if "!errorlevel!"=="1" (
-                set "tmp_str=There's something about what you are "
-                call ui_inventory.cmd :playerItemWearingDescription !enchant_item!
+                call ui_inventory.cmd :playerItemWearingDescription !enchant_item! "tmp_str"
+                set "tmp_str=There's something about what you are !tmp_str!"
                 call player.cmd :playerDisturb 0 0
                 call ui_io.cmd :printMessage "!tmp_str!"
                 call identification.cmd :itemAppendToInscription item %config.identification.id_magik%
