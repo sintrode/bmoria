@@ -2,7 +2,18 @@
 call %*
 exit /b
 
+::------------------------------------------------------------------------------
+:: Displays the weight of a specified inventory item
+::
+:: Arguments: %1 - A variable to store the string containing the weight data
+::            %2 - The item_id of the item being weighed
+:: Returns:   None
+::------------------------------------------------------------------------------
 :inventoryItemWeightText
+set /a total_weight=!py.inventory[%~2].weight! * !py.inventory[%~2].items_count!
+set /a "quotient=%total_weight% / 10", "remainder=%total_weight% %% 10"
+call scores.cmd :sprintf "text" "%quotient%" 3
+set "text=%text%.%remainder% lb"
 exit /b
 
 :displayInventoryItems
