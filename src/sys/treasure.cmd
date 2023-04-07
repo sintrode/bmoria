@@ -738,8 +738,44 @@ if !%item%.sub_category_id! LSS 2 (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Randomly picks a type of magic wand based on its subtype
+::
+:: Arguments: %1 - The sub_category_id of the wand
+:: Returns:   A random number based on the sub_category_id
+::------------------------------------------------------------------------------
 :wandMagic
-exit /b
+set "wand[0]=10 6"
+set "wand[1]=8 6"
+set "wand[2]=5 6"
+set "wand[3]=8 6"
+set "wand[4]=4 3"
+set "wand[5]=8 6"
+set "wand[6]=20 12"
+set "wand[7]=20 12"
+set "wand[8]=10 6"
+set "wand[9]=12 6"
+set "wand[10]=10 12"
+set "wand[11]=3 3"
+set "wand[12]=8 6"
+set "wand[13]=10 6"
+set "wand[14]=5 3"
+set "wand[15]=5 3"
+set "wand[16]=5 6"
+set "wand[17]=5 4"
+set "wand[18]=8 4"
+set "wand[19]=6 2"
+set "wand[20]=4 2"
+set "wand[21]=8 6"
+set "wand[22]=5 2"
+set "wand[23]=12 12"
+
+if not defined wand[%~1] exit /b -1
+for /f "tokens=1,2" %%A in ("!wand[%~1]!") do (
+    call rng.cmd :randomNumber %%A
+    set /a wand_magic=!errorlevel!+%%B
+)
+exit /b !wand_magic!
 
 :staffMagic
 exit /b
