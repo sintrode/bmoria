@@ -745,40 +745,75 @@ exit /b
 :: Returns:   A random number based on the sub_category_id
 ::------------------------------------------------------------------------------
 :wandMagic
-set "wand[0]=10 6"
-set "wand[1]=8 6"
-set "wand[2]=5 6"
-set "wand[3]=8 6"
-set "wand[4]=4 3"
-set "wand[5]=8 6"
-set "wand[6]=20 12"
-set "wand[7]=20 12"
-set "wand[8]=10 6"
-set "wand[9]=12 6"
-set "wand[10]=10 12"
-set "wand[11]=3 3"
-set "wand[12]=8 6"
-set "wand[13]=10 6"
-set "wand[14]=5 3"
-set "wand[15]=5 3"
-set "wand[16]=5 6"
-set "wand[17]=5 4"
-set "wand[18]=8 4"
-set "wand[19]=6 2"
-set "wand[20]=4 2"
-set "wand[21]=8 6"
-set "wand[22]=5 2"
-set "wand[23]=12 12"
+set "item_stat_block[0]=10 6"
+set "item_stat_block[1]=8 6"
+set "item_stat_block[2]=5 6"
+set "item_stat_block[3]=8 6"
+set "item_stat_block[4]=4 3"
+set "item_stat_block[5]=8 6"
+set "item_stat_block[6]=20 12"
+set "item_stat_block[7]=20 12"
+set "item_stat_block[8]=10 6"
+set "item_stat_block[9]=12 6"
+set "item_stat_block[10]=10 12"
+set "item_stat_block[11]=3 3"
+set "item_stat_block[12]=8 6"
+set "item_stat_block[13]=10 6"
+set "item_stat_block[14]=5 3"
+set "item_stat_block[15]=5 3"
+set "item_stat_block[16]=5 6"
+set "item_stat_block[17]=5 4"
+set "item_stat_block[18]=8 4"
+set "item_stat_block[19]=6 2"
+set "item_stat_block[20]=4 2"
+set "item_stat_block[21]=8 6"
+set "item_stat_block[22]=5 2"
+set "item_stat_block[23]=12 12"
 
-if not defined wand[%~1] exit /b -1
-for /f "tokens=1,2" %%A in ("!wand[%~1]!") do (
+if not defined item_stat_block[%~1] exit /b -1
+for /f "tokens=1,2" %%A in ("!item_stat_block[%~1]!") do (
     call rng.cmd :randomNumber %%A
-    set /a wand_magic=!errorlevel!+%%B
+    set /a magic_number=!errorlevel!+%%B
 )
-exit /b !wand_magic!
+exit /b !magic_number!
 
+::------------------------------------------------------------------------------
+:: Randomly picks a type of magic staff based on its subtype
+::
+:: Arguments: %1 - The sub_category_id of the staff
+:: Returns:   A random number based on the sub_category_id
+::------------------------------------------------------------------------------
 :staffMagic
-exit /b
+set "item_stat_block[0]=20 12"
+set "item_stat_block[1]=8 6"
+set "item_stat_block[2]=5 6"
+set "item_stat_block[3]=20 12"
+set "item_stat_block[4]=15 6"
+set "item_stat_block[5]=4 5"
+set "item_stat_block[6]=5 3"
+set "item_stat_block[7]=3 1"
+set "item_stat_block[8]=3 1"
+set "item_stat_block[9]=5 6"
+set "item_stat_block[10]=10 12"
+set "item_stat_block[11]=5 6"
+set "item_stat_block[12]=5 6"
+set "item_stat_block[13]=5 6"
+set "item_stat_block[14]=10 12"
+set "item_stat_block[15]=3 4"
+set "item_stat_block[16]=5 6"
+set "item_stat_block[17]=5 6"
+set "item_stat_block[18]=3 4"
+set "item_stat_block[19]=10 12"
+set "item_stat_block[20]=3 4"
+set "item_stat_block[21]=3 4"
+set "item_stat_block[22]=10 6"
+
+if not defined item_stat_block[%~1] exit /b -1
+for /f "tokens=1,2" %%A in ("!item_stat_block[%~1]!") do (
+    call rng.cmd :randomNumber %%A
+    set /a magic_number=!errorlevel!+%%B
+)
+exit /b !magic_number!
 
 :magicalCloak
 exit /b
