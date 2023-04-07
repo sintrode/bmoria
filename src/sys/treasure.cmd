@@ -815,7 +815,43 @@ for /f "tokens=1,2" %%A in ("!item_stat_block[%~1]!") do (
 )
 exit /b !magic_number!
 
+::------------------------------------------------------------------------------
+:: Add magical enchantment to cloaks
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The odds of the item gaining magical attributes
+::            %3 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalCloak
+set "item=%~1"
+set "special=%~2"
+set "level=%~3"
+
+call :magicShouldBeEnchanted %special%
+if "!errorlevel!"=="1" (
+    call :magicEnchantmentBonus 1 20 %level%
+    set /a %item%.to_ac+=!errorlevel!
+    exit /b
+)
+
+call rng.cmd :randomNumber 2
+if "!errorlevel!"=="1" (
+    set "%item%.special_name_id=%SpecialNameIds.SN_PROTECTION%"
+    call :magicEnchantmentBonus 2 40 %level%
+    set /a %item%.to_ac+=!errorlevel!
+    set /a %item%.cost+=250
+    exit /b
+)
+
+call :magicEnchantmentBonus 1 20 %level%
+set /a %item%.to_ac+=!errorlevel!
+set /a "%item%.identification|=%config.identification.ID_SHOW_P1%"
+call rng.cmd :randomNumber 3
+set "%item%.misc_use=!errorlevel!"
+set "%item%.flags|=%config.treasure.flags.TR_STEALTH%"
+set "%item%.special_name_id=%SpecialNameIds.SN_STEALTH%"
+set /a %item%.cost+=500
 exit /b
 
 :cursedCloak
