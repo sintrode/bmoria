@@ -899,7 +899,49 @@ set "%item%.cost=0"
 set /a "%item%.flags|=%config.treasure.flags.TR_CURSED%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Enchants a magical chest
+::
+:: Arguments: %1 - A reference to the item being enchanted
+::            %2 - The level of the dungeon that the player is on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :magicalChests
+set "item=%~1"
+set "level=%~2"
+
+set /a level_inc=%level%+4
+call rng.cmd :randomNumber %level_inc%
+set "magic_type=!errorlevel!"
+
+set "item_stat_block[1]=0 %SpecialNameIds.SN_EMPTY%"
+set "item_stat_block[2]=%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_LOCKED%"
+set "item_stat_block[3]=%config.treasure.chests.CH_LOSE_STR%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_POISON_NEEDLE%"
+set "item_stat_block[4]=%config.treasure.chests.CH_LOSE_STR%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_POISON_NEEDLE%"
+set "item_stat_block[5]=%config.treasure.chests.CH_POISON%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_POISON_NEEDLE%"
+set "item_stat_block[6]=%config.treasure.chests.CH_POISON%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_POISON_NEEDLE%"
+set "item_stat_block[7]=%config.treasure.chests.CH_PARALYSED%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_GAS_TRAP%"
+set "item_stat_block[8]=%config.treasure.chests.CH_PARALYSED%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_GAS_TRAP%"
+set "item_stat_block[9]=%config.treasure.chests.CH_PARALYSED%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_GAS_TRAP%"
+set "item_stat_block[10]=%config.treasure.chests.CH_EXPLODE%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_EXPLOSION_DEVICE%"
+set "item_stat_block[11]=%config.treasure.chests.CH_EXPLODE%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_EXPLOSION_DEVICE%"
+set "item_stat_block[12]=%config.treasure.chests.CH_SUMMON%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_SUMMONING_RUNES%"
+set "item_stat_block[13]=%config.treasure.chests.CH_SUMMON%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_SUMMONING_RUNES%"
+set "item_stat_block[14]=%config.treasure.chests.CH_SUMMON%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_SUMMONING_RUNES%"
+set "item_stat_block[15]=%config.treasure.chests.CH_PARALYSED%|%config.treasure.chests.CH_POISON%|%config.treasure.chests.CH_LOST_STR%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_MULTIPLE_TRAPS%"
+set "item_stat_block[16]=%config.treasure.chests.CH_PARALYSED%|%config.treasure.chests.CH_POISON%|%config.treasure.chests.CH_LOST_STR%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_MULTIPLE_TRAPS%"
+set "item_stat_block[17]=%config.treasure.chests.CH_PARALYSED%|%config.treasure.chests.CH_POISON%|%config.treasure.chests.CH_LOST_STR%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_MULTIPLE_TRAPS%"
+set "item_stat_block[18]=%config.treasure.chests.CH_SUMMON%|%config.treasure.chests.CH_EXPLODE%|%config.treasure.chests.CH_LOCKED% %SpecialNameIds.SN_MULTIPLE_TRAPS%"
+
+if not defined item_stat_block[%magic_type%] set "magic_type=18"
+for /f "tokens=1,2" %%A in ("!item_stat_block[%magic_type%]!") do (
+    if "%%A"=="0" (
+        set "%item%.flags=0"
+    ) else (
+        set /a "%item%.flags|=(%%~A)"
+    )
+    set "%item%.special_name_id=%%~B"
+)
 exit /b
 
 :magicalProjectileAdjustment
