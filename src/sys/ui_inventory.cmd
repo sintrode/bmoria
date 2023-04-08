@@ -379,8 +379,40 @@ if not "%game.screen.current_screen_id%"=="%Screen.Blank%" (
 )
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Handle dropping items
+::
+:: Arguments: %1 - A reference to the command given to get here
+:: Returns:   0 if the player drops an item
+::            1 if there is nothing to drop or if they are standing on something
+::------------------------------------------------------------------------------
 :uiCommandInventoryDropItem
-exit /b
+if "%py.pack.unique_items%"=="0" (
+    if "%py.equipment_count%"=="0" (
+        call ui_io.cmd :printMessage "But you are not carrying anything."
+        exit /b 1
+    )
+)
+
+if not "!dg.floor[%py.pos.y%][%py.pos.x%].treasure_id!"=="0" (
+    call ui_io.cmd :printMessage "There's no room to drop anything here."
+    exit /b 1
+)
+
+set "set_command=0"
+if "%game.screen.current_screen_id%"=="%Screen.Equipment%" (
+    if %py.equipment_count% GTR 0 set "set_command=1"
+)
+if "%py.pack.unique_items%"=="0" set "set_command=1"
+if "!set_command!"=="1" (
+    if not "%game.screen.current_screen_id%"=="%Screen.Blank%" (
+        call :uiCommandSwitchScreen "%Screen.Equipment%"
+    )
+    set "%~1=r"
+) else if not "%game.screen.current_screen_id%"=="%Screen.Blank%" (
+    call :uiCommandSwitchScreen "%Screen.Inventory%"
+)
+exit /b 0
 
 :uiCommandInventoryWearWieldItem
 exit /b
