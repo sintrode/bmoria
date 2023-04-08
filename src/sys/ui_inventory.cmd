@@ -549,7 +549,38 @@ if !m! LEQ %to% (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Builds a prompt for later use
+::
+:: Arguments: %1 - A variable to hold the prompt string
+::            %2 - An integer to represent the first item in the list
+::            %3 - An integer to represent the last item in the list
+::            %4 - A string to include a swap command
+::            %5 - The command to perform the triggering action
+::            %6 - The prompt string, a verbose form of %5
+:: Returns:   None
+::------------------------------------------------------------------------------
 :buildCommandHeading
+set "from=%~2"
+set "to=%~3"
+set "swap=%~4"
+set "command=%~5"
+set "prompt=%~6"
+
+set /a from+=97, to+=97
+cmd /c exit /b %from%
+set "from_letter=!=ExitCodeAscii!"
+cmd /c exit /b %to%
+set "to_letter=!=ExitCodeAscii!"
+
+set "list="
+if "%game.screen.current_screen_id%"=="%Screen.Blank%" set "list=, * to list"
+
+set "digits="
+if "%command%"=="w" set "digits=, 0-9"
+if "%command%"=="d" set "digits=, 0-9"
+
+set "%~1=(%from_letter%-%to_letter%%list%%swap%%digits%, space to break, Q to quit) %prompt% which one?"
 exit /b
 
 :changeScreenForCommand
