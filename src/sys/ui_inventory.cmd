@@ -175,8 +175,74 @@ if "%~1"=="%PlayerEquipment.Wield%" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display equipment items
+::
+:: Arguments: %1 - Determines if the item weights should be shown
+::            %2 - The rightmost column
+:: Returns:   The leftmost column to display on
+::------------------------------------------------------------------------------
 :displayEquipment
-exit /b
+set "show_weights=%~1"
+set "column=%~2"
+
+for /L %%A in (0,1,11) do set "descriptions[%%A]="
+set /a len=79-%column%
+if "%show_weights%"=="true" (
+    set "lim=52"
+) else (
+    set "lim=60"
+)
+
+set "line=0"
+for /L %%A in (22,1,33) do (
+    if not "!py.inventory[%%A].category_id!"=="%TV_NOTHING%" (
+        call :equipmentPositionDescription %%A "!py.inventory[%%A].weight!" "equipped_description"
+        call identification.cmd :itemDescription "description" "!py.inventory[%%A]!" "true"
+        set "description=!description:~0,%lim%!"
+
+        call scores.cmd :sprintf "pad_description" "!equipped_description!" -14
+        set /a line_letter=!line!+97
+        cmd /c exit /b !line_letter!
+        set "tmp_desc=!=ExitCodeAscii!) !pad_description!: !description!"
+        set "descriptions[!line!]=!tmp_desc!"
+        call helpers.cmd :getLength "!tmp_desc!" str_len
+        set /a l=!str_len!+2
+        set "tmp_desc="
+
+        if "!show_weights!"=="true" set /a l+=9
+        if !l! GTR !len! set "len=!l!"
+
+        set /a line+=1
+    )
+)
+
+set /a column=79-%len%
+if %column% LSS 0 set "column=0"
+
+set "line=0"
+for /L %%A in (22,1,33) do (
+    if not "!py.inventory[%%A].category_id!"=="%TV_NOTHING%" (
+        for /F "delims=" %%B in ("!line!") do (
+            set /a line_inc=%%B+1
+            if "%column%"=="0" (
+                call ui_io.cmd :putStringClearToEOL "!descriptions[%%B]!" "!line_inc!;%column%"
+            ) else (
+                call ui_io.cmd :putString "  " "!line_inc!;%column%"
+                set /a col_inc=%column%+2
+                call ui_io.cmd :putStringClearToEOL "!descriptions[%%B]!" "!line_inc!;!col_inc!"
+            )
+            if "!show_weights!"=="true" (
+                call :inventoryItemWeightText "text" %%A
+                call ui_io.cmd :putStringClearToEOL "!text!" "!line_inc!;71"
+            )
+        )
+
+        set /a line+=1
+    )
+)
+call ui_io.cmd :eraseLine "!line_inc!;%column%"
+exit /b %column%
 
 :showEquipmentHelpMenu
 exit /b
