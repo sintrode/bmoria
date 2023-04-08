@@ -414,8 +414,44 @@ if "!set_command!"=="1" (
 )
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Validator for accessing the Wear screen
+::
+:: Arguments: None
+:: Returns:   0 if the player was able to access the Wear screen
+::            1 if the player has nothing to wear or wield
+::------------------------------------------------------------------------------
 :uiCommandInventoryWearWieldItem
-exit /b
+set "game.screen.wear_low_id=0"
+for /L %%A in (0,1,%py.pack.unique_items%) do (
+    for /f "delims=" %%B in ("!game.screen.wear_low_id!") do (
+        if !py.inventory[%%~B].category_id! GTR %TV_MAX_WEAR% (
+            set /a game.screen.wear_low_id+=1
+        )
+    )
+)
+
+set "game.screen.wear_high_id=!game.screen.wear_low_id!"
+for /L %%A in (!game.screen.wear_low_id!,1,%py.pack.unique_items%) do (
+    for /f "delims=" %%B in ("!game.screen.wear_high_id!") do (
+        if !py.inventory[%%~B].category_id! GEQ %TV_MIN_WEAR% (
+            set /a game.screen.wear_high_id+=1
+        )
+    )
+)
+set /a game.screen.wear_high_id-=1
+
+if !game.screen.wear_low_id! GTR !game.screen.wear_high_id! (
+    call ui_io.cmd :printMessage "You have nothing to wear or wield."
+    exit /b 1
+)
+
+if not "!game.screen.current_screen_id!"=="%Screen.Blank%" (
+    if not "!game.screen.current_screen_id!"=="%Screen.Inventory%" (
+        call :uiCommandSwitchScreen "%Screen.Wear%"
+    )
+)
+exit /b 0
 
 :uiCommandInventoryUnwieldItem
 exit /b
