@@ -263,7 +263,47 @@ call ui_io.cmd :putStringClearToEOL "  i: inventory of pack" "6;%left_column%"
 call ui_io.cmd :putStringClearToEOL "  e: list used equipment" "7;%left_column%"
 exit /b 7
 
+::------------------------------------------------------------------------------
+:: Allows different inventory subscreens to be displayed
+::
+:: Arguments: %1 - The screen to switch to
+:: Returns:   None
+::------------------------------------------------------------------------------
 :uiCommandSwitchScreen
+set "next_screen=%~1"
+if "%next_screen%"=="%game.screen.current_screen_id%" exit /b
+set "%game.screen.current_screen_id%=%next_screen%"
+
+set "current_line_pos=0"
+if "%next_screen%"=="%Screen.Help%" (
+    call :showEquipmentHelpMenu "%game.screen.screen_left_pos%"
+    set "current_line_pos=!errorlevel!"
+) else if "%next_screen%"=="%Screen.Inventory%" (
+    set /a unique_items_dec=%py.pack.unique_items%-1
+    call :displayInventoryItems 0 "!unique_items_dec!" "%config.options.show_inventory_weights%" "%game.screen.screen_left_pos%" "CNIL"
+    set "game.screen.screen_left_pos=!errorlevel!"
+    set "current_line_pos=%py.pack.unique_items%"
+) else if "%next_screen%"=="%Screen.Wear%" (
+    call :displayInventoryItems "%game.screen.wear_low_id%" "%game.screen.wear_high_id%" "%config.options.show_inventory_weights%" "%game.screen.screen_left_pos%" "CNIL"
+    set "game.screen.screen_left_pos=!errorlevel!"
+    set /a current_line_pos=%game.screen.wear_high_id% - %game.screen.wear_low_id% + 1
+) else if "%next_screen%"=="%Screen.Equipment%" (
+    call :displayEquipment "%config.options.show_inventory_weights%" "%game.screen.screen_left_pos%"
+    set "game.screen.screen_left_pos=!errorlevel!"
+    set "current_line_pos=%py.equipment_count%"
+)
+
+if !current_line_pos! GEQ %game.screen.screen_bottom_pos% (
+    set /a game.screen.screen_bottom_pos=!current_line_pos! + 1
+    call ui_io.cmd :eraseLine "!game.screen.screen_bottom_pos!;!game.screen.screen_left_pos!"
+    exit /b
+)
+set /a current_line_pos+=1
+
+for /L %%A in (!current_line_pos!,1,!game.screen.screen_bottom_pos!) do (
+    call ui_io.cmd :eraseLine "%%A;!game.screen.screen_left_pos!"
+)
+set "current_line_pos=!game.screen.screen_bottom_pos!"
 exit /b
 
 :verifyAction
