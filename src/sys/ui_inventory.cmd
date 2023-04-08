@@ -306,8 +306,19 @@ for /L %%A in (!current_line_pos!,1,!game.screen.screen_bottom_pos!) do (
 set "current_line_pos=!game.screen.screen_bottom_pos!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Confirm if the user wants to wear or read an item
+::
+:: Arguments: %1 - The prompt to display before getting input
+::            %2 - The index of the item being manipulated
+:: Returns:   0 if the user agrees
+::            1 if the user wants to back out
+::------------------------------------------------------------------------------
 :verifyAction
-exit /b
+call identification.cmd :itemDescription "description" "py.inventory[%~1]" "true"
+set "description=!description:~0,-1!?"
+call ui_io.cmd :getInputConfirmation "%~1 !description!"
+exit /b !errorlevel!
 
 :requestAndShowInventoryScreen
 exit /b
