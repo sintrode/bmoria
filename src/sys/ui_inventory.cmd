@@ -583,7 +583,24 @@ if "%command%"=="d" set "digits=, 0-9"
 set "%~1=(%from_letter%-%to_letter%%list%%swap%%digits%, space to break, Q to quit) %prompt% which one?"
 exit /b
 
+::------------------------------------------------------------------------------
+:: A wrapper for switching the screen while in the inventory
+::
+:: Arguments: %1 - The command passed to the menu
+:: Returns:   None
+::------------------------------------------------------------------------------
 :changeScreenForCommand
+if "%~1"=="t" (
+    call :uiCommandSwitchScreen "%Screen.Equipment%"
+) else if "%~1"=="r" (
+    call :uiCommandSwitchScreen "%Screen.Equipment%"
+) else if "%~1"=="w" (
+    if not "%game.screen.current_screen_id%"=="%Screen.Inventory%" (
+        call :uiCommandSwitchScreen "%Screen.Wear%"
+    )
+) else (
+    call :uiCommandSwitchScreen "%Screen.Inventory%"
+)
 exit /b
 
 :flipInventoryEquipmentScreens
