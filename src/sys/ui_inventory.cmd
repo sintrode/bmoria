@@ -320,7 +320,38 @@ set "description=!description:~0,-1!?"
 call ui_io.cmd :getInputConfirmation "%~1 !description!"
 exit /b !errorlevel!
 
+::------------------------------------------------------------------------------
+:: Update the inventory screen after something happens
+::
+:: Arguments: %1 - Determine if the user should be prompted to continue
+:: Returns:   None
+::------------------------------------------------------------------------------
 :requestAndShowInventoryScreen
+if "%game.doing_inventory_command%"=="0" (
+    set "game.screen.screen_left_pos=0"
+    set "game.screen.screen_bottom_pos=0"
+    set "game.screen.current_screen_id=%Screen.Blank%"
+    exit /b
+)
+
+if "%screen_has_changed%"=="true" (
+    if "%~1"=="true" (
+        set "game.doing_inventory_command=0"
+        exit /b
+    )
+    call ui_io.cmd :getInputConfirmation "Continuing with inventory command?"
+    if "!errorlevel!"=="1" (
+        set "game.doing_inventory_command=0"
+        exit /b
+    )
+
+    set "game.screen.screen_left_pos=50"
+    set "game.screen.screen_bottom_pos=0"
+)
+
+set "current_screen=%game.screen.current_screen_id%"
+set "game.screen.current_screen_id=%Screen.Wrong%"
+call :uiCommandSwitchScreen "%current_screen%"
 exit /b
 
 :uiCommandInventoryTakeOffItem
