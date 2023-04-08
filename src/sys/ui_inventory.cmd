@@ -354,8 +354,30 @@ set "game.screen.current_screen_id=%Screen.Wrong%"
 call :uiCommandSwitchScreen "%current_screen%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Handle unequipping items
+::
+:: Arguments: None
+:: Returns:   0 if the player removes an item
+::            1 if the player has nothing equipped or no room to store the item
+::------------------------------------------------------------------------------
 :uiCommandInventoryTakeOffItem
-exit /b
+if "%py.equipment_count%"=="0" (
+    call ui_io.cmd :printMessage "You are not using any equipment."
+    exit /b 1
+)
+
+if %py.pack.unique_items% GEQ %PlayerEquipment.Wield% (
+    if "%game.doing_inventory_command%"=="0" (
+        call ui_io.cmd :printMessage "You will have to drop something first."
+        exit /b 1
+    )
+)
+
+if not "%game.screen.current_screen_id%"=="%Screen.Blank%" (
+    call :uiCommandSwitchScreen "%Screen.Equipment%"
+)
+exit /b 0
 
 :uiCommandInventoryDropItem
 exit /b
