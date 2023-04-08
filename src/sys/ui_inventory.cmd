@@ -244,8 +244,24 @@ for /L %%A in (22,1,33) do (
 call ui_io.cmd :eraseLine "!line_inc!;%column%"
 exit /b %column%
 
+::------------------------------------------------------------------------------
+:: Display the Help menu for the inventory
+::
+:: Arguments: %1 - The leftmost column of the text
+:: Returns:   7 always
+::------------------------------------------------------------------------------
 :showEquipmentHelpMenu
-exit /b
+set "left_column=%~1"
+if %left_column% GTR 52 set "left_column=52"
+
+call ui_io.cmd :putStringClearToEOL "  Q: quit" "1;%left_column%"
+call ui_io.cmd :putStringClearToEOL "  w: wear or wield object" "2;%left_column%"
+call ui_io.cmd :putStringClearToEOL "  t: take off item" "3;%left_column%"
+call ui_io.cmd :putStringClearToEOL "  d: drop object" "4;%left_column%"
+call ui_io.cmd :putStringClearToEOL "  x: exchange weapons" "5;%left_column%"
+call ui_io.cmd :putStringClearToEOL "  i: inventory of pack" "6;%left_column%"
+call ui_io.cmd :putStringClearToEOL "  e: list used equipment" "7;%left_column%"
+exit /b 7
 
 :uiCommandSwitchScreen
 exit /b
