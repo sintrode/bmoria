@@ -500,7 +500,53 @@ set "py.weapon_is_heavy=false"
 call player.cmd :playerStrength
 exit /b
 
+::------------------------------------------------------------------------------
+:: Look for an item based on provided search criteria
+::
+:: Arguments: %1 - The item to look for
+::            %2 - The command that was used to get here
+::            %3 - The first item in the inventory to look at
+::            %4 - The last item in the inventory to look at
+::: Returns:  The item_id of the selected item
+::------------------------------------------------------------------------------
 :inventoryGetItemMatchingInscription
+set "which=%~1"
+set "command=%~2"
+set "from=%~3"
+set "to=%~4"
+
+call helpers.cmd :charToDec "%which%"
+set "which_ascii=!errorlevel!"
+
+if !which_ascii! GEQ 48 if !which_ascii! LEQ 57 (
+    if not "%command%"=="r" if not "%command%"=="t" (
+        set "m=%from%"
+        call :inventoryGetItemMatchingInscriptionWhileLoop
+
+        if !m! LEQ %to% (
+            set "item_id=!m!"
+        ) else (
+            set "item_id=-1"
+        )
+    )
+) else if !which_ascii! GEQ 65 if !which_ascii! LEQ 90 (
+    set /a item_id=!which_ascii!-65
+) else (
+    set /a item_id=!which_ascii!-97
+)
+exit /b !item_id!
+
+:inventoryGetItemMatchingInscriptionWhileLoop
+set "tmp_m=!m!"
+if !m! LEQ %to% (
+    if !m! LSS %PLAYER_INVENTORY_SIZE% (
+        set "m_inc=0"
+        if not "!py.inventory[%tmp_m%].inscription:~0,1!"=="%which%" set "m_inc=1"
+        if not "!py.inventory[%tmp_m%].inscription:~1,1!"=="" set "m_inc=1"
+        if "!m_inc!"=="1" set /a m+=1
+        goto :inventoryGetItemMatchingInscriptionWhileLoop
+    )
+)
 exit /b
 
 :buildCommandHeading

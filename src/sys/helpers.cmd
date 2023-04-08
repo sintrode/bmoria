@@ -184,3 +184,22 @@ set "char=!char:~0,1!"
 for /f "delims=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" %%A in ("!char!") do exit /b 0
 for /f "delims=abcdefghijklmnopqrstuvwxyz" %%A in ("!char!") do exit /b 1
 exit /b 2
+
+::------------------------------------------------------------------------------
+:: Converts an ASCII character to its decimal value
+::
+:: Arguments: %1 - The character to convert
+:: Returns:   The decimal value of the character (41 for A, 61 for a, etc.)
+::------------------------------------------------------------------------------
+:charToDec
+set "char=%~1"
+set "char=!char:~0,1!"
+>bit_file echo !char!
+fsutil file createnew zero.tmp 1 > NUL
+set "hex="
+for /F "skip=1 tokens=2" %%a in ('fc /B bit_file zero.tmp') do (
+    if not defined hex set "hex=%%a"
+)
+set /a dec=0x!hex!
+del zero.tmp bit_file
+exit /b !dec!
