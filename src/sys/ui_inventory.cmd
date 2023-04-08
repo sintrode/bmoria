@@ -617,8 +617,36 @@ if "%game.screen.current_screen_id%"=="%Screen.Equipment%" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determine where to place rings, which famously can only go on one finger
+:: per hand and can't share a hand with other rings
+::
+:: Arguments: None
+:: Returns:   The PlayerEquipment enum value representing which hand to use
+::------------------------------------------------------------------------------
 :requestPutRingOnWhichHand
-exit /b
+set "hand=0"
+
+:requestPutRingOnWhichHandWhileLoop
+call ui_io.cmd :getMenuItem "Put ring on which hand (l/r)?" "query"
+if "!errorlevel!"=="1" (
+    set "hand=-1"
+) else (
+    if /I "!query!"=="l" (
+        set "hand=%PlayerEquipment.Left%"
+    ) else if /I "!query!"=="r" (
+        set "hand=%PlayerEquipment.Right%"
+    ) else (
+        call ui_io.cmd :terminalBellSound
+        if not "!hand!"=="0" (
+            call :verifyAction "Replace" "!hand!"
+            if "!errorlevel!"=="1" set "hand=0"
+        )
+    )
+)
+if "!hand!"=="0" goto :requestPutRingOnWhichHandWhileLoop
+
+exit /b !hand!
 
 :inventoryGetSlotToWearEquipment
 exit /b
