@@ -453,7 +453,51 @@ if not "!game.screen.current_screen_id!"=="%Screen.Blank%" (
 )
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Try to unwield an item
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :uiCommandInventoryUnwieldItem
+call player.cmd :playerIsWieldingItem
+if "!errorlevel!"=="1" (
+    call ui_io.cmd :printMessage "But you are wielding no weapon."
+    exit /b
+)
+
+call player.cmd :playerWornItemIsCursed "%PlayerEquipment.Wield%"
+if "!errorlevel!"=="0" (
+    call identification.cmd :itemDescription "description" "py.inventory[%PlayerEquipment.Wield%]" "false"
+    call ui_io.cmd :printMessage "The !description! you are wielding appears to be cursed."
+    exit /b
+)
+
+set "game.player_turn_free=false"
+
+:: Swap auxiliary and wield weapons
+call inventory.cmd :inventoryCopyItem "saved_item" "py.inventory[%playerEquipment.Auxiliary%]"
+call inventory.cmd :inventoryCopyItem "py.inventory[%PlayerEquipment.Auxiliary%]" "py.inventory[%PlayerEquipment.Wield%]"
+call inventory.cmd :inventoryCopyItem "py.inventory[%playerEquipment.Wield%]" "saved_item"
+
+if "%game.screen.current_screen_id%"=="%Screen.Equipment%" (
+    call :displayEquipment "%config.options.show_inventory_weights%" "%game.screen.screen_left_pos%"
+    set "game.screen.screen_left_pos=!errorlevel!"
+)
+
+call player.cmd :playerAdjustBonusesForItem "py.inventory[%PlayerEquipment.Auxiliary%]" -1
+call player.cmd :playerAdjustBonusesForItem "py.inventory[%PlayerEquipment.Wield%]" 1
+
+if not "!py.inventory[%PlayerEquipment.Wield%].category_id!"=="%TV_NOTHING%" (
+    set "label=Primary weapon   : "
+    call inventory.cmd :itemDescription "description" "py.inventory[%PlayerEquipment.Wield%]" "true"
+    call ui_io.cmd :printMessage "!label! !description!"
+) else (
+    call ui_io.cmd :printMessage "No primary weapon."
+)
+
+set "py.weapon_is_heavy=false"
+call player.cmd :playerStrength
 exit /b
 
 :inventoryGetItemMatchingInscription
