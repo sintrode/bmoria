@@ -603,7 +603,18 @@ if "%~1"=="t" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Toggle between the Equipment and Inventory screens
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :flipInventoryEquipmentScreens
+if "%game.screen.current_screen_id%"=="%Screen.Equipment%" (
+    call :uiCommandSwitchScreen "%Screen.Inventory%"
+) else if "%game.screen.current_screen_id%"=="%Screen.Equipment%" (
+    call :uiCommandSwitchScreen "%Screen.Equipment%"
+)
 exit /b
 
 :requestPutRingOnWhichHand
