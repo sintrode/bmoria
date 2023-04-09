@@ -946,8 +946,115 @@ if "%py.pack.unique_items%"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Select an item for later use
+::
+:: Arguments: %1 - The command that was given to get here
+::            %2 - A variable to hold a subcommand
+::            %3 - Determines if an item was selected or not
+:: Returns:   0 if an item was selected
+::            1 if the process was aborted or otherwise failed
+::------------------------------------------------------------------------------
 :selectItemCommands
-exit /b
+set "command=%~1"
+set "which=%~2"
+set "selecting=%~3"
+
+:selectItemCommandsWhileLoop
+if "!selecting!"=="false" exit /b 1
+if "!game.player_free_turn!"=="false" exit /b !bool_values[%selecting%]!
+
+set "swap="
+if "%command%"=="w" (
+    set "from_line=%game.screen.wear_low_id%"
+    set "to_line=%game.screen.wear_high_id%"
+    set "str_prompt=Wear/Wield"
+) else (
+    set "from_line=0"
+    if "%command%"=="d" (
+        set /a to_line=%py.pack.unique_items% - 1
+        set "str_prompt=Drop"
+
+        if %py.equipment_count% GTR 0 (
+            set "swap=, / for Equip"
+        )
+    ) else (
+        set /a to_line=%py.equipment_count% - 1
+        if "%command%"=="t" (
+            set "str_prompt=Take off"
+        ) else (
+            set "str_prompt=Throw off"
+            if %py.pack.unique_items% GTR 0 (
+                set "swap=, / for Inven"
+            )
+        )
+    )
+)
+
+if %from_line% GTR %to_line% exit /b 1
+
+:: TODO: See if there are scenarios where only swap or only str_prompt are present
+call :buildCommandHeading "heading_msg" "%from_line%" "%to_line%" "%swap%" "%str_prompt%"
+
+:: Abort everything
+call ui_io/cmd :getCommand "heading_msg" "%which%"
+if "!errorlevel!"=="1" (
+    set "which=Q"
+    exit /b 1
+)
+
+:: Draw the screen and maybe exit main prompt
+if "%which%"==" " (
+    call :changeScreenForCommand "%command%"
+    exit /b 1
+)
+if "%which%"=="*" (
+    call :changeScreenForCommand "%command%"
+    goto :selectItemCommandsWhileLoop
+)
+
+:: Swap screens for dropping items
+if "%which%"=="/" (
+    if not "%swap%"=="" (
+        if "%command%"=="d" (
+            set "command=r"
+        ) else (
+            set "command=d"
+        )
+        call :flipInventoryEquipmentScreens
+        goto :selectItemCommandsWhileLoop
+    )
+)
+
+:: Look for an item whose description matches "which"
+call :inventoryGetItemMatchingInscription "%which%" "%command%" "%from_line%" "%to_line%"
+set "item_id=!errorlevel!"
+set "is_invalid=0"
+if !item_id! LSS %from_line% set "is_invalid=1"
+if !item_id! GTR %to_line% set "is_invalid=1"
+if "!is_invalid!"=="1" (
+    call ui_io.cmd :terminalBellSound
+    goto :selectItemCommandsWhileLoop
+)
+
+:: Do something with the item that was found
+if "%command%"=="r" (
+    call :executeRemoveItemCommand "!selecting!" "%item_id%" "%command%" "%which%" "%str_prompt%" || exit /b 1
+) else if "%command%"=="t" (
+    call :executeRemoveItemCommand "!selecting!" "%item_id%" "%command%" "%which%" "%str_prompt%" || exit /b 1
+) else if "%command%"=="w" (
+    call :executeWearItemCommand "%item_id%" "%which%" "%str_prompt%"
+) else (
+    call :executeDropItemCommand "%item_id%" "%which%" "%str_prompt%"
+    exit /b 1
+)
+
+if "!game.player_free_turn!"=="false" (
+    if "%game.screen.current_screen_id%"=="%Screen.Blank%" (
+        exit /b 1
+    )
+)
+goto :selectItemCommandsWhileLoop
 
 :inventoryDisplayAppropriateHeader
 exit /b

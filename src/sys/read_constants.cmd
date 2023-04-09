@@ -7,6 +7,10 @@
 ::------------------------------------------------------------------------------
 @echo off
 
+::----- general
+set "bool_values[false]=1"
+set "bool_values[true]=0"
+
 ::----- dungeon_tile.h
 set "tile_null_wall=0"
 set "tile_dark_floor=1"
