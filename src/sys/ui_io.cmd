@@ -130,7 +130,14 @@ if "!message_ready_to_print!"=="true" call :printMessage "CNIL"
 cls
 exit /b
 
+::------------------------------------------------------------------------------
+:: Clears all rows from the specified row down
+::
+:: Arguments: %1 - The first row to clear
+:: Returns:   None
+::------------------------------------------------------------------------------
 :clearToBottom
+echo %ESC%[%~1;1H%ESC%[0J
 exit /b
 
 :moveCursor
