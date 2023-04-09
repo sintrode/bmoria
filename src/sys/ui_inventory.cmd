@@ -698,7 +698,21 @@ if defined slot[%~1] (
 )
 exit /b %slot%
 
+::------------------------------------------------------------------------------
+:: Indicate that an item is cursed
+::
+:: Arguments: %1 - The item_id of the specified item
+:: Returns:   None
+::------------------------------------------------------------------------------
 :inventoryItemIsCursedMessage
+call identification.cmd :itemDescription "description" "py.inventory[%~1]" "false"
+set "msg=The !description! you are"
+if "%~1"=="%PlayerEquipment.Head%" (
+    set "msg=!msg! wielding"
+) else (
+    set "msg=!msg! wearing"
+)
+call ui_io.cmd :printMessage "!msg! appears to be cursed."
 exit /b
 
 :executeRemoveItemCommand
