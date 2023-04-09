@@ -185,7 +185,24 @@ set "out_str=!out_str:~0,79!"
 <nul set /p ".=%ESC%[%~2H%~1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Clear a line and display a message on it
+::
+:: Arguments: %1 - The string to display
+::            %2 - The coordinates to place the text
+:: Returns:   None
+::------------------------------------------------------------------------------
 :putStringClearToEOL
+for /f "tokens=1,2 delims=;" %%A in ("%~2") do (
+    if "%%~B"=="%MSG_LINE%" (
+        if "!message_ready_to_print!"=="true" (
+            call :printMessage "CNIL"
+        )
+    )
+)
+
+<nul set /p ".=%ESC%[%~2H%ESC%[0K"
+call :putString %*
 exit /b
 
 :eraseLine
