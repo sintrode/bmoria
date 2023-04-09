@@ -565,7 +565,7 @@ set "from=%~2"
 set "to=%~3"
 set "swap=%~4"
 set "command=%~5"
-set "prompt=%~6"
+set "str_prompt=%~6"
 
 set /a from+=97, to+=97
 cmd /c exit /b %from%
@@ -580,7 +580,7 @@ set "digits="
 if "%command%"=="w" set "digits=, 0-9"
 if "%command%"=="d" set "digits=, 0-9"
 
-set "%~1=(%from_letter%-%to_letter%%list%%swap%%digits%, space to break, Q to quit) %prompt% which one?"
+set "%~1=(%from_letter%-%to_letter%%list%%swap%%digits%, space to break, Q to quit) %str_prompt% which one?"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -715,8 +715,80 @@ if "%~1"=="%PlayerEquipment.Head%" (
 call ui_io.cmd :printMessage "!msg! appears to be cursed."
 exit /b
 
+::------------------------------------------------------------------------------
+:: Determine which item to remove
+::
+:: Arguments: %1 - Determines if the item is being selected or not
+::            %2 - The item_id of the specified item
+::            %3 - A reference to the command that was used to get here
+::            %4 - The button that was pressed to specify the item
+::            %5 - The prompt to display during verification
+:: Returns:   0 if the item is not being removed
+::            1 if the item will be removed
+::------------------------------------------------------------------------------
 :executeRemoveItemCommand
-exit /b
+set "item_id=%~2"
+set "command=%~3"
+set "which=%~4"
+set "str_prompt=%~5"
+
+set "item_id_to_take_off=%~2"
+set "item_id=21"
+:executeRemoveItemCommandWhileLoop
+set /a item_id+=1
+for /f "delims=" %%A in ("!item_id!") do (
+    if not "!py.inventory[%%~B].category_id!"=="%TV_NOTHING%" (
+        set /a item_id_to_take_off-=1
+    )
+)
+if %item_id_to_take_off% GEQ 0 goto :executeRemoveItemCommandWhileLoop
+
+set "is_valid_letter=0"
+call helpers.cmd :isUpper "%which%"
+if "!errorlevel!"=="1" set /a is_valid_letter+=1
+call :verifyAction "%str_prompt%" "%item_id%"
+if "!errorlevel!"=="1" set /a is_valid_letter+=1
+if "!is_valid_letter!"=="2" (
+    set "item_id=-1"
+) else (
+    call inventory.cmd :inventoryItemIsCursed "py.inventory[%item_id%]"
+    if "!errorlevel!"=="0" (
+        set /a "item_id=-1"
+        call ui_io.cmd :printMessage "Hmm, it seems to be cursed."
+    ) else if "!%command%!"=="t" (
+        call inventory.cmd :inventoryCanCarryItemCount "py.inventory[%item_id%]"
+        if "!errorlevel!"=="1" (
+            if not "!dg.floor[%py.pos.y%][%py.pos.x%].treasure_id!"=="0" (
+                set "item_id=-1"
+                call ui_io.cmd :printMessage "You can't carry it."
+            ) else (
+                call ui_io.cmd :getInputConfirmation "You can't carry it. Drop it?"
+                if "!errorlevel!"=="0" (
+                    set "%~3=r"
+                ) else (
+                    set "item_id=-1"
+                )
+            )
+        )
+    )
+)
+
+if %item_id% GEQ 0 (
+    if "!%command%!"=="r" (
+        call inventory.cmd :inventoryDropItem "%item_id%" "true"
+
+        if "%py.pack.unique_items%"=="0" if "%py.equipment_count%"=="0" set "py.pack.weight=0"
+    ) else (
+        call inventory.cmd :inventoryCarryItem "py.inventory[%item_id%]"
+        call player.cmd :playerTakeOff "%item_id%" "!errorlevel!"
+    )
+
+    call player.cmd :playerStrength
+    set "game.player_free_turn=false"
+
+    if "!%command%!"=="r" set "%~1=false"
+)
+exit /b %~1
 
 :executeWearItemCommand
 exit /b
