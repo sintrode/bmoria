@@ -250,10 +250,22 @@ for /f "tokens=1,2 delims=;" %%A in ("%~2") do (
 <nul set /p ".=%ESC%[%coord.y%;%coord.x%H%~1"
 exit /b
 
-:currentCursorPosition
-exit /b
-
+::------------------------------------------------------------------------------
+:: Print a line of text to the message line, clearing the line first
+::
+:: Arguments: %1 - The message to display
+:: Returns:   None
+::------------------------------------------------------------------------------
 :messageLinePrintMessage
+:: Save the current cursor position
+echo %ESC%7
+
+set "message=%~1"
+set "message=!message:~0,79!"
+<nul set /p ".=%ESC%[0;0H%ESC%[0J!message!"
+
+:: Restore the cursor position
+echo %ESC%8
 exit /b
 
 :messageLineClear
