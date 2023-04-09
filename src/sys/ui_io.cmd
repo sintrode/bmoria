@@ -119,7 +119,15 @@ if not "!eof_flag!"=="0" exit /b
 call :checkForNonBlockingKeyPress 0
 exit /b
 
+::------------------------------------------------------------------------------
+:: Clears the screen, printing an extra line first if necessary
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :clearScreen
+if "!message_ready_to_print!"=="true" call :printMessage "CNIL"
+cls
 exit /b
 
 :clearToBottom
