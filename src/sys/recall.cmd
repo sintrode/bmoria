@@ -775,7 +775,8 @@ for %%A in (no_charm sleepless warm_blooded movement_type known) do (
     set "%%A="
 )
 
-call ui_io.cmd :getKeyInput
+call ui_io.cmd :getKeyInput key
+call helpers.cmd :charToDec "!key!"
 exit /b !errorlevel!
 
 :copyMemory

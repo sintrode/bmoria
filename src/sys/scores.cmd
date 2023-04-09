@@ -200,7 +200,7 @@ goto :showScoresScreenInnerWhile
 call ui_io.cmd :putStringClearToEOL "Rank  Points Name              Sex Race       Class  Lvl Killed By" "0;0"
 call ui_io.cmd :eraseLine "1;0"
 call ui_io.cmd :putStringClearToEOL "[ press any key to continue ]" "23;23"
-call ui_io.cmd :getKeyInput
+call ui_io.cmd :getKeyInput key
 if "!key!"=="Q" exit /b
 goto :showScoresScreenOuterWhile
 

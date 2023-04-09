@@ -1132,7 +1132,84 @@ if "%py.equipment_count%"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: The main Inventory subroutine
+::
+:: Arguments: %1 - The command that was given to get here
+:: Returns:   None
+::------------------------------------------------------------------------------
 :inventoryExecuteCommand
+set "command=%~1"
+set "game.player_free_turn=true"
+call ui_io.cmd :terminalSaveScreen
+
+set "recover_screen=false"
+if "%command%"==" " set "recover_screen=true"
+call :requestAndShowInventoryScreen "%recover_screen%"
+
+:inventoryExecuteCommandWhileLoop
+set "selecting=false"
+if /I "%command%"=="i" (
+    call :uiCommandDisplayInventory
+) else if /I "%command%"=="e" (
+    call :uiCommandDisplayEquipment
+) else if /I "%command%"=="t" (
+    call :uiCommandInventoryTakeOffItem "!selecting!"
+    if "!errorlevel!"=="0" set "selecting=true"
+) else if /I "%command%"=="d" (
+    call :uiCommandInventoryDropItem "%command%" "!selecting!"
+    if "!errorlevel!"=="0" set "selecting=true"
+) else if /I "%command%"=="w" (
+    call :uiCommandInventoryWearWieldItem "!selecting!"
+    if "!errorlevel!"=="0" set "selecting=true"
+) else if /I "%command%"=="x" (
+    call :uiCommandInventoryUnwieldItem
+) else if /I "%command%"=="?" (
+    call :uiCommandSwitchScreen "%Screen.Help%"
+) else if /I "%command%"==" " (
+    REM dummy command to return to the main prompt
+) else (
+    call ui_io.cmd :terminalBellSound
+)
+
+set "game.doing_inventory_command=0"
+set "which=z"
+
+call :selectItemCommands "%command%" "which" "!selecting!"
+if "!errorlevel!"=="0" (
+    set "selecting=true"
+) else (
+    set "selecting=false"
+)
+
+if "!which!"=="Q" (
+    set "command=Q"
+) else if "%game.screen.current_screen_id%"=="%Screen.Blank%" (
+    set "command=Q"
+) else if "!game.player_free_turn!"=="false" (
+    REM Save state for recovery in case this is called again
+    if "!selecting!"=="true" (
+        set "game.doing_inventory_command=!command!"
+    ) else (
+        set "game.doing_inventory_command= "
+    )
+
+    REM Flush last message before clearing screen_has_changed
+    call ui_io.cmd :printMessage "CNIL"
+
+    REM Let us know if the world has changed
+    set "screen_has_changed=false"
+    set "command=Q"
+) else (
+    call :inventoryDisplayAppropriateHeader
+    call ui_io.cmd :putString "e\i\t\w\x\d\?\Q:" "%game.screen.screen_bottom_pos%;60"
+    call ui_io.cmd :getKeyInput command
+    call ui_io.cmd :eraseLine "%game.screen.screen_bottom_pos%;%game.screen.screen_left_pos%"
+)
+if not "!command!"=="Q" goto :inventoryExecuteCommandWhileLoop
+
+if not "%game.screen.current_screen_id%"=="%Screen.Blank%" call ui_io.cmd :terminalRestoreScreen
+call player.cmd :playerRecalculateBonuses
 exit /b
 
 :inventorySwitchPackMenu
