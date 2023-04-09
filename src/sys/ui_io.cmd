@@ -1,3 +1,10 @@
+::------------------------------------------------------------------------------
+:: In case you were wondering why all of the coordinates in the game are in Y;X
+:: format, it's specifically for this script. There's a non-zero chance that
+:: everything has an off-by-one error since ncurses thinks the top-left corner
+:: is 0,0 and VT100 thinks the top-left corner is 1,1 but we can adjust values
+:: as necessary
+::------------------------------------------------------------------------------
 @echo off
 call %*
 exit /b
@@ -140,7 +147,16 @@ exit /b
 echo %ESC%[%~1;1H%ESC%[0J
 exit /b
 
+::------------------------------------------------------------------------------
+:: Move the location of the cursor. We're using set /p instead of echo so that
+:: we don't end up on the next line, and the . is in front of the = purely for
+:: syntax highlighting reasons; it isn't necessary.
+::
+:: Arguments: %1 - A string in "Y;X" format
+:: Returns:   None
+::------------------------------------------------------------------------------
 :moveCursor
+<nul set /p ".=%~1"
 exit /b
 
 :addChar
