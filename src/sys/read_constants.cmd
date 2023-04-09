@@ -512,4 +512,8 @@ for %%A in (CloseMenu Equipment Inventory) do (
     set "PackMenu.%%A=!counter!"
     set /a counter+=1
 )
+
+::----- ui_io.cpp
+set "eof_flag=0"
+set "panic_save=false"
 exit /b

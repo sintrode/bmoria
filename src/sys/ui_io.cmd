@@ -2,7 +2,13 @@
 call %*
 exit /b
 
+::------------------------------------------------------------------------------
+:: Originally a bunch of stuff for ncurses that prevents people from inputting
+:: CTRL+C or displaying entered characters. We're not going to do any of that
+:: stuff because of how we're taking input, so this is super short.
+::------------------------------------------------------------------------------
 :moriaTerminalInitialize
+set "curses_on=true"
 exit /b
 
 :terminalInitialize
