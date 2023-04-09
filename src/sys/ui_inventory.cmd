@@ -900,7 +900,50 @@ call identification.cmd :itemAppendToInscription "item" "%config.identification.
 set "!item.cost!=-1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Actions for the Drop command
+::
+:: Arguments: %1 - The item_id of the item being dropped
+::            %2 - The choice that was selected in the previous menu
+::            %3 - The verification prompt
+:: Returns:   None
+::------------------------------------------------------------------------------
 :executeDropItemCommand
+set "item_id=%~1"
+set "which=%~2"
+set "str_prompt=%~3"
+
+set "confirmed=-1"
+if !py.inventory[%item_id%].items_count! GTR 1 (
+    call identification.cmd :itemDescription "description" "py.inventory[%item_id%]" "true"
+    set "description=!description:~0,-1!?"
+    call ui_io.cmd :getInputConfirmationWithAbort 0 "Drop all !description!"
+    set "confirmed=!errorlevel!"
+    if "!confirmed!"=="-1" set "item_id=-1"
+) else (
+    call helpers.cmd :isUpper "%which%"
+    if "!errorlevel!"=="1" (
+        call :verifyAction "%prompt%" "%item_id%"
+        if "!errorlevel!"=="1" set "item_id=-1"
+    )
+)
+
+if %item_id! GEQ 0 (
+    set "game.player_free_turn=false"
+    if "!confirmed!"=="0" (
+        set "bool_conf=true"
+    ) else (
+        set "bool_conf=false"
+    )
+    call inventory.cmd :inventoryDropItem "%item_id%" "!bool_conf!"
+    call player.cmd :playerStrength
+)
+
+if "%py.pack.unique_items%"=="0" (
+    if "%py.equipment_count%"=="0" (
+        set "py.pack.weight=0"
+    )
+)
 exit /b
 
 :selectItemCommands
