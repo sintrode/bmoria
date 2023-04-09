@@ -476,9 +476,9 @@ if "!errorlevel!"=="0" (
 set "game.player_turn_free=false"
 
 :: Swap auxiliary and wield weapons
-call inventory.cmd :inventoryCopyItem "saved_item" "py.inventory[%playerEquipment.Auxiliary%]"
+call inventory.cmd :inventoryCopyItem "saved_item" "py.inventory[%PlayerEquipment.Auxiliary%]"
 call inventory.cmd :inventoryCopyItem "py.inventory[%PlayerEquipment.Auxiliary%]" "py.inventory[%PlayerEquipment.Wield%]"
-call inventory.cmd :inventoryCopyItem "py.inventory[%playerEquipment.Wield%]" "saved_item"
+call inventory.cmd :inventoryCopyItem "py.inventory[%PlayerEquipment.Wield%]" "saved_item"
 
 if "%game.screen.current_screen_id%"=="%Screen.Equipment%" (
     call :displayEquipment "%config.options.show_inventory_weights%" "%game.screen.screen_left_pos%"
@@ -790,7 +790,114 @@ if %item_id% GEQ 0 (
 )
 exit /b %~1
 
+::------------------------------------------------------------------------------
+:: Determine which item to wear
+::
+:: Arguments: %1 - The item_id of the selected item
+::            %2 - The choice that was selected in the menu
+::            %3 - The prompt to display when verifying
+:: Returns:   None
+::------------------------------------------------------------------------------
 :executeWearItemCommand
+set "item_id=%~1"
+set "which=%~2"
+set "str_prompt=%~3"
+
+set "slot=0"
+set "is_valid_letter=0"
+call helpers.cmd :isUpper "%which%" || set /a is_valid_letter+=1
+call :verifyAction "%prompt%" "%item_id%" || set /a is_valid_letter+=1
+if "!is_valid_letter!"=="2" (
+    set "item_id=-1"
+) else (
+    call :inventoryGetSlotToWearEquipment "!py.inventory[%item_id%].category_id!"
+    set "slot=!errorlevel!"
+    if "!slot!"=="-1" set "item_id=-1"
+)
+
+if !item_id! GEQ 0 (
+    if not "!py.inventory[%slot%].category_id!"=="%TV_NOTHING%" (
+        call inventory.cmd :inventoryItemIsCursed "py.inventory[%slot%]"
+        if "!errorlevel!"=="0" (
+            call :inventoryItemIsCursedMessage "%slot%"
+            set "item_id=-1"
+        ) else if "!py.inventory[%item_id%].sub_category_id!"=="%ITEM_GROUP_MIN%" (
+            if !py.inventory[%item_id%].items_count! GTR 1 (
+                call inventory.cmd :inventoryCanCarryItemCount "py.inventory[%slot%]"
+                if "!errorlevel!"=="1" (
+                    call ui_io.cmd :printMessage "You will have to drop something first."
+                    set "itemn_id=-1"
+                )
+            )
+        )
+    )
+)
+
+if "%item_id%"=="-1" exit /b
+
+set "game.player_free_turn=false"
+
+:: Remove the new item from the inventory
+call inventory.cmd :inventoryCopyItem "saved_item" "py.inventory[%item_id%]"
+call inventory.cmd :inventoryCopyItem "item" "saved_item"
+
+set /a game.screen.wear_high_id-=1
+if !item.items_count! GTR 1 (
+    if !item.sub_category_id! LEQ %ITEM_SINGLE_STACK_MAX% (
+        set "item.items_count=1"
+        set /a game.screen.wear_high_id+=1
+    )
+)
+
+set /a py.pack.weight+=!item.weight! * !item.items_count!
+call inventory.cmd :inventoryDestroyItem "%item_id%"
+
+:: Add the old item to the inventory and remove from the equipment list if necessary
+call inventory.cmd :inventoryCopyItem "item" "py.inventory[%slot%]"
+if not "!item.category_id!"=="%TV_NOTHING%" (
+    set "uinq_items=%py.pack.unique_items%"
+    call inventory.cmd :inventoryCarryItem "item"
+    set "id=!errorlevel!"
+
+    if not "!py.pack.unique_items!"=="!uniq_items!" set /a game.screen.wear_high_id+=1
+
+    call player.cmd :playerTakeOff "%slot%" "!id!"
+)
+
+:: Wear the new item
+call inventory.cmd :inventoryCopyItem "item" "saved_item"
+set /a py.equipment_count+=1
+
+call player.cmd :playerAdjustBonusesForItem "item" 1
+
+set "text="
+if "%slot%"=="%PlayerEquipment.Wield%" (
+    set "text=You are wielding"
+) else if "%slot%"=="%PlayerEquipment.Light%" (
+    set "text=Your light source is"
+) else (
+    set "text=You are wearing"
+)
+
+call identification.cmd :itemDescription "description" "item" "true"
+set "item_id_to_take_off=%PlayerEquipment.Wield%"
+set "item_id=0"
+
+for /L %%A in (%item_id_to_take_off%,1,%slot%) do (
+    if not "!py.inventory[%%A].category_id!"=="%TV_NOTHING%" set /a item_id+=1
+)
+
+set /a item_letter=%item_id%+97
+cmd /c exit /b !item_letter!
+call ui_io.cmd :printMessage "!text! !description! (!=ExitCodeAscii!)"
+
+if "%slot%"=="%PlayerEquipment.Wield%" set "py.weapon_is_heavy=false"
+call player.cmd :playerStrength
+
+call inventory.cmd :inventoryItemIsCursed "item"
+call ui_io.cmd :printMessage "It feels deathly cold."
+call identification.cmd :itemAppendToInscription "item" "%config.identification.ID_DAMD%"
+set "!item.cost!=-1"
 exit /b
 
 :executeDropItemCommand
