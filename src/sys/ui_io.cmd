@@ -156,13 +156,33 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :moveCursor
-<nul set /p ".=%~1"
+<nul set /p ".=%ESC%[%~1H"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Place a specified character at given coordinates
+::
+:: Arguments: %1 - The character to display
+::            %2 - The coordates to place the character at
+:: Returns:   None
+::------------------------------------------------------------------------------
 :addChar
+<nul set /p ".=%ESC%[%~2H%~1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display text on the screen
+::
+:: Arguments: %1 - The string to display
+::            %2 - The coordinates to place the text
+:: Returns:   None
+::------------------------------------------------------------------------------
 :putString
+set "out_str=%~1"
+
+:: Truncate the string to 79 characters if necessary
+set "out_str=!out_str:~0,79!"
+<nul set /p ".=%ESC%[%~2H%~1"
 exit /b
 
 :putStringClearToEOL
