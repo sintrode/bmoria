@@ -1056,7 +1056,52 @@ if "!game.player_free_turn!"=="false" (
 )
 goto :selectItemCommandsWhileLoop
 
+::------------------------------------------------------------------------------
+:: Generate a header line based on the current screen ID
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :inventoryDisplayAppropriateHeader
+if "%game.screen.current_screen_id%"=="%Screen.Inventory%" (
+    set /a weight_quotient=%py.pack.weight% / 10
+    set /a weight_remainder=%py.pack.weight% %% 10
+
+    set "no_weights=0"
+    if "%config.options.show_inventory_weights%"=="false" set "no_weights=1"
+    if "%py.pack.unique_items%"=="0" set "no_weights=1"
+
+    if "!no_weights!"=="1" (
+        if "%py.pack.unique_items%"=="0" (
+            set "pack_list=nothing."
+        ) else (
+            set "pack_list=-"
+        )
+        set "msg=You are carrying !weight_quotient!.!weight_remainder! pounds. In your pack there is !pack_list!"
+    ) else (
+        call player.cmd :playerCarryingLoadList
+        set "full_capacity=!errorlevel!"
+        set /a capacity_quotient=!full_capacity!/10, capacity_remainder=!full_capacity!%%10
+        set "msg=You are carrying !weight_quotient!.!weight_remainder! pounds. Your capacity is !capacity_quotient!.!capacity_remainder! pounds. In your pack is -"
+    )
+    call ui_io.cmd :putStringClearToEOL "!msg!" "0;0"
+) else if "%game.screen.current_screen_id%"=="%Screen.Wear%" (
+    if %game.screen.wear_high_id% LSS %game.screen.wear_low_id% (
+        call ui_io.cmd :putStringClearToEOL "You have nothing you could wield." "0;0"
+    ) else (
+        call ui_io.cmd :putStringClearToEOL "You could wield -" "0;0"
+    )
+) else if "%game.screen.current_screen_id%"=="%Screen.Equipment%" (
+    if "%py.equipment_count%"=="0" (
+        call ui_io.cmd :putStringClearToEOL "You are not using anything." "0;0"
+    ) else (
+        call ui_io.cmd :putStringClearToEOL "You are using -" "0;0"
+    )
+) else (
+    call ui_io.cmd :putStringClearToEOL "Allowed commands:" "0;0"
+)
+
+call ui_io.cmd :eraseLine "%game.screen.screen_bottom_pos%;%game.screen.screen_left_pos%"
 exit /b
 
 :uiCommandDisplayInventory
