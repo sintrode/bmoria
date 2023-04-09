@@ -1268,5 +1268,181 @@ if "!menu_active!"=="true" (
 set /a %~4=%py.equipment_count%-1
 exit /b !changed!
 
+::------------------------------------------------------------------------------
+:: Get the item_id of an item and return its menu letter value
+::
+:: Arguments: %1 - A variable to store the command key in
+::            %2 - The prompt to display
+::            %3 - The item_id of the first item in the list
+::            %4 - The item_id of the last item in the list
+::            %5 - A filter to only return certain items
+::            %6 - A message to display, if any
+:: Returns:   0 if an item is found
+::            1 if the player does not select an item
+::------------------------------------------------------------------------------
 :inventoryGetInputForItemId
-exit /b
+set "str_prompt=%~2"
+set "item_id_start=%~3"
+set "item_id_end=%~4"
+set "mask=%~5"
+set "message=%~6"
+
+set "menu=%PackMenu.Inventory%"
+set "pack_full=false"
+
+if %item_id_end% GTR %PlayerEquipment.Wield% (
+    set "pack_full=true"
+
+    if "%py.pack.unique_items%"=="0" (
+        set "menu=%PackMenu.Equipment%"
+        set /a item_id_end=%py.equipment_count%-1
+    ) else (
+        set /a item_id_end=%py.pack.unique_items%-1
+    )
+)
+
+if %py.pack.unique_items% LSS 1 (
+    set "no_items=0"
+    if "!pack_full!"=="false" set "no_items=1"
+    if %py.equipment_count% LSS 1 set "no_items=1"
+    if "!no_items!"=="1" (
+        call ui_io.cmd :putStringClearToEOL "You are not carrying anything." "0;0"
+        exit /b 1
+    )
+)
+
+set "%~1="
+set "item_found=false"
+set "menu_active=false"
+
+:inventoryGetInputForItemIdWhileLoop
+if "!menu_active!"=="true" (
+    if "%menu%"=="%PackMenu.Inventory%" (
+        call :displayInventoryItems "%item_id_start%" "%item_id_end%" "false" "80" "%mask%"
+    ) else (
+        call :displayEquipment "false" "80"
+    )
+)
+
+:: These are in both if statements no matter what
+set /a item_start_ascii=!item_id_start!+97, item_end_ascii=!item_id_end!+97
+cmd /c exit /b !item_start_ascii!
+set "item_id_start_letter=!=ExitCodeAscii!"
+cmd /c exit /b !item_end_ascii!
+set "item_id_end_letter=!=ExitCodeAscii!"
+if "%menu%"=="%PackMenu.Inventory%" (set "num_range=0-9") else (set "num_range=")
+
+if "!pack_full!"=="true" (
+    if "%menu%"=="%PackMenu.Inventory%" (set "disp_menu=Inven") else (set "disp_menu=Equip")
+    if "!menu_active!"=="true" (set "opt_cmd=") else (set "opt_cmd= * to see,")
+    if "%menu%"=="%PackMenu.Inventory%" (set "toggle_name=Equip") else (set "toggle_name=Inven")
+    set "description=(!disp_menu!: !item_id_start_letter!-!item_id_end_letter!,!num_range!!opt_cmd! / for !toggle_name!, or Q) %str_prompt%"
+) else (
+    if "!menu_active!"=="true" (set "opt_cmd=") else (set "opt_cmd= * for inventory list,")
+    set "description=(Items !item_id_start_letter!-!item_id_end_letter!,!num_range!!opt_cmd! Q to quit) %str_prompt%"
+)
+
+call :ui_io.cmd :putStringClearToEOL "!description!" "0;0"
+
+set "done=false"
+:inventoryGetInputForItemIdInnerWhileLoop
+if "!done!"=="true" goto :inventoryGetInputForItemIdAfterInnerWhileLoop
+call ui_io.cmd :getKeyInput "which"
+if "!which!"=="Q" (
+    set "menu=%PackMenu.CloseMenu%"
+    set "done=true"
+    set "game.player_free_turn=true"
+) else if "!which!"=="/" (
+    call :inventorySwitchPackMenu "str_prompt" "menu" "!menu_active!" "item_id_end"
+) else if "!which!"=="*" (
+    if "!menu_active!"=="false" (
+        set "done=true"
+        call ui_io.cmd :terminalSaveScreen
+        set "menu_active=true"
+    )
+) else (
+    call helpers.cmd :charToDec "%which%"
+    set "which_ascii=!errorlevel!"
+
+    if !which_ascii! GEQ 48 if !which_ascii! LEQ 57 (
+        if not "!menu!"=="%PackMenu.Equipment%" (
+            set "m=!item_id_start!"
+            for /L %%M in (!item_id_start!,1,%PlayerEquipment.Wield%) do (
+                set "inc_m=0"
+                if not "!py.inventory[%%A].inscription:~0,1!"=="!which!" set "inc_m=1"
+                if not "!py.inventory[%%A].inscription:~1,1!"=="" set "inc_m=1"
+                if "!inc_m!"=="1" set /a m+=1
+                set "inc_m="
+            )
+
+            if !m! LSS %PlayerEquipment.Wield% (
+                set "%~1=!m!"
+            ) else (
+                set "%~1=-1"
+            )
+        )
+    ) else if !which_ascii! GEQ 65 if !which_ascii! LEQ 90 (
+        set /a item_id=!which_ascii!-65
+    ) else (
+        set /a item_id=!which_ascii!-97
+    )
+
+    set "valid_item=0"
+    if !%~1! GEQ !item_id_start! set /a valid_item+=1
+    if !%~1! LEQ !item_id_end! set /a valid_item+=1
+    set "no_mask=0"
+    if "%mask%"=="CNIL" set "no_mask=1"
+    if not "!mask:~%~1,1!"=="" set "no_mask=1"
+    if "!no_mask!"=="1" set /a valid_item+=1
+
+
+    if "!valid_item!"=="3" (
+        if "!menu!"=="%PackMenu.Equipment%" (
+            set "item_id_start=21"
+            set "item_id_end=!%~1!"
+
+            for /L %%A in (!item_id_start!,-1,0) do (
+                set /a item_id_start+=1
+                call :inventoryGetInputForItemIdInnermostWhileLoop "item_id_start"
+            )
+            set "%~1=!item_id_start!"
+        )
+
+        call :verifyAction "Try" "!%~1!"
+        if "!errorlevel!"=="1" (
+            set "menu=%PackMenu.CloseMenu%"
+            set "done=true"
+            set "game.player_free_turn=true"
+            goto :inventoryGetInputForItemIdInnerWhileLoop
+        )
+
+        set "menu=%PackMenu.CloseMenu%"
+        set "done=true"
+        set "item_found=true"
+    ) else if not "%message%"=="" (
+        call ui_io.cmd :printMessage "%message%"
+        set "done=true"
+    ) else (
+        call ui_io.cmd :terminalBellSound
+    )
+)
+goto :inventoryGetInputForItemIdAfterInnerWhileLoop
+
+:inventoryGetInputForItemIdAfterInnerWhileLoop
+if not "!menu!"=="%PackMenu.CloseMenu%" goto :inventoryGetInputForItemIdWhileLoop
+
+:inventoryGetInputForItemIdAfterWhileLoop
+if "!menu_active!"=="true" call ui_io.cmd :terminalRestoreScreen
+call ui_io.cmd :messageLineClear
+exit /b !item_found!
+
+:: The C++ code has a quadruple-nested while loop. Nope.
+:inventoryGetInputForItemIdInnermostWhileLoop
+set "itemIdStart=!%~1!"
+:inventoryGetInputForItemIdInnermostWhileLoopNext
+if not "!py.inventory[%itemIdStart%].category_id!"=="%TV_NOTHING%" (
+    set "%~1=!itemIdStart!"
+    exit /b
+)
+set /a itemIdStart+=1
+goto :inventoryGetInputForItemIdInnermostWhileLoopNext
