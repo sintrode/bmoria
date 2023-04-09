@@ -81,8 +81,21 @@ exit /b
 echo %ESC%[?1049l
 exit /b
 
+::------------------------------------------------------------------------------
+:: Technically display a BEL character, but actually make the computer beep.
+:: Can be disabled in the settings.
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :terminalBellSound
-exit /b
+call :putQIO
+
+:: There's probably a more elegant way to do that
+if "%config.options.error_beep_sound%"=="true" (
+    echo 
+)
+exit /b 0
 
 :putQIO
 exit /b
