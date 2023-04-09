@@ -97,7 +97,17 @@ if "%config.options.error_beep_sound%"=="true" (
 )
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: This was needed more in the C++ code because ncurses manipulates values
+:: without displaying anything unless refresh() is called, but we're doing
+:: everything directly, so there's no need to read from a buffer since there
+:: isn't one.
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :putQIO
+set "screen_has_changed=true"
 exit /b
 
 :flushInputBuffer
