@@ -60,7 +60,15 @@ echo %ESC%[%line_dec%;1H
 set "line_dec="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Engage the alternate screen buffer. Thankfully, we never have to run this
+:: while on the other screen or else I'd have no way of doing this.
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :terminalSaveScreen
+echo %ESC%[?1049h
 exit /b
 
 :terminalRestoreScreen
