@@ -268,7 +268,16 @@ set "message=!message:~0,79!"
 echo %ESC%8
 exit /b
 
+::------------------------------------------------------------------------------
+:: Clears the top line for later use
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :messageLineClear
+echo %ESC%7
+<nul set /p ".=%ESC%[0;0H%ESC%[0J"
+echo %ESC%8
 exit /b
 
 :printMessage
