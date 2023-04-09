@@ -224,7 +224,7 @@ for /f "tokens=1,2 delims=;" %%A in ("%~2") do (
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Moves the cursor to a Y;X position on the screen based on the panel
+:: Moves the cursor to a relative Y;X position
 ::
 :: Arguments: %1 - The new coordinates of the cursor
 :: Returns:   None
@@ -236,7 +236,18 @@ for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
 <nul set /p ".=%ESC%[%coord.y%;%coord.x%H"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Moves the cursor to a relative Y;X position and displays a character
+::
+:: Arguments: %1 - The character to display
+::            %2 - The new coordinates of the cursor
+:: Returns:   None
+::------------------------------------------------------------------------------
 :panelPutTile
+for /f "tokens=1,2 delims=;" %%A in ("%~2") do (
+    set /a coord.y=%%~A-%dg.panel.row_prt%, coord.x=%%~B-%dg.panel_col_prt%
+)
+<nul set /p ".=%ESC%[%coord.y%;%coord.x%H%~1"
 exit /b
 
 :currentCursorPosition
