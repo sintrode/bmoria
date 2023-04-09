@@ -91,10 +91,8 @@ exit /b
 :terminalBellSound
 call :putQIO
 
-:: There's probably a more elegant way to do that
-if "%config.options.error_beep_sound%"=="true" (
-    echo 
-)
+:: There's probably a more elegant way to do this
+if "%config.options.error_beep_sound%"=="true" echo 
 exit /b 0
 
 ::------------------------------------------------------------------------------
@@ -110,7 +108,15 @@ exit /b 0
 set "screen_has_changed=true"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Don't keep user input in the input buffer. I'm not sure this is needed tbh.
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :flushInputBuffer
+if not "!eof_flag!"=="0" exit /b
+call :checkForNonBlockingKeyPress 0
 exit /b
 
 :clearScreen
