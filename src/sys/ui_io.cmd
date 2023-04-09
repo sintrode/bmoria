@@ -71,7 +71,14 @@ exit /b
 echo %ESC%[?1049h
 exit /b
 
+::------------------------------------------------------------------------------
+:: Restore from the alternate screen buffer
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :terminalRestoreScreen
+echo %ESC%[?1049l
 exit /b
 
 :terminalBellSound
