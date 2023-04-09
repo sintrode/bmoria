@@ -648,8 +648,55 @@ if "!hand!"=="0" goto :requestPutRingOnWhichHandWhileLoop
 
 exit /b !hand!
 
+::------------------------------------------------------------------------------
+:: Determine where an item is equipped
+::
+:: Arguments: %1 - The category_id of the specified item
+:: Returns:   The PlayerEquipment enum where the item is equipped
+::            -1 if the item is not equipped
+::------------------------------------------------------------------------------
 :inventoryGetSlotToWearEquipment
-exit /b
+set "slot=-1"
+set "slot[%TV_SLING_AMMO%]=%PlayerEquipment.Wield%"
+set "slot[%TV_BOLT%]=%PlayerEquipment.Wield%"
+set "slot[%TV_ARROW%]=%PlayerEquipment.Wield%"
+set "slot[%TV_BOW%]=%PlayerEquipment.Wield%"
+set "slot[%TV_HAFTED%]=%PlayerEquipment.Wield%"
+set "slot[%TV_POLEARM%]=%PlayerEquipment.Wield%"
+set "slot[%TV_SWORD%]=%PlayerEquipment.Wield%"
+set "slot[%TV_DIGGING%]=%PlayerEquipment.Wield%"
+set "slot[%TV_SPIKE%]=%PlayerEquipment.Wield%"
+set "slot[%TV_LIGHT%]=%PlayerEquipment.Light%"
+set "slot[%TV_BOOTS%]=%PlayerEquipment.Feet%"
+set "slot[%TV_GLOVES%]=%PlayerEquipment.Hands%"
+set "slot[%TV_CLOAK%]=%PlayerEquipment.Outer%"
+set "slot[%TV_HELM%]=%PlayerEquipment.Head%"
+set "slot[%TV_SHIELD%]=%PlayerEquipment.Arm%"
+set "slot[%TV_HARD_ARMOR%]=%PlayerEquipment.Body%"
+set "slot[%TV_SOFT_ARMOR%]=%PlayerEquipment.Body%"
+set "slot[%TV_AMULET%]=%PlayerEquipment.Neck%"
+
+if "%~1"=="%TV_RING%" (
+    call player.cmd :playerRightHandRingEmpty
+    if "!errorlevel!"=="0" (
+        set "slot[%TV_RING%]=%PlayerEquipment.Right%"
+    ) else (
+        call player.cmd :playerLeftHandRingEmpty
+        if "!errorlevel!"=="0" (
+            set "slot[%TV_RING%]=%PlayerEquipment.Left%"
+        ) else (
+            call :requestPutRingOnWhichHand
+            set "slot[%TV_RING%]=!errorlevel!"
+        )
+    )
+)
+
+if defined slot[%~1] (
+    set "slot=!slot[%~1]!"
+) else (
+    call ui_io.cmd :printMessage "I don't see how you can use that."
+)
+exit /b %slot%
 
 :inventoryItemIsCursedMessage
 exit /b
