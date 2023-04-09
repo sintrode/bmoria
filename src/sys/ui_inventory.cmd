@@ -855,7 +855,7 @@ call inventory.cmd :inventoryDestroyItem "%item_id%"
 :: Add the old item to the inventory and remove from the equipment list if necessary
 call inventory.cmd :inventoryCopyItem "item" "py.inventory[%slot%]"
 if not "!item.category_id!"=="%TV_NOTHING%" (
-    set "uinq_items=%py.pack.unique_items%"
+    set "uniq_items=%py.pack.unique_items%"
     call inventory.cmd :inventoryCarryItem "item"
     set "id=!errorlevel!"
 
@@ -1212,8 +1212,61 @@ if not "%game.screen.current_screen_id%"=="%Screen.Blank%" call ui_io.cmd :termi
 call player.cmd :playerRecalculateBonuses
 exit /b
 
+::------------------------------------------------------------------------------
+:: Switch between the Equipment and Inventory menus
+::
+:: Arguments: %1 - The prompt to display
+::            %2 - A reference to which menu to display
+::            %3 - Determines if the menu is active
+::            %4 - A reference to the item_id of the last item in the menu
+:: Returns:   0 if the menu changed
+::            1 if the player did not change the menu
+::------------------------------------------------------------------------------
 :inventorySwitchPackMenu
-exit /b
+set "str_prompt=%~1"
+set "menu_active=%~3"
+set "item_id_end=%~4"
+
+if "!%~2!"=="%PackMenu.Inventory%" (
+    set "changed=1"
+
+    if "%py.equipment_count%"=="0" (
+        call ui_io.cmd :putStringClearToEOL "But you're not using anything -more-" "0;0"
+        call ui_io.cmd :getKeyInput "dummy"
+    ) else (
+        set "%~2=%PackMenu.Equipment%"
+        set "changed=0"
+
+        if "%menu_active%"=="true" (
+            set "%~4=%py.equipment_count%"
+            set /a unique_items_dec=%py.pack.unique_items%-1
+            for /L %%A in (!%~4!,1,!unique_items_dec!) do (
+                call ui_io.cmd :eraseLine "%%A;0"
+            )
+        )
+        set /a item_id_end=%py.equipment_count%-1
+    )
+
+    call ui_io.cmd :putStringClearToEOL "%str_prompt%" "0;0"
+    exit /b !changed!
+)
+
+if "%py.pack.unique_items%"=="0" (
+    call ui_io.cmd :putStringClearToEOL "But you're not carrying anything -more-" "0;0"
+    call ui_io.cmd :getKeyInput "dummy"
+    exit /b 1
+)
+
+set "%~2=%PackMenu.Inventory%"
+if "!menu_active!"=="true" (
+    set "%~4=%py.pack.unique_items%"
+    set /a unique_items_dec=%py.pack.unique_items%-1
+    for /L %%A in (!%~4!,1,!unique_items_dec!) do (
+        call ui_io.cmd :eraseLine "%%A;0"
+    )
+)
+set /a %~4=%py.equipment_count%-1
+exit /b !changed!
 
 :inventoryGetInputForItemId
 exit /b

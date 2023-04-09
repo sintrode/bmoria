@@ -12,7 +12,7 @@ exit /b
 :memoryPrint
 :: If the string is just '\n' by itself, we're done printing
 if "%~1"=="\n" (
-    call ui_io.cmd :putStringClearToEOF "CNIL" "!roff_print_line!;0"
+    call ui_io.cmd :putStringClearToEOL "CNIL" "!roff_print_line!;0"
     set /a roff_print_line+=1
     exit /b
 )
@@ -20,18 +20,18 @@ if "%~1"=="\n" (
 :: Add %1 to the buffer
 set "roff_buffer=!roff_buffer!%~1"
 
-:: If %1 contains a '\n', then split the string there and putStringClearToEOF
+:: If %1 contains a '\n', then split the string there and putStringClearToEOL
 :: it, setting the new buffer to the back half of %1.
 if not "!roff_buffer!"=="!roff_buffer:\n=!" (
     set "back_half=!roff_buffer:*\n=!"
     for /f "delims=" %%A in ("!back_half!") do set "front_half=!roff_buffer:%%~A=!"
-    call ui_io.cmd :putStringClearToEOF "!front_half!" "!roff_print_line!;0"
+    call ui_io.cmd :putStringClearToEOL "!front_half!" "!roff_print_line!;0"
     set /a roff_print_line+=1
     set "roff_buffer=!back_half!"
 )
 
 :: If the buffer length is greater than 80, move characters from the end of
-:: the buffer string to the start of a temp string, then putStringClearToEOF
+:: the buffer string to the start of a temp string, then putStringClearToEOL
 :: the buffer and then replace the buffer string with the temp string.
 call helpers.cmd :getLength "!roff_buffer!" buffer_length
 if !buffer_length! GEQ 80 (
@@ -40,7 +40,7 @@ if !buffer_length! GEQ 80 (
         set "roff_buffer=!roff_buffer:~0,-1!"
     )
     call :dropCharsUntilSpace
-    call ui_io.cmd :putStringClearToEOF "!roff_buffer!" "!roff_print_line!;0"
+    call ui_io.cmd :putStringClearToEOL "!roff_buffer!" "!roff_print_line!;0"
     set /a roff_print_line+=1
     set "roff_buffer=!temp_string!"
 )
@@ -764,7 +764,7 @@ if not "%win_creature%"=="0" (
     call :memoryPrint " Killing one of these wins the game^^!"
 )
 call :memoryPrint "\n"
-call ui_io.cmd :putStringClearToEOF "--pause--" "!roff_print_line!;0"
+call ui_io.cmd :putStringClearToEOL "--pause--" "!roff_print_line!;0"
 
 if "%game.wizard_mode%"=="true" (
     call :copyMemory "%memory%" "saved_memory"
