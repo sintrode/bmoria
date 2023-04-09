@@ -205,7 +205,22 @@ for /f "tokens=1,2 delims=;" %%A in ("%~2") do (
 call :putString %*
 exit /b
 
+::------------------------------------------------------------------------------
+:: Clear a line of text
+::
+:: Arguments: %1 - The coordinates of the line to clear
+:: Returns:   None
+::------------------------------------------------------------------------------
 :eraseLine
+for /f "tokens=1,2 delims=;" %%A in ("%~2") do (
+    if "%%~B"=="%MSG_LINE%" (
+        if "!message_ready_to_print!"=="true" (
+            call :printMessage "CNIL"
+        )
+    )
+)
+
+<nul set /p ".=%ESC%[%~2H%ESC%[0K"
 exit /b
 
 :panelMoveCursor
