@@ -1104,7 +1104,18 @@ if "%game.screen.current_screen_id%"=="%Screen.Inventory%" (
 call ui_io.cmd :eraseLine "%game.screen.screen_bottom_pos%;%game.screen.screen_left_pos%"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display the Equipment screen if the player has things equipped
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :uiCommandDisplayInventory
+if "%py.equipment_count%"=="0" (
+    call ui_io.cmd :printMessage "You are not using any equipment."
+) else (
+    call :uiCommandSwitchScreen "%Screen.Equipment%"
+)
 exit /b
 
 :uiCommandDisplayEquipment
