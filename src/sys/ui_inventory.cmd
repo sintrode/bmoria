@@ -1105,20 +1105,31 @@ call ui_io.cmd :eraseLine "%game.screen.screen_bottom_pos%;%game.screen.screen_l
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Display the Equipment screen if the player has things equipped
+:: Display the Inventory screen if the player has things
 ::
 :: Arguments: None
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :uiCommandDisplayInventory
+if "%py.pack.unique_items%"=="0" (
+    call ui_io.cmd :printMessage "You are not carrying anything."
+) else (
+    call :uiCommandSwitchScreen "%Screen.Inventory%"
+)
+exit /b
+
+::------------------------------------------------------------------------------
+:: Display the Equipment screen if the player has things equipped
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
+:uiCommandDisplayEquipment
 if "%py.equipment_count%"=="0" (
     call ui_io.cmd :printMessage "You are not using any equipment."
 ) else (
     call :uiCommandSwitchScreen "%Screen.Equipment%"
 )
-exit /b
-
-:uiCommandDisplayEquipment
 exit /b
 
 :inventoryExecuteCommand
