@@ -11,8 +11,38 @@ exit /b
 set "curses_on=true"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Ensure that the window is at least 80x24. We're going to have to run the
+:: game via conhost because SOMEBODY decided that Windows Terminal doesn't need
+:: to respect the `mode con` command. But on the bright side, Terminal is at
+:: least 120x30, so it should be fine unless the player resizes it.
+::
+:: Arguments: None
+:: Returns:   0 if the screen is at least 80x24
+::            1 if the screen is too small for some reason
+::------------------------------------------------------------------------------
 :terminalInitialize
-exit /b
+set "lines="
+set "cols="
+for /f "skip=2 tokens=2" %%A in ('mode con') do (
+    if not defined lines (
+        set "lines=%%A"
+    ) else if not defined cols (
+        set "cols=%%A"
+    )
+)
+
+set "is_too_small=0"
+if %lines% LSS 24 set "is_too_small=1"
+if %cols% LSS 80 set "is_too_small=1"
+if "!is_too_small!"=="1" (
+    echo Screen too small for Moria.
+    exit /b 1
+)
+
+call :moriaTerminalInitialize
+cls
+exit /b 0
 
 :terminalRestore
 exit /b
