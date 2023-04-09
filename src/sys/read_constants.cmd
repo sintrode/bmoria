@@ -516,4 +516,5 @@ for %%A in (CloseMenu Equipment Inventory) do (
 ::----- ui_io.cpp
 set "eof_flag=0"
 set "panic_save=false"
+for /f %%A in ('echo prompt $E ^| cmd') do set "ESC=%%A"
 exit /b

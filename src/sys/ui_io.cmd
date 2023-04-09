@@ -44,7 +44,20 @@ call :moriaTerminalInitialize
 cls
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Dump the buffer and flush, moving the cursor to the bottom left
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :terminalRestore
+if "!curses_on!"=="false" exit /b
+
+call :putQIO
+cls
+set /a line_dec=%lines%-1
+echo %ESC%[%line_dec%;1H
+set "line_dec="
 exit /b
 
 :terminalSaveScreen
