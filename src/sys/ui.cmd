@@ -498,7 +498,29 @@ if not "!is_searching!"=="0" (
 call ui_io.cmd :putString "          " "23;38"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's speed
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterSpeed
+:: Go faster in Search mode
+set "speed=%py.flags.speed%"
+set "is_searching=%py.flags.status% & %config.player.status.PY_SEARCH%"
+if not "!is_searching!"=="0" set /a speed-=1
+
+if !speed! GTR 1 (
+    call ui_io.cmd :putString "Very Slow" "23;49"
+) else if "!speed!"=="1" (
+    call ui_io.cmd :putString "Slow     " "23;49"
+) else if "!speed!"=="0" (
+    call ui_io.cmd :putString "         " "23;49"
+) else if "!speed!"=="-1" (
+    call ui_io.cmd :putString "Fast     " "23;49"
+) else (
+    call ui_io.cmd :putString "Very Fast" "23;49"
+)
 exit /b
 
 :printCharacterStudyInstruction
