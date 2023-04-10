@@ -353,8 +353,21 @@ exit /b !errorlevel!
 call :getCommand %*
 exit /b !errorlevel!
 
+::------------------------------------------------------------------------------
+:: Gets a string terminated by a RETURN
+::
+:: Arguments: %1 - The variable to store the input in
+::            %2 - The coordinates to place the cursor initially
+::            %3 - The length of a space buffer to place at the coordinates
+:: Returns:   0 if a string has been provided
+::            1 if the user hit enter without typing anything
+::------------------------------------------------------------------------------
 :getStringInput
-exit /b
+<nul set /p ".=%ESC%[%~2H"
+for /L %%A in (%~3,-1,1) do <nul set /p ".= "
+<nul set /p ".=%ESC%[%~2H"
+set /p "%~1=" || exit /b 1
+exit /b 0
 
 :getInputConfirmation
 exit /b
