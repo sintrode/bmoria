@@ -280,7 +280,14 @@ call player.cmd :playerRankTitle "player_rank"
 call :printCharacterInfoInField "!player_rank!" "4;0"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's level
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterLevel
+call :printNumber "%py.misc.level%" "13;6"
 exit /b
 
 :printCharacterCurrentMana
