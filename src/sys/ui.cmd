@@ -680,7 +680,30 @@ call :printHeaderNumber "Weight       " "%py.misc.weight%" "4;38"
 call :printHeaderNumber "Social Class " "%py.misc.social_class%" "5;38"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints level/XP/gold/HP/MP
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterLevelExperience
+call :printHeaderLongNumber7Spaces "Level      " "%py.misc.level%"    "9;28"
+call :printHeaderLongNumber7Spaces "Experience " "%py.misc.exp%"     "10;28"
+call :printHeaderLongNumber7Spaces "Max Exp    " "%py.misc.max_exp%" "11;28"
+
+set /a level_dec=%py.misc.level%-1
+if %py.misc.level% GEQ %player_max_level% (
+    call ui_io.cmd :putStringClearToEOL "Exp to Adv.: *******" "12;28"
+) else (
+    set /a next_xp=!py.base_exp_levels[%level_dec%]! * %py.misc.experience_factor% / 100
+    call :printHeaderLongNumber7Spaces "Exp to Adv." "!next_xp!" "12;28"
+)
+
+call :printHeaderLongNumber7Spaces "Gold       " "%py.misc.au%"    "13;28"
+call :printHeaderNumber "Max Hit Points " "%py.misc.max_hp%"        "9;52"
+call :printHeaderNumber "Cur Hit Points " "%py.misc.current_hp%"   "10;52"
+call :printHeaderNumber "Max Mana       " "%py.misc.mana%"         "11;52"
+call :printHeaderNumber "Cur Mana       " "%py.misc.current_mana%" "12;52"
 exit /b
 
 :printCharacterAbilities
