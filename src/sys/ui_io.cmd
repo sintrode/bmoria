@@ -311,7 +311,20 @@ set "game.command_count=%tmp_count%"
 set "tmp_count="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Returns a single character input from the terminal.
+::
+:: Arguments: %1 - The variable to store the character in
+:: Returns:   None
+:: Thanks:    https://gist.github.com/Grub4K/2d3f5875c488164b44454cbf37deae80
+::------------------------------------------------------------------------------
 :getKeyInput
+set "game.command_count=0"
+set "key="
+for /f "delims=" %%A in ('xcopy /w "!comspec!" "!comspec!" 2^>nul') do (
+    if not defined key set "key=%%A^!"
+)
+set "%~1=!key:~0,1!"
 exit /b
 
 :getCommand
