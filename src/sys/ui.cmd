@@ -410,7 +410,20 @@ if not "!is_confused!"=="0" (
 set "is_confused="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's fear status
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterFearState
+set /a "is_afraid=%py.flags.status% & %config.player.status.PY_FEAR%"
+if not "!is_afraid!"=="0" (
+    call ui_io.cmd :putString "Afraid" "23;22"
+) else (
+    call ui_io.cmd :putString "      " "23;22"
+)
+set "is_afraid="
 exit /b
 
 :printCharacterPoisonedState
