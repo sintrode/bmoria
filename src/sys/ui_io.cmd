@@ -298,7 +298,17 @@ if "!combine_messages!"=="true" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display a message without interrupting a counted command
+::
+:: Arguments: %1 - The message to display
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printMessageNoCommandInterrupt
+set "tmp_count=%game.command_count%"
+call :printMessage "%~1"
+set "game.command_count=%tmp_count%"
+set "tmp_count="
 exit /b
 
 :getKeyInput
