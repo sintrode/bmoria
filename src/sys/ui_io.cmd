@@ -418,7 +418,14 @@ pause >nul
 call :eraseLine "%~1;0"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Gets a default username in case the player doesn't name their character
+::
+:: Arguments: %1 - A variable to store the player's name
+:: Returns:   None
+::------------------------------------------------------------------------------
 :getDefaultPlayerName
+set "%~1=!USERNAME:~0,%PLAYER_NAME_SIZE%!"
 exit /b
 
 ::------------------------------------------------------------------------------
