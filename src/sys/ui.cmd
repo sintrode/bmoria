@@ -563,7 +563,41 @@ if not "!is_wiz!"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints character screen information
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterStatsBlock
+call :printCharacterInfoInField "!character_races[%py.misc.race_id%].name!" "2;0"
+call :printCharacterInfoInField "!classes[%py.misc.class_id%].title!" "3;0"
+call :printCharacterTitle
+
+for /L %%A in (0,1,5) do call :displayCharacterStats %%A
+
+call :printHeaderNumber "LEV " %py.misc.level% "13;0"
+call :printHeaderNumber "EXP " %py.misc.exp% "14;0"
+call :printHeaderNumber "MANA" %py.misc.current_mana% "15;0"
+call :printHeaderNumber "MHP " %py.misc.max_hp% "16;0"
+call :printHeaderNumber "CHP " %py.misc.current_hp% "17;0"
+call :printHeaderNumber "AC  " %py.misc.display_ac% "19;0"
+call :printHeaderNumber "GOLD" %py.misc.au% "20;0"
+call :printCharacterWinner
+
+:: This originally had a bunch of if statements, but the same checks are also
+:: done inside of each of the :print subroutines, so no sense checking twice
+call :printCharacterHungerStatus
+call :printCharacterBlindStatus
+call :printCharacterConfusedStatus
+call :printCharacterFearStatus
+call :printCharacterPoisonedStatus
+call :printCharacterMovementStatus
+
+set /a "speed=%py.flags.speed% - (%py.flags.status% & %config.player.status.PY_SEARCH%) >> 8"
+if not "!speed!"=="0" call :printCharacterSpeed
+
+call :printCharacterStudyInstruction
 exit /b
 
 :printCharacterInformation
