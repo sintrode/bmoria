@@ -372,9 +372,24 @@ if not "%is_weak%"=="0" (
 ) else (
     call ui_io.cmd :putString "      " "23;0"
 )
+
+set "is_weak="
+set "is_hungry="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's blind status
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterBlindStatus
+set /a "is_blind=%py.flags.status% & %config.player.status.PY_BLIND%"
+if not "!is_blind!"=="0" (
+    call ui_io.cmd :putString "Blind" "23;7"
+) else (
+    call ui_io.cmd :putString "     " "23;7"
+)
 exit /b
 
 :printCharacterConfusedState
