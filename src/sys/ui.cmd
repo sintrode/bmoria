@@ -834,8 +834,89 @@ if "!key!"=="c" (
 )
 goto :changeCharacterNameWhileLoop
 
+::------------------------------------------------------------------------------
+:: Print a list of spells
+::
+:: Arguments: %1 - A variable to store the list of spells
+::            %2 - The number of choices in the list
+::            %3 - Determine if the spells are commented
+::            %4 -  -1 if the spells start at 'a'
+::                 >=0 if the spells are offset
+:: Returns:   None
+::------------------------------------------------------------------------------
 :displaySpellsList
+set "number_of_choices=%~2"
+set "comment=%~3"
+set "non_consecutive=%~4"
+
+if "%comment%"=="true" (
+    set "col=22"
+) else (
+    set "col=31"
+)
+
+if "!classes[%py.misc.class_id%].class_to_use_mage_spells!"=="%config.spells.SPELL_MAGE_TYPE%" (
+    set "consecutive_offset=%config.spells.NAME_OFFSET_SPELLS%"
+) else (
+    set "consecutive_offset=%config.spells.NAME_OFFSET_PRAYERS%"
+)
+
+call ui_io.cmd :eraseLine "1;%col%"
+set /a col_inc=%col%+5
+call ui_io.cmd :putString "Name" "1;%col_inc%"
+set /a col_inc=%col%+35
+call ui_io.cmd :putString "Lv Mana Fail" "1;%col_inc%"
+
+:: Only show 22 choices at a time
+if %number_of_choices% GTR 22 set "number_of_choices=22"
+set /a number_of_choices-=1
+for /L %%A in (0,1,%number_of_choices%) do (
+    set "spell_id=!spell_ids[%%A]!"
+    set /a class_dec=%py.misc.class_id%-1
+    for /f "tokens=1,2" %%B in ("!class_dec! !spell_id!") do (
+        set "spell=magic_spells[%%~B][%%~C]"
+    )
+
+    set /a "did_forget=%py.flags.spells_forgotten% & (1 << !spell_id!)"
+    set /a "did_learn=%py.flags.spells.learnt% & (1 << !spell_id!)"
+    set /a "did_work=%py.flags.spells.worked% & (1 << !spell_id!)"
+    set "p="
+    if "%comment%"=="false" (
+        set "p="
+    ) else if not "!did_forget!"=="0" (
+        set "p=forgotten"
+    ) else if "!did_learn!"=="0" (
+        set "p=unknown"
+    ) else if "!did_work!"=="0" (
+        set "p=untried"
+    ) else (
+        set "p="
+    )
+
+    if "%non_consecutive%"=="-1" (
+        set /a spell_char_ascii=%%A+97
+        cmd /c exit /b !spell_char_ascii!
+        set "spell_char=!=ExitCodeAscii!"
+    ) else (
+        set /a spell_char_ascii=97 + !spell_id! - !non_consecutive!
+        cmd /c exit /b !spell_char_ascii!
+        set "spell_char=!=ExitCodeAscii!"
+    )
+
+    set /a spell_offset=!spell_id!+!consecutive_offset!, a_inc=%%A+2
+    call :displayOneSpell "!spell!" "!spell_offset!" "!spell_id!" !a_inc!
+)
 exit /b
+
+:displayOneSpell
+call scores.cmd :sprintf "disp_spell_name" "!spell_names[%~2]!" -30
+call scores.cmd :sprintf "disp_level_needed" "!%~1.level_required!" 2
+call scores.cmd :sprintf "disp_mana_needed" "!%~1.mana_required!" 4
+call mage_spells.cmd :spellChangeOfSuccess "%~3"
+set "disp_odds=!errorlevel!"
+
+set "out_val=!spell_char!) !disp_spell_name!!disp_level_needed! !disp_mana_needed! !disp_odds!%%!p!"
+call ui_io.cmd :putStringClearToEOL "!out_val!" "%~4;!col!"
 
 :playerGainLevel
 exit /b
