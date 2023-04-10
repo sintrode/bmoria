@@ -647,7 +647,24 @@ call :printHeaderNumber "+ To AC     " "%py.misc.display_to_ac%"     "11;1"
 call :printHeaderNumber "  Total AC  " "%py.misc.display_ac%"        "12;1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Calculates an efficiency rating based on various stats
+::
+:: Arguments: %1 - The threshold value of the stat
+::            %2 - The actual value of the stat
+::            %3 - A variable to store the output in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :statRating
+set /a stat_ratio=%~1/%~2
+set "%~3=Superb"
+if !stat_ratio! LEQ -1 set "%~3=Very Bad"
+if !stat_ratio! GEQ 0 if !stat_ratio! LEQ 1 set "%~3=Bad"
+if "!stat_ratio!"=="2" set "%~3=Poor"
+if !stat_ratio! GEQ 3 if !stat_ratio! LEQ 4 set "%~3=Fair"
+if "!stat_ratio!"=="5" set "%~3=Good"
+if "!stat_ratio!"=="6" set "%~3=Very Good"
+if !stat_ratio! GEQ 7 if !stat_ratio! LEQ 8 set "%~3=Excellent"
 exit /b
 
 :printCharacterVitalStatistics
