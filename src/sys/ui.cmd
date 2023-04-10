@@ -918,7 +918,36 @@ set "disp_odds=!errorlevel!"
 set "out_val=!spell_char!) !disp_spell_name!!disp_level_needed! !disp_mana_needed! !disp_odds!%%!p!"
 call ui_io.cmd :putStringClearToEOL "!out_val!" "%~4;!col!"
 
+::------------------------------------------------------------------------------
+:: Increase hit points and level
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :playerGainLevel
+set /a py.misc.level+=1
+call ui_io.cmd :printMessage "Welcome to level %py.misc.level%."
+
+call player_stats.cmd :playerCalculateHitPoints
+
+set /a level_dec=%py.misc.level%-1
+set /a new_exp=!py.base_exp_levels[%level_dec%]! * %py.misc.experience_factor% / 100
+if %py.misc.exp% GTR %new_exp% (
+    set /a diff_exp=%py.misc.exp% - %new_exp%
+    set /a "py.misc.exp=%new_exp% + (!diff_exp! / 2)"
+)
+
+call :printCharacterLevel
+call :printCharacterTitle
+
+set "player_class=classes[%py.misc.class_id%]"
+if "!%player_class%.class_to_use_mage_spells!"=="%config.spells.SPELL_TYPE_MAGE%" (
+    call player.cmd :playerCalculateAllowedSpellsCount "%PlayerAttr.a_int%"
+    call player.cmd :playerGainMana "%PlayerAttr.a_int%"
+) else if "!%player_class%.class_to_use_mage_spells!"=="%config.spells.SPELL_TYPE_PRIEST%" (
+    call player.cmd :playerCalculateAllowedSpellsCount "%PlayerAttr.a_wis%"
+    call player.cmd :playerGainMana "%PlayerAttr.a_wis%"
+)
 exit /b
 
 :displayCharacterExperience
