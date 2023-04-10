@@ -269,7 +269,15 @@ call scores.cmd :sprintf "str" "%~1" 6
 call ui_io.cmd :putString "!str!" "%~2"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's rank-based title
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterTitle
+call player.cmd :playerRankTitle "player_rank"
+call :printCharacterInfoInField "!player_rank!" "4;0"
 exit /b
 
 :printCharacterLevel
