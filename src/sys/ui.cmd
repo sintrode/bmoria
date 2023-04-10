@@ -357,6 +357,7 @@ exit /b
 
 ::------------------------------------------------------------------------------
 :: Prints how hungry the character is
+:: TODO: Merge :printCharacter____Status subroutines
 ::
 :: Arguments: None
 :: Returns:   None
@@ -390,9 +391,23 @@ if not "!is_blind!"=="0" (
 ) else (
     call ui_io.cmd :putString "     " "23;7"
 )
+set "is_blind="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's confused status
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterConfusedState
+set /a "is_confused=%py.flags.status% & %config.player.status.PY_CONFUSED%"
+if not "!is_confused!"=="0" (
+    call ui_io.cmd :putString "Confused" "23;13"
+) else (
+    call ui_io.cmd :putString "        " "23;13"
+)
+set "is_confused="
 exit /b
 
 :printCharacterFearState
