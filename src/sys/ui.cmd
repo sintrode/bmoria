@@ -622,7 +622,29 @@ call ui_io.cmd :putString "!gender_string!" "4;15"
 call ui_io.cmd :putString "!classes[%py.misc.class_id%].title!" "5;15"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Print stats, to_hit, to_damage, and AC
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterStats
+for /L %%A in (0,1,5) do (
+    set a_inc=%%A+2
+    call :statsAsString "!py.stats.used[%%A]!" "buf"
+    call ui_io.cmd :putString "!stat_names[%%A]!" "!a_inc!;61"
+    call ui_io.cmd :putString "!buf!" "!a_inc!;66"
+
+    if !py.stats.max[%%A]! GTR !py.stats.current[%%A]! (
+        call :statsAsString "!py.stats.max[%%A]!" "buf"
+        call ui_io.cmd :putString "!buf!" "!a_inc!;73"
+    )
+)
+
+call :printHeaderNumber "+ To Hit    " "%py.misc.display_to_hit%"     "9;1"
+call :printHeaderNumber "+ To Damage " "%py.misc.display_to_damage%" "10;1"
+call :printHeaderNumber "+ To AC     " "%py.misc.display_to_ac%"     "11;1"
+call :printHeaderNumber "  Total AC  " "%py.misc.display_ac%"        "12;1"
 exit /b
 
 :statRating
