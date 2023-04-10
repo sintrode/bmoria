@@ -426,7 +426,20 @@ if not "!is_afraid!"=="0" (
 set "is_afraid="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's poisoned status
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterPoisonedState
+set /a "is_poisoned=%py.flags.status% & %config.player.status.PY_POISONED%"
+if not "!is_poisoned!"=="0" (
+    call ui_io.cmd :putString "Poisoned" "23;29"
+) else (
+    call ui_io.cmd :putString "        " "23;29"
+)
+set "is_poisoned="
 exit /b
 
 :printCharacterMovementState
