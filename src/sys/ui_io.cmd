@@ -369,8 +369,17 @@ for /L %%A in (%~3,-1,1) do <nul set /p ".= "
 set /p "%~1=" || exit /b 1
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Prompt the user to validate a choice
+::
+:: Arguments: %1 - The prompt to display
+:: Returns:   0 if the user entered Y
+::            1 if the user entered anything else
+::------------------------------------------------------------------------------
 :getInputConfirmation
-exit /b
+call :getInputConfirmationWithAbort 0 "%~1"
+if "!errorlevel!"=="1" exit /b 0
+exit /b 1
 
 :getInputConfirmationWithAbort
 exit /b
@@ -383,3 +392,34 @@ exit /b
 
 :getDefaultPlayerName
 exit /b
+
+::------------------------------------------------------------------------------
+:: Uses the VT100 sequence ESC[6n to get the cursor position
+:: Code by Dave Benham
+:: Originally found at https://www.dostips.com/forum/viewtopic.php?p=61345#p61345
+::
+:: Arguments: %1 - The variable to store the coordinates in
+:: Returns:   0 if coordinates were successfully retrieved
+::            1 if something went wrong while getting the coordinates
+::------------------------------------------------------------------------------
+:get_cursor_pos
+setlocal enableDelayedExpansion
+set "response="
+for /l %%N in (2 1 13) do (
+  <nul set /p "=%ESC%[6n"
+  for /l %%# in (1 1 %%N) do pause < con > nul
+  for /f "skip=1 eol=" %%C in ('"replace /w ? . < con"') do (
+    if "%%C"=="R" (
+      if "%~1" neq "" (
+        for /f "delims=; tokens=1,2" %%A in ("!response!") do (
+          endlocal
+          set "%~1.y=%%A"
+          set "%~1.x=%%B"
+        )
+      ) else echo {!response!}
+      exit /b 0
+    ) else set "response=!response!%%C"
+  )
+)
+>&2 echo ERROR: get_cursor_pos failed to return a value
+exit /b 1
