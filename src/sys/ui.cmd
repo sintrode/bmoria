@@ -310,7 +310,14 @@ exit /b
 call :printNumber "%py.misc.max_hp%" "16;6"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's current hit points
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterCurrentHitPoints
+call :printNumber "%py.misc.current_hp%" "17;6"
 exit /b
 
 :printCharacterCurrentArmorClass
