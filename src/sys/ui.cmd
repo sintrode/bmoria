@@ -706,7 +706,67 @@ call :printHeaderNumber "Max Mana       " "%py.misc.mana%"         "11;52"
 call :printHeaderNumber "Cur Mana       " "%py.misc.current_mana%" "12;52"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints miscellaneous character abilities
+:: TODO: Refactor for readability
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterAbilities
+call ui_io.cmd :clearToBottom 14
+
+set /a xbth=%py.misc.bth% + %py.misc.plusses_to_hit% * %bth_per_plus_to_hit_adjust% + (!class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.BTH%]! * %py.misc.level%)
+set /a xbthb=%py.misc.bth_with_bows% + %py.plusses_to_hit% * %bth_per_plus_to_hit_adjust% + (!class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.BTHB%]! * %py.misc.level%)
+
+set /a xfos=40 - %py.misc.fos%
+if !xfos! LSS 0 set "xfos=0"
+
+set "xsrh=%py.misc.chance_in_search%"
+
+set /a xstl=%py.misc.stealth_factor%+1
+call player_stats.cmd :playerDisarmAdjustment
+set "disarm_adj=!errorlevel!"
+call player_stats.cmd :playerStatAdjustmentWisdomIntelligence "%PlayerAttr.a_int%"
+set "int_adj=!errorlevel!"
+set /a xdis=%py.misc.disarm% + 2 * !disarm_adj! + !int_adj! + (!class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.disarm%]! * %py.misc.level% / 3)
+call player_stats.cmd :playerStatAdjustmentWisdomIntelligence "%PlayerAttr.a_wis%"
+set "wis_adj=!errorlevel!"
+set /a xsave=%py.misc.saving_throw% + !wis_adj! + (!class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.save%]! * %py.misc.level% / 3)
+set /a xdev=%py.misc.saving_throw% + !int_adj! + (!class_level_adj[%py.misc.class_id%][%PlayerClassLevelAdj.device%]! * %py.misc.level% / 3)
+
+set /a xinfra=%py.flags.see_infra% * 10
+set "xinfra=!xinfra! feet"
+
+call ui_io.cmd :putString "(Miscellaneous Abilities)" "15;25"
+call ui_io.cmd :putString "Fighting    :" "16;1"
+call :statRating 12 !xbth! "bth_stat"
+call ui_io.cmd :putString "!bth_stat!"    "16;15"
+call ui_io.cmd :putString "Bows/Throw  :" "17;1"
+call :statRating 12 !xbthb! "bthb_stat"
+call ui_io.cmd :putString "!bthb_stat!"   "17;15"
+call ui_io.cmd :putString "Saving Throw:" "18;1"
+call :statRating 6 !xsave! "save_stat"
+call ui_io.cmd :putString "!save_stat!"   "18;15"
+
+call ui_io.cmd :putString "Stealth     :" "16;28"
+call :statRating 1 !xstl! "stl_stat"
+call ui_io.cmd :putString "!save_stat!"   "16;42"
+call ui_io.cmd :putString "Disarm      :" "17;28"
+call :statRating 8 !xdis! "dis_stat"
+call ui_io.cmd :putString "!dis_stat!"    "17;42"
+call ui_io.cmd :putString "Magic Device:" "18;28"
+call :statRating 6 !xdev! "dev_stat"
+call ui_io.cmd :putString "!dev_stat!"    "18;42"
+
+call ui_io.cmd :putString "Perception  :" "16;55"
+call :statRating 3 !xfos! "fos_stat"
+call ui_io.cmd :putString "!fos_stat!"    "16;69"
+call ui_io.cmd :putString "Searching   :" "17;55"
+call :statRating 3 !xsrh! "srh_stat"
+call ui_io.cmd :putString "!srh_stat!"    "17;69"
+call ui_io.cmd :putString "Infra-Vision:" "18;55"
+call ui_io.cmd :putString "!xinfra!"      "18;69"
 exit /b
 
 :printCharacter
