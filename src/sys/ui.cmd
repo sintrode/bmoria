@@ -341,7 +341,7 @@ call :printNumber "%py.misc.au%" "20;6"
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Print the character's depth in feet
+:: Prints the character's depth in feet
 ::
 :: Arguments: None
 :: Returns:   None
@@ -355,7 +355,23 @@ if "!depth!"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints how hungry the character is
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterHungerStatus
+set /a "is_weak=%py.flags.status% & %config.player.status.PY_WEAK%"
+set /a "is_hungry=%py.flags.status% & %config.player.status.PY_HUNGRY%"
+
+if not "%is_weak%"=="0" (
+    call ui_io.cmd :putString "Weak  " "23;0"
+) else if not "%is_hungry%"=="0" (
+    call ui_io.cmd :putString "Hungry" "23;0"
+) else (
+    call ui_io.cmd :putString "      " "23;0"
+)
 exit /b
 
 :printCharacterBlindStatus
