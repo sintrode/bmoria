@@ -442,7 +442,60 @@ if not "!is_poisoned!"=="0" (
 set "is_poisoned="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's movement state - searching, resting, paralyzed, count
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterMovementState
+set /a "is_repeat=%py.flags.status%&=~%config.player.status.PY_REPEAT%"
+
+if %py.flags.paralysis% GTR 1 (
+    call ui_io.cmd :putString "Paralysed" "23;38"
+    exit /b
+)
+
+set /a "is_resting=%py.flags.status% & %config.player.status.PY_REST%"
+if not "!is_resting!"=="0" (
+    if %py.flags.rest% LSS 0 (
+        set "rest_string=Rest *"
+    ) else if "%config.options.display_counts%"=="true" (
+        call scores.cmd :sprintf "rest_string" "%py.flags.rest%" -5
+        set "rest_string=Rest !rest_string!"
+    ) else (
+        set "rest_string=Rest"
+    )
+
+    call ui_io.cmd :putString "!rest_string!" "23;38"
+    set "is_resting="
+    exit /b
+)
+
+if %game.command_count% GTR 0 (
+    if "%config.options.display_counts%"=="true" (
+        call scores.cmd :sprintf "repeat_string" "%game.command_count%" -3
+        set "repeat_string=Repeat !repeat_string!"
+    ) else (
+        set "repeat_string=Repeat"
+    )
+
+    set /a "py.flags.status|=%config.player.status.PY_REPEAT%"
+    call ui_io.cmd :putString "!repeat_string!" "23;38"
+
+    set /a "is_searching=!py.flags.status! & %config.player.status.PY_SEARCH%"
+    if not "!is_searching!"=="0" call ui_io.cmd :putString "Search" "23;38"
+    set "is_searching="
+    exit /b
+)
+
+set /a "is_searching=!py.flags.status! & %config.player.status.PY_SEARCH%"
+if not "!is_searching!"=="0" (
+    call ui_io.cmd :putString "Searching" "23;38"
+    set "is_searching="
+    exit /b
+)
+call ui_io.cmd :putString "          " "23;38"
 exit /b
 
 :printCharacterSpeed
