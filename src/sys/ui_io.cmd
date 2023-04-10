@@ -342,11 +342,16 @@ call :messageLineClear
 if "!command!"=="Q" exit /b 1
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Wrappers for :getCommand but with a more meaningful name
+::------------------------------------------------------------------------------
 :getTileCharacter
-exit /b
+call :getCommand %*
+exit /b !errorlevel!
 
 :getMenuItemId
-exit /b
+call :getCommand %*
+exit /b !errorlevel!
 
 :getStringInput
 exit /b
