@@ -783,7 +783,23 @@ call :printCharacterLevelExperience
 call :printCharacterAbilities
 exit /b
 
+::------------------------------------------------------------------------------
+:: Get the character's name from the player
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :getCharacterName
+call ui_io.cmd :putStringClearToEOL "Enter your character's name" "21;2"
+call ui_io.cmd :putString "                       " "2;15"
+
+call ui_io.cmd :getStringInput "py.misc.name" "2;15" 23
+if "!errorlevel!"=="1" (
+    call ui_io.cmd :getDefaultPlayerName "py.misc.name"
+    call ui_io.cmd :putString "!py.misc.name!" "2;15"
+)
+
+call ui_io.cmd :clearToBottom 20
 exit /b
 
 :changeCharacterName
