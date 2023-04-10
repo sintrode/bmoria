@@ -950,6 +950,28 @@ if "!%player_class%.class_to_use_mage_spells!"=="%config.spells.SPELL_TYPE_MAGE%
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's experience points
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :displayCharacterExperience
+if %py.misc.exp% GTR %config.player.PLAYER_MAX_EXP% (
+    set "py.misc.exp=%config.player.PLAYER_MAX_EXP%"
+)
+
+:displayCharacterExperienceWhileLoop
+set /a level_dec=!py.misc.exp!-1
+if !py.misc.level! GEQ %PLAYER_MAX_LEVEL% goto :displayCharacterExperienceAfterWhileLoop
+set /a check_exp=!py.base_exp_levels[%level_dec%]! * %py.misc.experience_factor% / 100
+if !check_exp! GTR !py.misc.exp! goto :displayCharacterExperienceAfterWhileLoop
+call :playerGainLevel
+:displayCharacterExperienceWhileLoop
+
+:displayCharacterExperienceAfterWhileLoop
+if %py.misc.exp% GTR %py.misc.max_exp% set "py.misc.max_exp=%py.misc.exp%"
+
+call :printLongNumber "%py.misc.exp%" "14;6"
 exit /b
 
