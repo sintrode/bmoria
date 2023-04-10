@@ -540,7 +540,27 @@ if "%py.flags.new_spells_to_learn%"=="0" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's winner status
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterWinner
+set /a "is_res=%game.noscore%&1", "is_wiz=%game.noscore%&2", "is_dup=%game.noscore%&4"
+if not "!is_wiz!"=="0" (
+    if "%game.wizard_mode%"=="true" (
+        call ui_io.cmd :putString "Is wizard  " "22;0"
+    ) else (
+        call ui_io.cmd :putString "Was wizard " "22;0"
+    )
+) else if not "!is_res!"=="0" (
+    call ui_io.cmd :putString "Resurrected" "22;0"
+) else if not "!is_dup!"=="0" (
+    call ui_io.cmd :putString "Duplicate  " "22;0"
+) else if "%game.total_winner%"=="true" (
+    call ui_io.cmd :putString "*Winner*   " "22;0"
+)
 exit /b
 
 :printCharacterStatsBlock
