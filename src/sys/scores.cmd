@@ -204,6 +204,15 @@ call ui_io.cmd :getKeyInput key
 if "!key!"=="Q" exit /b
 goto :showScoresScreenOuterWhile
 
+::------------------------------------------------------------------------------
+:: Formats output for later use
+::
+:: Arguments: %1 - The variable to store the result in
+::            %2 - The value to format
+::            %3 - The width of the field, leftpadded for a positive value
+::                 or rightpadded for a negative value
+:: Returns:   None
+::------------------------------------------------------------------------------
 :sprintf
 set "disp=%~2"
 if %~3 LSS 0 (

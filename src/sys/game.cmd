@@ -251,5 +251,5 @@ goto :getAllDirections
 ::------------------------------------------------------------------------------
 :exitProgram
 call ui_io.cmd :flushInputBuffer
-call io_io.cmd :terminalRestore
+call ui_io.cmd :terminalRestore
 exit /b

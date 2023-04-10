@@ -172,7 +172,23 @@ if "!%tile%.perma_lit_room!"=="true" (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Convert stat to a string if the stat is greater than 18
+::
+:: Arguments: %1 - The base stat value
+::            %2 - A variable to store the output in
+:: Returns:   None
+::------------------------------------------------------------------------------
 :statsAsString
+set /a percentile=%~1-18
+if %~1 LSS 18 (
+    call scores.cmd :sprintf "stat_string" "%~1" 6
+) else if "%percentile%"=="100" (
+    set "stat_string=18/100"
+) else (
+    set "percentile=0!percentile!"
+    set "stat_string= 18/!percentile:~0,2!"
+)
 exit /b
 
 :displayCharacterStats
