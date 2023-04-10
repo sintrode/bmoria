@@ -217,6 +217,7 @@ exit /b
 
 ::------------------------------------------------------------------------------
 :: A wrapper for :printHeaderNumber
+:: TODO: Merge the :five print____Number subroutines
 ::------------------------------------------------------------------------------
 :printHeaderLongNumber
 call :printHeaderNumber %*
@@ -235,7 +236,17 @@ call scores.cmd :sprintf "str" "%~2" 6
 call ui_io.cmd :putString "%~1: !str!" "%~3"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Print a 7-digit number with a header at specified coordinates
+::
+:: Arguments: %1 - The header to display
+::            %2 - The number to display
+::            %3 - The coordinates at which to display the string
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printHeaderLongNumber7Spaces
+call scores.cmd :sprintf "str" "%~2" 7
+call ui_io.cmd :putString "%~1: !str!" "%~3"
 exit /b
 
 :printLongNumber
