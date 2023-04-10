@@ -291,7 +291,7 @@ set "moria_message_size=80"
 set "msg_line=0"                     %= message line location =%
 set "message_history_size=22"        %= how many messages to save in the buffer =%
 set "stat_column=0"
-for /F %%A in ('echo prompt $E^| cmd') do set "ESC=%%a"
+for /F %%A in ('echo prompt $E ^| cmd') do set "ESC=%%a"
 
 ::----- version.h
 set "current_version_major=0"
@@ -516,5 +516,14 @@ for %%A in (CloseMenu Equipment Inventory) do (
 ::----- ui_io.cpp
 set "eof_flag=0"
 set "panic_save=false"
-for /f %%A in ('echo prompt $E ^| cmd') do set "ESC=%%A"
+
+::----- ui.cpp
+set "counter=0"
+for %%A in (STR INT WIS DEX CON CHR) do (
+    set "stat_names[!counter!]=%%~A"
+    set /a counter+=1
+)
+set "BLANK_LENGTH=24"
+set "screen_has_changed=false"
+set "last_message_id=0"
 exit /b

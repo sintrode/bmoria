@@ -2,7 +2,19 @@
 call %*
 exit /b
 
+::------------------------------------------------------------------------------
+:: Calculates current boundaries
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :panelBounds
+set /a dg.panel.top=%dg.panel.row% * (%screen_height% / 2)
+set /a dg.panel.bottom=%dg.panel.top% + %screen_height% - 1
+set /a dg.panel.row_prt=%dg.panel.top% - 1
+set /a dg.panel.left=%dg.panel.col% * (%screen_width% / 2)
+set /a dg.panel.right=%dg.panel.left% + %screen_width% - 1
+set /a dg.panel.col_prt=%dg.panel.left% - 13
 exit /b
 
 :coordOutsidePanel
