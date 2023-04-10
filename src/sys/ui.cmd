@@ -17,8 +17,72 @@ set /a dg.panel.right=%dg.panel.left% + %screen_width% - 1
 set /a dg.panel.col_prt=%dg.panel.left% - 13
 exit /b
 
+::------------------------------------------------------------------------------
+:: Calculate new borders if a specified set of coordinates goes offscreen
+::
+:: Arguments: %1 - The set of coordinates to validate
+::            %2 - Determines if a recalculation should be forced
+:: Returns:   0 if the coordinates are outside of the panel
+::            1 if the coordinates exist on the current panel
+::------------------------------------------------------------------------------
 :coordOutsidePanel
-exit /b
+set "coord=%~1"
+set "force=%~2"
+
+for /f "tokens=1,2 delims=;" %%A in ("%coord%") do (
+    set "coord.y=%%~A"
+    set "coord.x=%%~B"
+)
+set "panel=%dg.panel.row%;%dg.panel.col%"
+set "panel.y=%dg.panel.row%"
+set "panel.x=%dg.panel.col%"
+
+set "recalc_y=0"
+if "%force%"=="true" set "recalc_y=1"
+set /a border_inc=%dg.panel.top%+2
+if %coord.y% LSS %border_inc% set "recalc_y=1"
+set /a border_inc=%dg.panel.bottom%-2
+if %coord.y% GTR %border_inc% set "recalc_y=1"
+if "!recalc_y!"=="1" (
+    set /a "panel.y=(%coord.y% - %screen_height% / 4) / (%screen_height% / 2)"
+    if !panel.y! GTR %dg.panel.max_rows% (
+        set "panel.y=%dg.panel.max_rows%"
+    ) else if !panel.y! LSS 0 (
+        set "panel.y=0"
+    )
+)
+set "recalc_y="
+
+set "recalc_x=0"
+if "%force%"=="true" set "recalc_x=1"
+set /a border_inc=%dg.panel.left%+3
+if %coord.x% LSS %border_inc% set "recalc_x=1"
+set /a border_inc=%dg.panel.right%+3
+if %coord.x% GTR %border_inc% set "recalc_x=1"
+if "!recalc_x!"=="1" (
+    set /a "panel.x=(%coord.x% - %screen_width% / 4) / (%screen_width% / 2)"
+    if !panel.x! GTR %dg.panel.max_cols% (
+        set "panel.x=%dg.panel.max_cols%"
+    ) else if !panel.x! LSS 0 (
+        set "panel.x=0"
+    )
+)
+set "recalc_x="
+
+set "new_bounds=0"
+if not "!panel.y!"=="%dg.panel.row%" set "new_bounds=1"
+if not "!panel.x!"=="%dg.panel.col%" set "new_bounds=1"
+if "!new_bounds!"=="1" (
+    set "dg.panel.row=!panel.y!"
+    set "dg.panel.col=!panel.x!"
+    call :panelBounds
+
+    if "%config.options.find_bound%"=="true" (
+        call player_run.cmd :playerEndRunning
+    )
+    exit /b 0
+)
+exit /b 1
 
 :coordInsidePanel
 exit /b
