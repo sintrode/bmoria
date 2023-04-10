@@ -204,7 +204,15 @@ call ui_io.cmd :putString "!stat_names!" "!stat_row!;%STAT_COLUMN%"
 call ui_io.cmd :putString "!text!" "!stat_row!;!stat_col_inc!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Print character information at specified coordinates
+::
+:: Arguments: %1 - The info to display
+::            %2 - The coordinates to place the string at
+::------------------------------------------------------------------------------
 :printCharacterInfoInField
+call ui_io.cmd :putString "             " "%~2"
+call ui_io.cmd :putString %*
 exit /b
 
 :printHeaderLongNumber
