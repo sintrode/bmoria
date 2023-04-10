@@ -290,7 +290,14 @@ exit /b
 call :printNumber "%py.misc.level%" "13;6"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's current mana points
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterCurrentMana
+call :printNumber "%py.misc.current_mana%" "15;6"
 exit /b
 
 :printCharacterMaxHitPoints
