@@ -327,8 +327,20 @@ for /f "delims=" %%A in ('xcopy /w "!comspec!" "!comspec!" 2^>nul') do (
 set "%~1=!key:~0,1!"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prompts for input and stores the value in a variable
+::
+:: Arguments: %1 - The message to display while prompting for input
+::            %2 - A variable to store the command given by the player
+:: Returns:   0 if the player entered a valid command
+::            1 if the player entered Q as the escape command
+::------------------------------------------------------------------------------
 :getCommand
-exit /b
+if not "%~1"=="dummy" call :putStringClearToEOL "%~1" "0;0"
+call :getKeyInput "command"
+call :messageLineClear
+if "!command!"=="Q" exit /b 1
+exit /b 0
 
 :getTileCharacter
 exit /b
