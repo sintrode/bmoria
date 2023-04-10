@@ -330,7 +330,14 @@ exit /b
 call :printNumber "%py.misc.display_ac%" "19;6"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's gold
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterGoldValue
+call :printNumber "%py.misc.au%" "20;6"
 exit /b
 
 :printCharacterCurrentDepth
