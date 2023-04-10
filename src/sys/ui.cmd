@@ -509,6 +509,7 @@ exit /b
 set "speed=%py.flags.speed%"
 set "is_searching=%py.flags.status% & %config.player.status.PY_SEARCH%"
 if not "!is_searching!"=="0" set /a speed-=1
+set "is_searching="
 
 if !speed! GTR 1 (
     call ui_io.cmd :putString "Very Slow" "23;49"
@@ -521,9 +522,22 @@ if !speed! GTR 1 (
 ) else (
     call ui_io.cmd :putString "Very Fast" "23;49"
 )
+set "speed="
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's study reminder
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterStudyInstruction
+set /a "py.flags.status&=~%config.player.status.PY_STUDY%"
+if "%py.flags.new_spells_to_learn%"=="0" (
+    call ui_io.cmd :putString "     " "23;59"
+) else (
+    call ui_io.cmd :putString "Study" "23;59"
+)
 exit /b
 
 :printCharacterWinner
