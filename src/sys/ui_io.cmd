@@ -81,7 +81,6 @@ exit /b
 ::------------------------------------------------------------------------------
 :flushInputBuffer
 if not "!eof_flag!"=="0" exit /b
-call :checkForNonBlockingKeyPress 0
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -417,9 +416,6 @@ if /I "!key!"=="n" (
 call :putStringClearToEOL "[ press any key to continue ]" "%~1;23"
 pause >nul
 call :eraseLine "%~1;0"
-exit /b
-
-:checkForNonBlockingKeyPress
 exit /b
 
 :getDefaultPlayerName
