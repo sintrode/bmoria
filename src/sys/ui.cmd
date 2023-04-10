@@ -320,7 +320,14 @@ exit /b
 call :printNumber "%py.misc.current_hp%" "17;6"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's armor class
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterCurrentArmorClass
+call :printNumber "%py.misc.display_ac%" "19;6"
 exit /b
 
 :printCharacterGoldValue
