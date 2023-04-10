@@ -182,16 +182,26 @@ exit /b
 :statsAsString
 set /a percentile=%~1-18
 if %~1 LSS 18 (
-    call scores.cmd :sprintf "stat_string" "%~1" 6
+    call scores.cmd :sprintf "%~2" "%~1" 6
 ) else if "%percentile%"=="100" (
-    set "stat_string=18/100"
+    set "%~2=18/100"
 ) else (
     set "percentile=0!percentile!"
-    set "stat_string= 18/!percentile:~0,2!"
+    set "%~2= 18/!percentile:~0,2!"
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Print character stat in its dedicated row and column
+::
+:: Arguments: %1 - The index of the stat to display
+:: Returns:   None
+::------------------------------------------------------------------------------
 :displayCharacterStats
+call :statsAsString "!py.stats.used[%~1]!" "text"
+set /a stat_row=%~1+6, stat_col_inc=%stat_column%+6
+call ui_io.cmd :putString "!stat_names!" "!stat_row!;%STAT_COLUMN%"
+call ui_io.cmd :putString "!text!" "!stat_row!;!stat_col_inc!"
 exit /b
 
 :printCharacterInfoInField

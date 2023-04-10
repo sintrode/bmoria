@@ -520,7 +520,7 @@ set "panic_save=false"
 ::----- ui.cpp
 set "counter=0"
 for %%A in (STR INT WIS DEX CON CHR) do (
-    set "stat_names[!counter!]=%%~A"
+    set "stat_names[!counter!]=%%~A : "
     set /a counter+=1
 )
 set "BLANK_LENGTH=24"
