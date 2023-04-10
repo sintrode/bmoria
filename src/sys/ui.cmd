@@ -300,7 +300,14 @@ exit /b
 call :printNumber "%py.misc.current_mana%" "15;6"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints the character's maximum hit points
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterMaxHitPoints
+call :printNumber "%py.misc.max_hp%" "16;6"
 exit /b
 
 :printCharacterCurrentHitPoints
