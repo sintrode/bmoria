@@ -381,8 +381,31 @@ call :getInputConfirmationWithAbort 0 "%~1"
 if "!errorlevel!"=="1" exit /b 0
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: A wrapper for :getInputConfirmation
+::
+:: Arguments: %1 - The column to place the prompt at
+::            %2 - The prompt to display before verification
+:: Returns:    0 if the player enters N
+::             1 if the player enters Y
+::            -1 if the player enters anything else
+::------------------------------------------------------------------------------
 :getInputConfirmationWithAbort
-exit /b
+call :get_cursor_pos getyx
+if !getyx.x! GTR 73 <nul set /p ".=%ESC%[0;73H"
+
+<nul set /p ".= [y/n]"
+call :getKeyInput key
+
+call :messageLineClear
+
+if /I "!key!"=="n" (
+    exit /b 0
+) else if /I "!key!"=="y" (
+    exit /b 1
+) else (
+    exit /b -1
+)
 
 :waitForContinueKey
 exit /b
