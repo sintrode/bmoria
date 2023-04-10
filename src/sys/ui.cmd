@@ -103,19 +103,35 @@ set /a "is_valid=!valid_y! | !valid_x!"
 exit /b !is_valid!
 
 ::------------------------------------------------------------------------------
-:: Draw the entire screen
+:: Prints the map of the dungeon
 ::
 :: Arguments: None
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :drawDungeonPanel
+set "line=1"
+for /L %%Y in (%dg.panel.top%,1,%dg.panel.bottom%) do (
+    call ui_io.cmd :eraseLine "!line!;13"
+    set /a line+=1
+
+    for /L %%X in (%dg.panel.left%,1,%dg.panel.right%) do (
+        call dungeon.cmd :caveGetTileSymbol "%%Y;%%X" "ch"
+        if not "!ch!"==" " call ui_io.cmd :panelPutTile "!ch!" "%%Y;%%X"
+    )
+)
+exit /b
+
+::------------------------------------------------------------------------------
+:: Draw the entire screen
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
+:drawCavePanel
 call ui_io.cmd :clearScreen
 call :printCharacterStatsBlock
 call :drawDungeonPanel
 call :printCharacterCurrentDepth
-exit /b
-
-:drawCavePanel
 exit /b
 
 :dungeonResetView
