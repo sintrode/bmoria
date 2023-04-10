@@ -769,7 +769,18 @@ call ui_io.cmd :putString "Infra-Vision:" "18;55"
 call ui_io.cmd :putString "!xinfra!"      "18;69"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Display the character on the screen
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacter
+call :printCharacterInformation
+call :printCharacterVitalStatistics
+call :printCharacterStats
+call :printCharacterLevelExperience
+call :printCharacterAbilities
 exit /b
 
 :getCharacterName
