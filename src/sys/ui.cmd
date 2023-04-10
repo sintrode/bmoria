@@ -84,8 +84,23 @@ if "!new_bounds!"=="1" (
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Check if the specified coordinates are on the current screen panel
+::
+:: Arguments: %1 - The coordinates to check
+:: Returns:   0 if the coordinates are on the panel
+::            1 if the coordinates are out of bounds
+::------------------------------------------------------------------------------
 :coordInsidePanel
-exit /b
+set "valid_y=1"
+set "valid_x=1"
+
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
+    if %%~A GEQ %dg.panel.top% if %%~A LEQ %dg.panel.bottom% set "valid_y=0"
+    if %%~B GEQ %dg.panel.left% if %%~B LEQ %dg.panel.right% set "valid_y=0"
+)
+set /a "is_valid=!valid_y! | !valid_x!"
+exit /b !is_valid!
 
 :drawDungeonPanel
 exit /b
