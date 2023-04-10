@@ -24,7 +24,7 @@ set /a clock_var+=113452
 call rng.cmd :setRandomSeed !clock_var!
 
 :: And now for additional randomness
-call game.cpp :randomNumber 100
+call rng.cmd :randomNumber 100
 for /L %%A in (!errorlevel!,-1,1) do (
     call rng.cmd :rnd
 )
@@ -52,17 +52,6 @@ call rng.cmd :setRandomSeed !old_seed!
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Generates a random number between 1 and MAXVAL
-::
-:: Arguments: %1 - The maximum valid random value
-:: Returns:   A random number between 1 and %1
-::------------------------------------------------------------------------------
-:randomNumber
-call rng.cmd :rnd
-set /a random_number=!errorlevel! %% %~1 + 1
-exit /b !random_number!
-
-::------------------------------------------------------------------------------
 :: Generates a random integer number of normal distribution
 ::
 :: Arguments: %1 - mean
@@ -70,14 +59,14 @@ exit /b !random_number!
 :: Returns:   A random number within a few standard deviations
 ::------------------------------------------------------------------------------
 :randomNumberNormalDistribution
-call :randomNumber 32767
+call rng.cmd :randomNumber 32767
 set "tmp_random_number=!errorlevel!"
 
 if "%tmp_random_number%"=="32767" (
-    call :randomNumber %~2
+    call rng.cmd :randomNumber %~2
     set /a offset=4 * %~2 + !errorlevel!
 
-    call :randomNumber 2
+    call rng.cmd :randomNumber 2
     if "!errorlevel!"=="1" set /a offset=-!offset!
     set /a sd=%~1+!offset!
     exit /b !sd!
@@ -107,7 +96,7 @@ if !normal_table[%iindex%]! LSS !tmp_random_number! (
 
 set /a "offset=((%~2*!iindex!)+(%normal_table_sd% >> 1)) / %normal_table_sd%"
 
-call :randomNumber 2
+call rng.cmd :randomNumber 2
 if "!errorlevel!"=="1" set /a offset=-!offset!
 set /a sd=%~1+!offset!
 exit /b !sd!
@@ -179,7 +168,7 @@ exit /b
 :: Returns:   1, 2, 3, 4, 6, 7, 8 or 9
 ::------------------------------------------------------------------------------
 :getRandomDirection
-call game.cmd :randomNumber 9
+call rng.cmd :randomNumber 9
 if "!errorlevel!"=="5" (
     goto :getRandomDirection
 ) else (

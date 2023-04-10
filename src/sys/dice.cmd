@@ -12,7 +12,7 @@ exit /b
 :diceRoll
 set "sum=0"
 for /L %%A in (1,1,%~1) do (
-    call game.cmd :randomNumber "%~2"
+    call rng.cmd :randomNumber "%~2"
     set /a sum+=!errorlevel!
 )
 exit /b !sum!

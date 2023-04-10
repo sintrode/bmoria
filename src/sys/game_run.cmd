@@ -261,7 +261,7 @@ if "%py.carrying_light%"=="true" (
             call monster.cmd :updateMonsters false
         ) else (
             if !item! LSS 40 (
-                call game.cmd :randomNumber 5
+                call rng.cmd :randomNumber 5
                 if "!errorlevel!"=="1" (
                     if %py.flags.blind% LSS 1 (
                         call player.cmd :playerDisturb 0 0
@@ -422,9 +422,9 @@ if %py.flags.food% LSS %config.player.player_food_alert% (
         set "is_weak="
 
         if %py.flags.food% LSS %config.player.player_food_faint% (
-            call :game.cmd :randomNumber 8
+            call :rng.cmd :randomNumber 8
             if "!errorlevel!"=="1" (
-                call :game.cmd :randomNumber 5
+                call :rng.cmd :randomNumber 5
                 set /a py.flags.paralysis+=!errorlevel!
                 call ui_io.cmd :printMessage "You faint from the lack of food."
                 call player.cmd :playerDisturb 1 0
@@ -1067,7 +1067,7 @@ for /L %%A in (0,1,%player_inventory_size%) do (
     if !item.category_id! NEQ %tv_nothing% (
         call :itemEnchanted item
         if "!errorlevel!"=="0" (
-            call game.cmd :randomNumber !chance!
+            call rng.cmd :randomNumber !chance!
             if "!errorlevel!"=="1" (
                 call ui_inventory.cmd :playerItemWearingDescription !enchant_item! "tmp_str"
                 set "tmp_str=There's something about what you are !tmp_str!"
@@ -1956,7 +1956,7 @@ if %dg.current_level% NEQ 0 (
 )
 set "rotate_stock="
 
-call game.cmd :randomNumber "%config.monsters.mon_chance_of_new%"
+call rng.cmd :randomNumber "%config.monsters.mon_chance_of_new%"
 if "!errorlevel!"=="1" (
     call monster_manager.cmd :monsterPlaceNewWithinDistance 1 "%config.monsters.mon_max_sight%" "false"
 )
@@ -1988,7 +1988,7 @@ call :playerUpdateWordOfRecall
 
 :: Random teleportation
 if "%py.flags.teleport%"=="true" (
-    call game.cmd :randomNumber 100
+    call rng.cmd :randomNumber 100
     if "!errorlevel!"=="1" (
         call player.cmd :playerDisturb 0 0
         call player.cmd :playerTeleport 40

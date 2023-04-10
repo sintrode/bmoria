@@ -29,3 +29,14 @@ if !test! GTR 0 (
     set /a rnd_seed=!test! + %rng_m%
 )
 exit /b !rnd_seed!
+
+::------------------------------------------------------------------------------
+:: Generates a random number between 1 and MAXVAL
+::
+:: Arguments: %1 - The maximum valid random value
+:: Returns:   A random number between 1 and %1
+::------------------------------------------------------------------------------
+:randomNumber
+call rng.cmd :rnd
+set /a random_number=!errorlevel! %% %~1 + 1
+exit /b !random_number!
