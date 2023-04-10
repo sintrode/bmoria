@@ -802,8 +802,37 @@ if "!errorlevel!"=="1" (
 call ui_io.cmd :clearToBottom 20
 exit /b
 
+::------------------------------------------------------------------------------
+:: Change the character's name or savefile name
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :changeCharacterName
-exit /b
+set "flag=false"
+call :printCharacter
+
+:changeCharacterNameWhileLoop
+if "!flag!"=="true" exit /b
+call ui_io.cmd :putStringClearToEOL "<f>ile character description. <c>hange character name. <Q>uit." "21;2"
+
+call ui_io.cmd :getKeyInput key
+if "!key!"=="c" (
+    call :getCharacterName
+    set "flag=true"
+) else if "!key!"=="f" (
+    call ui_io.cmd :putStringClearToEOL "File name:" "0;0"
+    call ui_io.cmd :getStringInput "temp_name" "0;10" 60
+    if "!errorlevel!"=="0" if not "!temp_name!"=="" (
+        call game_files.cmd :outputPlayerCharacterToFile "!temp_name!"
+        if "!errorlevel!"=="0" set "flag=true"
+    )
+) else if "!key!"=="Q" (
+    set "flag=true"
+) else (
+    call ui_io.cmd :terminalBellSound
+)
+goto :changeCharacterNameWhileLoop
 
 :displaySpellsList
 exit /b
