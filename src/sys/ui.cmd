@@ -134,7 +134,42 @@ call :drawDungeonPanel
 call :printCharacterCurrentDepth
 exit /b
 
+::------------------------------------------------------------------------------
+:: Redraw the panel and update the lighting if needed
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :dungeonResetView
+set "tile=dg.floor[%py.pos.y%][%py.pos.x%]"
+
+call :coordOutsidePanel "%py.pos.y%;%py.pos.x%" "false" && call :drawDungeonPanel
+call dungeon.cmd :dungeonMoveCharacterLight "py.pos" "py.pos"
+
+if "!%tile%.feature_id!"=="%TILE_LIGHT_FLOOR%" (
+    if %py.flags.blind% LSS 1 (
+        if "!%tile%.permanent_light!"=="false" (
+            call dungeon.cmd :dungeonLightRoom "py.pos"
+        )
+    )
+    exit /b
+)
+
+if "!%tile%.perma_lit_room!"=="true" (
+    if %py.flags.blind% LSS 1 (
+        call helpers.cmd :expandCoordName "py.pos"
+        for /L %%Y in (%py.pos.y_dec%,1,%py.pos.y_inc%) do (
+            for /L %%X in (%py.pos.x_dec%,1,%py.pos.x_inc%) do (
+                if "!dg.floor[%%Y][%%X].feature_id!"=="%TILE_LIGHT_FLOOR%" (
+                    if "!dg.floor[%%Y][%%X].permanent_light!"=="false" (
+                        set "coord=%%Y;%%X"
+                        call dungeon.cmd :dungeonLightRoom "coord"
+                    )
+                )
+            )
+        )
+    )
+)
 exit /b
 
 :statsAsString
