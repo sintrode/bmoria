@@ -249,10 +249,24 @@ call scores.cmd :sprintf "str" "%~2" 7
 call ui_io.cmd :putString "%~1: !str!" "%~3"
 exit /b
 
+::------------------------------------------------------------------------------
+:: An overloaded method for :printNumber because int32_t and int are different
+:: things in C/C++
+::------------------------------------------------------------------------------
 :printLongNumber
+call :printNumber %*
 exit /b
 
+::------------------------------------------------------------------------------
+:: Print a number at specified coordinates with no header
+::
+:: Arguments: %1 - The number to display
+::            %2 - The coordinates at which to display the string
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printNumber
+call scores.cmd :sprintf "str" "%~1" 6
+call ui_io.cmd :putString "!str!" "%~2"
 exit /b
 
 :printCharacterTitle
