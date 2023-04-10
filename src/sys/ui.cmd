@@ -667,7 +667,17 @@ if "!stat_ratio!"=="6" set "%~3=Very Good"
 if !stat_ratio! GEQ 7 if !stat_ratio! LEQ 8 set "%~3=Excellent"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Prints age/height/weight/social class
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterVitalStatistics
+call :printHeaderNumber "Age          " "%py.misc.age%" "2;38"
+call :printHeaderNumber "Height       " "%py.misc.height%" "3;38"
+call :printHeaderNumber "Weight       " "%py.misc.weight%" "4;38"
+call :printHeaderNumber "Social Class " "%py.misc.social_class%" "5;38"
 exit /b
 
 :printCharacterLevelExperience
