@@ -407,7 +407,16 @@ if /I "!key!"=="n" (
     exit /b -1
 )
 
+::------------------------------------------------------------------------------
+:: Pauses for user response before returning
+::
+:: Arguments: %1 - The line number to place the message on
+:: Returns:   None
+::------------------------------------------------------------------------------
 :waitForContinueKey
+call :putStringClearToEOL "[ press any key to continue ]" "%~1;23"
+pause >nul
+call :eraseLine "%~1;0"
 exit /b
 
 :checkForNonBlockingKeyPress
