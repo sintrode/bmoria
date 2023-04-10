@@ -291,7 +291,7 @@ set "moria_message_size=80"
 set "msg_line=0"                     %= message line location =%
 set "message_history_size=22"        %= how many messages to save in the buffer =%
 set "stat_column=0"
-for /F %%A in ('echo prompt $E ^| cmd') do set "ESC=%%a"
+for /F %%A in ('echo prompt $E ^| cmd') do set "ESC=%%A"
 
 ::----- version.h
 set "current_version_major=0"
