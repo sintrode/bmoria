@@ -340,7 +340,19 @@ exit /b
 call :printNumber "%py.misc.au%" "20;6"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Print the character's depth in feet
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printCharacterCurrentDepth
+set /a depth=%dg.current_level% * 50
+if "!depth!"=="0" (
+    call ui_io.cmd :putStringClearToEOL "Town level" "23;65"
+) else (
+    call ui_io.cmd :putStringClearToEOL "!depth! feet" "23;65"
+)
 exit /b
 
 :printCharacterHungerStatus
