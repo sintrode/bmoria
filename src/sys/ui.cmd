@@ -215,13 +215,27 @@ call ui_io.cmd :putString "             " "%~2"
 call ui_io.cmd :putString %*
 exit /b
 
+::------------------------------------------------------------------------------
+:: A wrapper for :printHeaderNumber
+::------------------------------------------------------------------------------
 :printHeaderLongNumber
+call :printHeaderNumber %*
+exit /b
+
+::------------------------------------------------------------------------------
+:: Print a number with a header at specified coordinates
+::
+:: Arguments: %1 - The header to display
+::            %2 - The number to display
+::            %3 - The coordinates at which to display the string
+:: Returns:   None
+::------------------------------------------------------------------------------
+:printHeaderNumber
+call scores.cmd :sprintf "str" "%~2" 6
+call ui_io.cmd :putString "%~1: !str!" "%~3"
 exit /b
 
 :printHeaderLongNumber7Spaces
-exit /b
-
-:printHeaderNumber
 exit /b
 
 :printLongNumber
