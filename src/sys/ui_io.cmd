@@ -238,7 +238,64 @@ echo %ESC%7
 echo %ESC%8
 exit /b
 
+::------------------------------------------------------------------------------
+:: Output messages to the top of the screen
+::
+:: Arguments: %1 - The message to display
+:: Returns:   None
+::------------------------------------------------------------------------------
 :printMessage
+set "new_len=0"
+set "old_len=0"
+set "combine_messages=false"
+
+if "!message_ready_to_print!"=="true" (
+    call helpers.cmd :getLength "!messages[%last_message_id%]!" old_len
+    set /a old_len+=1
+
+    if not "%~1"=="" (
+        call helpers.cmd :getLength "%~1" new_len
+    ) else (
+        set "new_len=0"
+    )
+
+    set "merge_unnecessary=0"
+    if "%~1"=="" set "merge_unnecessary=1"
+    set /a msg_total=!new_len! + !old_len! + 2
+    if !msg_total! GEQ 73 set "merge_unnecessary=1"
+    if "!merge_unnecessary!"=="1" (
+        if !old_len! GTR 73 set "old_len=73"
+        call :putString " -more-" "%MSG_LINE%;!old_len!"
+        call :getKeyInput dummy
+    ) else (
+        set "combine_messages=true"
+    )
+)
+
+if "!combine_messages!"=="false" call :eraseLine "%MSG_LINE%;0"
+
+if "%~1"=="" (
+    set "message_ready_to_print=false"
+    exit /b
+)
+
+set "game.command_count=0"
+set "message_ready_to_print=true"
+
+:: If the new message and old message are short enough, put them on the same line
+if "!combine_messages!"=="true" (
+    set /a old_len_inc=!old_len!+2
+    call :putString "%~1" "%MSG_LINE%;!old_len_inc!"
+    set "messages[%last_message_id%]=!messages[%last_message_id%]! %~1"
+) else (
+    call :messageLinePrintMessage "%~1"
+    set /a last_message_id+=1
+    if !last_message_id! GEQ %MESSAGE_HISTORY_SIZE% set "last_message_id=0"
+
+    set "tmp_msg=%~1"
+    set "tmp_msg=!tmp_msg:~0,79!"
+    set "messages[!last_message_id!]=!tmp_msg!"
+)
 exit /b
 
 :printMessageNoCommandInterrupt
