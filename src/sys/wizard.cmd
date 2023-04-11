@@ -67,7 +67,34 @@ call dungeon.cmd :dungeonPlaceRandomObjectNear "%py.pos.y%;%py.pos.x%" "%i%"
 call ui.cmd :drawDungeonPanel
 exit /b
 
+::------------------------------------------------------------------------------
+:: Teleport to a specific depth
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wizardJumpLevel
+if %game.command_count% GTR 0 (
+    if %game.command_count% GTR 99 (
+        set "i=0"
+    ) else (
+        set "i=%game.command_count%"
+    )
+    set "game.command_count=0"
+) else (
+    set "i=-1"
+    call ui_io.cmd :putStringClearToEOL "Go to which level (0-99)? " "0;0"
+    call ui_io.cmd :getStringInput "input" "0;27" "10"
+    set /a "i=!input!"
+)
+
+if !i! GEQ 0 (
+    set "dg.current_level=!i!"
+    if !dg.current_level! GTR 99 set "dg.current_level=99"
+    set "dg.generate_new_level=true"
+) else (
+    call ui_io.cmd :messageLineClear
+)
 exit /b
 
 :wizardGainExperience
