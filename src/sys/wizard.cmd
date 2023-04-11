@@ -159,11 +159,261 @@ for /L %%Y in (0,1,%height_dec%) do (
 call ui.cmd :drawDungeonPanel
 exit /b
 
+::------------------------------------------------------------------------------
+:: Manually set the character's stats
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wizardCharacterAdjustment
-exit /b
+call ui_io.cmd :putStringClearToEOL "(3 - 118) Strength     = " "0;0"
+call ui_io.cmd :getStringInput "input" "0;25" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR 2 if !number! LSS 199 (
+        set "py.stats.max[%PlayerAttr.A_STR%]=!number!"
+        call player_stats.cmd :playerStatRestore "%PlayerAttr.A_STR%"
+    )
+) else (
+    exit /b
+)
 
+call ui_io.cmd :putStringClearToEOL "(3 - 118) Intelligence = " "0;0"
+call ui_io.cmd :getStringInput "input" "0;25" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR 2 if !number! LSS 199 (
+        set "py.stats.max[%PlayerAttr.A_INT%]=!number!"
+        call player_stats.cmd :playerStatRestore "%PlayerAttr.A_INT%"
+    )
+) else (
+    exit /b
+)
+
+call ui_io.cmd :putStringClearToEOL "(3 - 118) Wisdom       = " "0;0"
+call ui_io.cmd :getStringInput "input" "0;25" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR 2 if !number! LSS 199 (
+        set "py.stats.max[%PlayerAttr.A_WIS%]=!number!"
+        call player_stats.cmd :playerStatRestore "%PlayerAttr.A_WIS%"
+    )
+) else (
+    exit /b
+)
+
+call ui_io.cmd :putStringClearToEOL "(3 - 118) Dexterity    = " "0;0"
+call ui_io.cmd :getStringInput "input" "0;25" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR 2 if !number! LSS 199 (
+        set "py.stats.max[%PlayerAttr.A_DEX%]=!number!"
+        call player_stats.cmd :playerStatRestore "%PlayerAttr.A_DEX%"
+    )
+) else (
+    exit /b
+)
+
+call ui_io.cmd :putStringClearToEOL "(3 - 118) Constitution = " "0;0"
+call ui_io.cmd :getStringInput "input" "0;25" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR 2 if !number! LSS 199 (
+        set "py.stats.max[%PlayerAttr.A_CON%]=!number!"
+        call player_stats.cmd :playerStatRestore "%PlayerAttr.A_CON%"
+    )
+) else (
+    exit /b
+)
+
+call ui_io.cmd :putStringClearToEOL "(3 - 118) Charisma     = " "0;0"
+call ui_io.cmd :getStringInput "input" "0;25" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR 2 if !number! LSS 199 (
+        set "py.stats.max[%PlayerAttr.A_CHR%]=!number!"
+        call player_stats.cmd :playerStatRestore "%PlayerAttr.A_CHR%"
+    )
+) else (
+    exit /b
+)
+
+call ui_io.cmd :putStringClearToEOL "(1 - 32767) Hit Points = " "0;0"
+call ui_io.cmd :getStringInput "input" "0;25" "5"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR 0 if !number! LEQ 32767 (
+        set "py.misc.max_hp=!number!"
+        set "py.misc.current_hp=!number!"
+        set "py.misc.current_hp_fraction=0"
+        call ui.cmd :printCharacterMaxHitPoints
+        call ui.cmd :printCharacterCurrentHitPoints
+    )
+) else (
+    exit /b
+)
+
+call ui_io.cmd :putStringClearToEOL "(0 - 32767) Mana       = " "0;0"
+call ui_io.cmd :getStringInput "input" "0;25" "5"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR -1 if !number! LEQ 32767 (
+        set "py.misc.mana=!number!"
+        set "py.misc.current_mana=!number!"
+        set "py.misc.current_mana_fraction=0"
+        call ui.cmd :printCharacterCurrentMana
+    )
+) else (
+    exit /b
+)
+
+:: TODO: Make sure the two extra equals signs are okay here
+set "input=Current=%py.misc.au%  Gold = "
+call helpers.cmd :getLength "!input!" "number"
+call ui_io.cmd :putStringClearToEOL "!input!" "0;0"
+call ui_io.cmd :getStringInput "!input!" "0;!number!" "7"
+if "!errorlevel!"=="0" (
+    set /a "new_gold=!input!"
+    if !new_gold! GTR 0 (
+        set "py.misc.au=!new_gold!"
+        call ui.cmd :printCharacterGoldValue
+    )
+) else (
+    exit /b
+)
+
+set "input=Current=%py.misc.chance_in_search%  (0-200) Searching = "
+call helpers.cmd :getLength "!input!" "number"
+call ui_io.cmd :putStringClearToEOL "!input!" "0;0"
+call ui_io.cmd :getStringInput "!input!" "0;!number!" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR -1 if !number! LSS 201 (
+        set "py.misc.chance_in_search=!number!"
+    )
+) else (
+    exit /b
+)
+
+set "input=Current=%py.misc.stealth_factor%  (-1-18) Stealth = "
+call helpers.cmd :getLength "!input!" "number"
+call ui_io.cmd :putStringClearToEOL "!input!" "0;0"
+call ui_io.cmd :getStringInput "!input!" "0;!number!" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR -2 if !number! LSS 19 (
+        set "py.misc.stealth_factor=!number!"
+    )
+) else (
+    exit /b
+)
+
+set "input=Current=%py.misc.disarm%  (0-200) Disarming = "
+call helpers.cmd :getLength "!input!" "number"
+call ui_io.cmd :putStringClearToEOL "!input!" "0;0"
+call ui_io.cmd :getStringInput "!input!" "0;!number!" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR -1 if !number! LSS 201 (
+        set "py.misc.disarm=!number!"
+    )
+) else (
+    exit /b
+)
+
+set "input=Current=%py.misc.saving_throw%  (0-100) Save = "
+call helpers.cmd :getLength "!input!" "number"
+call ui_io.cmd :putStringClearToEOL "!input!" "0;0"
+call ui_io.cmd :getStringInput "!input!" "0;!number!" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR -1 if !number! LSS 201 (
+        set "py.misc.saving_throw=!number!"
+    )
+) else (
+    exit /b
+)
+
+set "input=Current=%py.misc.bth%  (0-200) Base to hit = "
+call helpers.cmd :getLength "!input!" "number"
+call ui_io.cmd :putStringClearToEOL "!input!" "0;0"
+call ui_io.cmd :getStringInput "!input!" "0;!number!" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR -1 if !number! LSS 201 (
+        set "py.misc.bth=!number!"
+    )
+) else (
+    exit /b
+)
+
+set "input=Current=%py.misc.bth_with_bows%  (0-100) Bows/Throwing = "
+call helpers.cmd :getLength "!input!" "number"
+call ui_io.cmd :putStringClearToEOL "!input!" "0;0"
+call ui_io.cmd :getStringInput "!input!" "0;!number!" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR -1 if !number! LSS 201 (
+        set "py.misc.bth_with_bows=!number!"
+    )
+) else (
+    exit /b
+)
+
+set "input=Current=%py.misc.weight%  Weight = "
+call helpers.cmd :getLength "!input!" "number"
+call ui_io.cmd :putStringClearToEOL "!input!" "0;0"
+call ui_io.cmd :getStringInput "!input!" "0;!number!" "3"
+if "!errorlevel!"=="0" (
+    set /a "number=!input!"
+    if !number! GTR -1 (
+        set "py.misc.weight=!number!"
+    )
+) else (
+    exit /b
+)
+
+:wizardCharacterAdjustmentWhileLoop
+call ui_io.cmd :getCommand "Alter speed? (+/-)" "input"
+if "!errorlevel!"=="1" exit /b
+
+if "!input!"=="+" (
+    call player.cmd :playerChangeSpeed -1
+) else if "!input!"=="-" (
+    call player.cmd :playerChangeSpeed 1
+) else (
+    exit /b
+)
+call ui.cmd :printCharacterSpeed
+goto :wizardCharacterAdjustmentWhileLoop
+
+::------------------------------------------------------------------------------
+:: Retrieve the specified element of the game_objects array
+::
+:: Arguments: %1 - The variable to store the index in
+::            %2 - A label to display
+::            %3 - The first valid item_id that can be selected
+::            %4 - The last valid item_id that can be selected
+:: Returns:   0 if a valid number is entered
+::            1 if the player aborts or enters an invalid number
+::------------------------------------------------------------------------------
 :wizardRequestObjectId
-exit /b
+set "msg=!%~2! ID (%~3-%~4): "
+call ui_io.cmd :putStringClearToEOL "!msg!" "0;0"
+call helpers.getLength "!msg!" "msg_length"
+
+call ui_io.cmd :getStringInput "input" "0;!msg_length!" "3" || exit /b 1
+for /f "delims=0123456789" %%A in ("!input!") do exit /b 1
+if !input! LSS %~3 (
+    call ui_io.cmd :putStringClearToEOL "Invalid ID. Must be %~3-%~4" "0;0"
+    exit /b 1
+)
+if !input! GTR %~4 (
+    call ui_io.cmd :putStringClearToEOL "Invalid ID. Must be %~3-%~4" "0;0"
+    exit /b 1
+)
+set "%~1=!input!"
+exit /b 0
 
 :wizardGenerateObject
 exit /b
