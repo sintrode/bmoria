@@ -115,7 +115,16 @@ if %game.command_count% GTR 0 (
 call ui.cmd :displayCharacterExperience
 exit /b
 
+::------------------------------------------------------------------------------
+:: Spawn in a new random monster
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wizardSummonMonster
+set "coord=%py.pos.y%;%py.pos.x%"
+call monster_manager.cmd :monsterSummon "coord" "true"
+call monster.cmd :updateMonsters "false"
 exit /b
 
 :wizardLightUpDungeon
