@@ -450,6 +450,75 @@ for /L %%A in (0,1,9) do (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Advanced subroutine for object generation
+:: WARNING: This will probably break something. Try not to use this one.
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wizardCreateObjects
+:: Initialize new object
+for %%A in (id special_name_id inscription flags category_id sprite misc_use 
+            cost sub_category_id items_count weight to_hit to_damage ac to_ac
+            "damage.dice" "damage.sides" depth_first_found identification) do (
+    set "forge.%%~A=0"
+)
+
+set "forge.id=%config.dungeon.objects.OBJ_WIZARD%"
+call identification.cmd :itemReplaceInscription "forge" "wizard item"
+set /a "forge.identification=%config.identification.ID_KNOWN2%|%config.identification.ID_STORE_BOUGHT%"
+
+call :wizardSetProperty "category_id"       "Tval   : "        "0;9"  3 "true"
+call :wizardSetProperty "sprite"            "Tchar  : "        "0;9"  1 "false"
+call :wizardSetProperty "sub_category_id"   "Subval : "        "0;9"  5 "true"
+call :wizardSetProperty "weight"            "Weight : "        "0;9"  5 "true"
+call :wizardSetProperty "items_count"       "Number : "        "0;9"  5 "true"
+call :wizardSetProperty "damage.dice"       "Damage (dice): "  "0;15" 3 "true"
+call :wizardSetProperty "damage.sides"      "Damage (sides): " "0;16" 3 "true"
+call :wizardSetProperty "to_hit"            "+To hit: "        "0;9"  3 "true"
+call :wizardSetProperty "to_damage"         "+To dam: "        "0;9"  3 "true"
+call :wizardSetProperty "ac"                "AC     : "        "0;9"  3 "true"
+call :wizardSetProperty "to_ac"             "+To AC : "        "0;9"  3 "true"
+call :wizardSetProperty "misc_use"          "P1     : "        "0;9"  5 "true"
+call :wizardSetProperty "flags"             "Flags (IN HEX): " "0;16" 8 "false"
+call :wizardSetProperty "cost"              "Cost : "          "0;9"  8 "true"
+call :wizardSetProperty "depth_first_found" "Level : "         "0;10" 3 "true"
+
+set "forge.sprite=!forge.sprite:~0,1!"
+set /a "forge.flags=0x!forge.flags!"
+
+call ui_io.cmd :getInputConfirmation "Allocate?"
+set "tile=dg.floor[%py.pos.y%][%py.pos.x%]"
+if "!errorlevel!"=="0" (
+    if not "!%tile%.treasure_id!"=="0" (
+        call dungeon.cmd :dungeonDeleteObject "py.pos"
+    )
+
+    call game_objects.cmd :popt
+    set "number=!errorlevel!"
+    call inventory.cmd :inventoryCopyItem "game.treasure.list[!number!]" "forge"
+    set "%tile%.treasure_id=!number!"
+    call ui_io.cmd :printMessage "Allocated."
+) else (
+    call ui_io.cmd :printMessage "Aborted."
+)
 exit /b
 
+::------------------------------------------------------------------------------
+:: Sets a specific property of the forge object
+::
+:: Arguments: %1 - The name of the property to set
+::            %2 - The putStringClearToEOL prompt
+::            %3 - The getStringInput coordinates
+::            %4 - The getStringInput length
+::            %5 - Determines if the input should be converted to a number
+:: Returns:   0 if the player enters text in getStringInput
+::            1 if the player aborts the creation process
+::------------------------------------------------------------------------------
+:wizardSetProperty
+call ui_io.cmd :putStringClearToEOL "%~2" "0;0"
+call ui_io.cmd :getStringInput "input" "%~3" %~4 || exit /b 1
+if "%~5"=="true" set /a "input=!input!"
+set "forge.%~1=!input!"
+exit /b 0
