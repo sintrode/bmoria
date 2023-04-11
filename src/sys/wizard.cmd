@@ -415,7 +415,39 @@ if !input! GTR %~4 (
 set "%~1=!input!"
 exit /b 0
 
+::------------------------------------------------------------------------------
+:: Basic subroutine for object generation
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wizardGenerateObject
+call :wizardRequestObjectId "id" "Dungeon/Store object" 0 366 || exit /b
+
+set /a coord.y=0, coord.x=0
+for /L %%A in (0,1,9) do (
+    call rng.cmd :randomNumber 5
+    set /a coord.y=!py.pos.y! - 3 + !errorlevel!
+    call rng.cmd :randomNumber 7
+    set /a coord.x=!py.pos.x! - 3 + !errorlevel!
+    set "coord=!coord.y!;!coord.x!"
+
+    call dungeon.cmd :coordInBounds "coord"
+    for /f "tokens=1,2" %%X in ("!coord.x! !coord.y!") do (
+        if !dg.floor[%%~Y][%%~X].feature_id! LEQ %MAX_CAVE_FLOOR% (
+            if "!dg.floor[%%~Y][%%~X].treasure_id!"=="0" (
+                call game_objects.cmd :popt
+                set "free_treasure_id=!errorlevel!"
+                set "dg.floor[%%Y][%%X].treasure_id=!free_treasure_id!"
+                call inventory.cmd :inventoryItemCopyTo "!id!" "game.treasure.list[!free_treasure_id!]"
+                call treasure.cmd :magicTreasureMagicalAbility "!free_treasure_id!" "%dg.current_level%"
+                call identification.cmd :itemIdentify "game.treasure.list[!free_treasure_id!]" "free_treasure_id"
+
+                exit /b
+            )
+        )
+    )
+)
 exit /b
 
 :wizardCreateObjects
