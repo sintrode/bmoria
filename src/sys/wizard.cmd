@@ -50,7 +50,21 @@ if %py.flags.slow% GTR 1 set "py.flags.slow=1"
 if %py.flags.image% GTR 1 set "py.flags.image=1"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Drop random items
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wizardDropRandomItems
+if %game.command_count% GTR 0 (
+    set "i=%game.command_count%"
+    set "game.command_count=0"
+) else (
+    set "i=1"
+)
+call dungeon.cmd :dungeonPlaceRandomObjectNear "%py.pos.y%;%py.pos.x%" "%i%"
+call ui.cmd :drawDungeonPanel
 exit /b
 
 :wizardJumpLevel
