@@ -6,8 +6,16 @@
 ::------------------------------------------------------------------------------
 @echo off
 setlocal enabledelayedexpansion
+:: TODO: Add loading bar because this is going to take about 60 seconds
 call sys\config.cmd
 call sys\read_constants.cmd
+call sys\data_creatures.cmd
+call sys\data_player.cmd
+call sys\data_recall.cmd
+call sys\data_store_owners.cmd
+call sys\data_stores.cmd
+call sys\data_tables.cmd
+call sys\data_treasure.cmd
 
 :main
 set "seed=0"
