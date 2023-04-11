@@ -97,7 +97,22 @@ if !i! GEQ 0 (
 )
 exit /b
 
+::------------------------------------------------------------------------------
+:: Increase the character's experience points
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wizardGainExperience
+if %game.command_count% GTR 0 (
+    set "py.misc.exp=%game.command_count%"
+    set "game.command_count=0"
+) else if "%py.misc.exp%"=="0" (
+    set "py.misc.exp=1"
+) else (
+    set /a py.misc.exp*=2
+)
+call ui.cmd :displayCharacterExperience
 exit /b
 
 :wizardSummonMonster
