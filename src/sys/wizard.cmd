@@ -28,7 +28,26 @@ if "!become_wizard!"=="1" (
 )
 exit /b 1
 
+::------------------------------------------------------------------------------
+:: Remove all status impairments and enfeeblements
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wizardCureAll
+call spells.cmd :spellRemoveCurseFromAllWornItems
+call player_magic.cmd :playerCureBlindness
+call player_magic.cmd :playerCureConfusion
+call player_magic.cmd :playerCurePoison
+call player_magic.cmd :playerRemoveFear
+call player_stats.cmd :playerStatRestore "%PlayerAttr.A_STR%"
+call player_stats.cmd :playerStatRestore "%PlayerAttr.A_INT%"
+call player_stats.cmd :playerStatRestore "%PlayerAttr.A_WIS%"
+call player_stats.cmd :playerStatRestore "%PlayerAttr.A_CON%"
+call player_stats.cmd :playerStatRestore "%PlayerAttr.A_DEX%"
+call player_stats.cmd :playerStatRestore "%PlayerAttr.A_CHR%"
+if %py.flags.slow% GTR 1 set "py.flags.slow=1"
+if %py.flags.image% GTR 1 set "py.flags.image=1"
 exit /b
 
 :wizardDropRandomItems
