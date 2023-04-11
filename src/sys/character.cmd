@@ -11,17 +11,19 @@ exit /b
 :characterGenerateStats
 set "total=0"
 for /L %%A in (0,1,17) do (
-    set /a max_rnd=3+%%A%%3
+    set /a "max_rnd=3 + (%%A %% 3)"
     call rng.cmd :randomNumber !max_rnd!
     set "dice[%%A]=!errorlevel!"
-    set /a total=!dice[%%A]!
+    set /a total+=!dice[%%A]!
 )
 if !total! LEQ 42 goto :characterGenerateStats
 if !total! GEQ 54 goto :characterGenerateStats
 
-for /L %%A in (1,1,6) do (
+for /L %%A in (0,1,5) do (
     set /a d1=3*%%A, d2=3*%%A+1, d3=3*%%A+2
-    set "py.stats.max[%%A]=5+d1+d2+d3"
+    for /f "tokens=1-3" %%B in ("!d1! !d2! !d3!") do (
+        set /a py.stats.max[%%A]= 5 + dice[%%~B] + dice[%%~C] + dice[%%~D]
+    )
 )
 exit /b
 
