@@ -35,8 +35,13 @@ exit /b
 :: Returns:   The new value of the stat
 ::------------------------------------------------------------------------------
 :decrementStat
+if "%~1"=="0" exit /b %~2
+
+:: Batch loops use GEQ instead of GTR so `for /L %%A in (0,1,0) do` runs once
+:: In C, this loop would not run at all, which is a problem.
+set /a adjustment=%~1+1
 set "stat=%~2"
-for /L %%A in (0,-1,%~1) do (
+for /L %%A in (0,-1,%adjustment%) do (
     if !stat! GTR 108 (
         set /a stat-=1
     ) else if !stat! GTR 88 (
@@ -62,8 +67,12 @@ exit /b !stat!
 :: Returns:   The new value of the stat
 ::------------------------------------------------------------------------------
 :incrementStat
+if "%~1"=="0" exit /b %~2
+
+:: Fix off-by-one error. See :decrementStat for more details.
+set /a adjustment=%~1-1
 set "stat=%~2"
-for /L %%A in (0,1,%~1) do (
+for /L %%A in (0,1,%adjustment%) do (
     if !stat! LSS 18 (
         set /a stat+=1
     ) else if !stat! LSS 88 (
