@@ -127,7 +127,36 @@ call monster_manager.cmd :monsterSummon "coord" "true"
 call monster.cmd :updateMonsters "false"
 exit /b
 
+::------------------------------------------------------------------------------
+:: Light the tiles in the dungeon
+::
+:: Arguments: None
+:: Returns:   None
+::------------------------------------------------------------------------------
 :wizardLightUpDungeon
+if "!dg.floor[%py.pos.y%][%py.pos.x%].permanent_light!"=="true" (
+    set "flag=false"
+) else (
+    set "flag=true"
+)
+
+set /a height_dec=%dg.height%-1, width_dec=%dg.width%-1
+for /L %%Y in (0,1,%height_dec%) do (
+    for /L %%X in (0,1,%width_dec%) do (
+        if !dg.floor[%%Y][%%X].feature_id! LEQ %MAX_CAVE_FLOOR% (
+            set /a y_dec=%%Y-1, y_inc=%%Y+1, x_dec=%%X-1, x_inc=%%X+1
+            for /L %%A in (!y_dec!,1,!y_inc!) do (
+                for /L %%B in (!x_dec!,1,!x_inc!) do (
+                    set "dg.floor[%%A][%%B].permanent_light=!flag!"
+                    if "!flag!"=="false" (
+                        set "dg.floor[%%A][%%B].field_mark=false"
+                    )
+                )
+            )
+        )
+    )
+)
+call ui.cmd :drawDungeonPanel
 exit /b
 
 :wizardCharacterAdjustment
