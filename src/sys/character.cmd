@@ -157,6 +157,12 @@ for /L %%A in (0,1,7) do (
     cmd /c exit /b !letter!
     set "description=!=ExitCodeAscii!) !character_races[%%A].name!"
     call ui_io.cmd :putString "!description!" "!coord.y!;!coord.x!"
+
+    set /a coord.x+=15
+    if !coord.x! GTR 70 (
+        set "coord.x=2"
+        set /a coord.y+=1
+    )
 )
 set "letter="
 exit /b
