@@ -512,12 +512,12 @@ exit /b
 ::------------------------------------------------------------------------------
 :addRaceToRaceList
 set "character_races[%race_count%].name=%~1"
-set "character_races[%race_count%].str_adjustment=%~2"
-set "character_races[%race_count%].int_adjustment=%~3"
-set "character_races[%race_count%].wis_adjustment=%~4"
-set "character_races[%race_count%].dex_adjustment=%~5"
-set "character_races[%race_count%].con_adjustment=%~6"
-set "character_races[%race_count%].chr_adjustment=%~7"
+set "character_races[%race_count%].adjustment[0]=%~2"
+set "character_races[%race_count%].adjustment[1]=%~3"
+set "character_races[%race_count%].adjustment[2]=%~4"
+set "character_races[%race_count%].adjustment[3]=%~5"
+set "character_races[%race_count%].adjustment[4]=%~6"
+set "character_races[%race_count%].adjustment[5]=%~7"
 set "character_races[%race_count%].base_age=%~8"
 set "character_races[%race_count%].max_age=%~9"
 
