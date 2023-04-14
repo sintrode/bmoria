@@ -235,7 +235,8 @@ set "flag=false"
 :characterGetHistoryInnerLoop
 if "!character_backgrounds[%background_id%].chart!"=="!history_id!" (
     call rng.cmd :randomNumber 100
-    call :check_test "!test_roll!" "!background_id!"
+    set "test_roll=!errorlevel!"
+    call :check_test "!test_roll!" "background_id"
 
     for /f "delims=" %%A in ("!background_id!") do (
         set "history_block=!history_block!!character_backgrounds[%%A].info!"
@@ -256,8 +257,13 @@ call :playerClearHistory
 
 :: Word wrap for history text
 set "cursor_start=0"
-call helpers.cmd :strlen "!history_block!"
-set /a cursor_end=!errorlevel!-1
+call helpers.cmd :getLength "!history_block!" str_len
+set /a cursor_end=!str_len!
+
+set "line_number=0"
+set "new_cursor_start=0"
+set "current_cursor_position=0"
+set "flag=false"
 
 :stripLeadingHistoryBlockWhitespace
 if "!history_block:~%cursor_start%,1!"==" " (
@@ -266,22 +272,29 @@ if "!history_block:~%cursor_start%,1!"==" " (
 )
 set /a current_cursor_position=cursor_end-cursor_start
 
-if %current_cursor_position% GTR 60 (
+if !current_cursor_position! GTR 60 (
     set "current_cursor_position=60"
     call :findPreviousSpace NEQ
 
-    set /a new_cursor_start=cursor_start+current_cursor_position
+    set /a new_cursor_start=cursor_start + current_cursor_position
 
     call :findPreviousSpace EQU
 ) else (
     set "flag=true"
 )
 
-set /a line_length=%current_cursor_position%-%cursor_start%
-set "py.mis.history[!line_number!]=!history_block:~%cursor_start%,%line_length%"
+set "py.misc.history[!line_number!]=!history_block:~%cursor_start%,%current_cursor_position%!"
 set /a line_number+=1
 set "line_length="
 set "cursor_start=!new_cursor_start!"
+if "!flag!"=="false" goto :stripLeadingHistoryBlockWhitespace
+
+if !social_class! GTR 100 (
+    set "social_class=100"
+) else if !social_class! LSS 1 (
+    set "social_class=1"
+)
+set "py.misc.social_class=!social_class!"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -294,9 +307,11 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :check_test
-if %~1 GTR !character_backgrounds[%~2].roll! (
-    set /a background_id+=1
-    goto :check_test
+for /f "delims=" %%B in ("!background_id!") do (
+    if %~1 GTR !character_backgrounds[%%B].roll! (
+        set /a background_id+=1
+        goto :check_test
+    )
 )
 exit /b
 
