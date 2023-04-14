@@ -293,7 +293,7 @@ call :addMonsterToCreatureList "Balrog"                    0xFF1F0002 0x0081C743
 exit /b
 
 ::------------------------------------------------------------------------------
-:: Adds a monster type to the creature_list array
+:: Adds a monster type to the creatures_list array
 ::
 :: Arguments: %1  - Name of the creature
 ::            %2  - CMOVE flags    (hexadecimal)
