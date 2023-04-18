@@ -33,7 +33,7 @@ set "config.options.error_beep_sound=true"        %= Beep for invalid characters
 
 :: Dungeon generation values
 :: The entire design of the dungeon can be changed by only slight adjustments here
-set "config.dungeon.dun_rangom_dir=9"       %= 1/x chance of random direction =%
+set "config.dungeon.dun_random_dir=9"       %= 1/x chance of random direction =%
 set "config.dungeon.dun_dir_change=70"      %= Chance of changing direction (99 max) =%
 set "config.dungeon.dun_tunneling=15"       %= Chance of extra tunnelling =%
 set "config.dungeon.dun_rooms_mean=32"      %= Mean of number of rooms, stddev 2 =%

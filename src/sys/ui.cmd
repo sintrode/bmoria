@@ -611,7 +611,7 @@ call ui_io.cmd :clearScreen
 
 call ui_io.cmd :putString "Name        :" "2;1"
 call ui_io.cmd :putString "Race        :" "3;1"
-call ui_io.cmd :putString "Sex         :" "2;1"
+call ui_io.cmd :putString "Sex         :" "4;1"
 call ui_io.cmd :putString "Class       :" "5;1"
 if "%game.character_generated%"=="false" exit /b
 
