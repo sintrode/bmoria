@@ -5,18 +5,18 @@
 
 :: Data files used by bmoria
 :: Use relative paths to the main.cmd script
-set "config.files.splash_screen=data/splash.txt"
-set "config.files.welcome_screen=data/welcome.txt"
-set "config.files.license=LICENSE"
-set "config.files.versions_history=data/versions.txt"
-set "config.files.help=data/help.txt"
-set "config.files.help_wizard=data/help_wizard.txt"
-set "config.files.help_roguelike=data/rl_help.txt"
-set "config.files.help_roguelike_wizard=data/rl_help_wizard.txt"
-set "config.files.death_tomb=data/death_tomb.txt"
-set "config.files.death_royal=data/death_royal.txt"
-set "config.files.scores=scores.dat"
-set "config.files.save_game=game.sav"
+set "config.files.splash_screen=..\data\splash.txt"
+set "config.files.welcome_screen=..\data\welcome.txt"
+set "config.files.license=..\LICENSE"
+set "config.files.versions_history=..\data\versions.txt"
+set "config.files.help=..\data\help.txt"
+set "config.files.help_wizard=..\data\help_wizard.txt"
+set "config.files.help_roguelike=..\data\rl_help.txt"
+set "config.files.help_roguelike_wizard=..\data\rl_help_wizard.txt"
+set "config.files.death_tomb=..\data\death_tomb.txt"
+set "config.files.death_royal=..\data\death_royal.txt"
+set "config.files.scores=..\scores.dat"
+set "config.files.save_game=..\game.sav"
 
 :: Game options as set on startup and with '=' set options command
 set "config.options.display_counts=true"          %= Display rest/repeat counts =%

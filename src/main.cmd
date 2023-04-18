@@ -18,16 +18,6 @@ for %%A in (config data_creatures data_player data_recall data_store_owners data
     echo %ESC%[2;11H!progress_bar!
 )
 
-REM call sys\config.cmd
-REM call sys\read_constants.cmd
-REM call sys\data_creatures.cmd
-REM call sys\data_player.cmd
-REM call sys\data_recall.cmd
-REM call sys\data_store_owners.cmd
-REM call sys\data_stores.cmd
-REM call sys\data_tables.cmd
-REM call sys\data_treasure.cmd
-
 :main
 set "seed=0"
 set "new_game=false"
