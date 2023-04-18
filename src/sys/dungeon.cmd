@@ -124,7 +124,7 @@ for /f "tokens=1-4 delims=; " %%A in ("!%~1! !%~2!") do (
     )
 
     set /a dx=%%B-%%D
-    if !dy! LSS 0 (
+    if !dx! LSS 0 (
         set /a dx*=-1
     )
 

@@ -6,8 +6,27 @@
 ::------------------------------------------------------------------------------
 @echo off
 setlocal enabledelayedexpansion
-call sys\config.cmd
+:: TODO: Add loading bar because this is going to take about 60 seconds
 call sys\read_constants.cmd
+cls
+set "progress_bar="
+echo %ESC%[2;1HTotal:  [/        ]
+for %%A in (config data_creatures data_player data_recall data_store_owners data_stores data_tables data_treasure) do (
+    echo %ESC%[1;1HLoading %%A.cmd                 
+    set "progress_bar=!progress_bar!/"
+    call sys\%%A.cmd
+    echo %ESC%[2;11H!progress_bar!
+)
+
+REM call sys\config.cmd
+REM call sys\read_constants.cmd
+REM call sys\data_creatures.cmd
+REM call sys\data_player.cmd
+REM call sys\data_recall.cmd
+REM call sys\data_store_owners.cmd
+REM call sys\data_stores.cmd
+REM call sys\data_tables.cmd
+REM call sys\data_treasure.cmd
 
 :main
 set "seed=0"
