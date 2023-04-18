@@ -323,6 +323,9 @@ set "key="
 for /f "delims=" %%A in ('xcopy /w "!comspec!" "!comspec!" 2^>nul') do (
     if not defined key set "key=%%A^!"
 )
+if !key:~-1!==^^ (
+    set "key=^"
+) else set "key=!key:~-2,1!"
 set "%~1=!key:~0,1!"
 exit /b
 
