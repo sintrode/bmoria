@@ -698,8 +698,8 @@ exit /b
 set "monster=monsters[%~1]"
 
 set "%monster%.hp=-1"
-for %%X in ("!%monster%.pos.x! !%monster%.pos.y!") do (
-    set "dg.floor[%%Y][%%X].creature_id=0"
+for /f "tokens=1,2 delims= " %%X in ("!%monster%.pos.x! !%monster%.pos.y!") do (
+    set "dg.floor[%%~Y][%%~X].creature_id=0"
 
     if "!%monster%.lit!"=="true" (
         set "monster_coord=%%Y;%%X"
@@ -723,7 +723,7 @@ set /a last_id=!next_free_monster_id!-1
 set "monster.pos.x=!monsters[%last_id%].pos.x!"
 set "monster.pos.y=!monsters[%last_id%].pos.y!"
 
-if "%~1"=="%last_id%" (
+if not "%~1"=="%last_id%" (
     set "dg.floor[%monster.pos.y%][%monster.pos.x%].creature_id=%~1"
     
     for %%A in (hp sleep_count speed creature_id "pos.y" "pos.x" distance_from_player lit stunned_amount confused_amount) do (

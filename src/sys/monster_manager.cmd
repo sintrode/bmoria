@@ -44,14 +44,16 @@ set "%monster%.creature_id=%~2"
 set /a "maxxed_out=!creatures_list[%~2].defenses! & %config.monsters.defense.cd_max_hp%"
 if not "%maxxed_out%"=="0" (
     call dice.cmd :maxDiceRoll !creatures_list[%~2].hit_die.dice! !creatures_list[%~2].hit_die.sides!
+    set "%monster%.hp=!errorlevel!"
 ) else (
     call dice.cmd :diceRoll !creatures_list[%~2].hit_die.dice! !creatures_list[%~2].hit_die.sides!
+    set "%monster%.hp=!errorlevel!"
 )
 
 set /a %monster%.speed=!creatures_list[%~2].speed!-10+%py.flags.speed%
 set "%monster%.stunned_amount=0"
 call dungeon.cmd :coordDistanceBetween "py.pos" "coord"
-set "%monster.distance_from_player=!errorlevel!"
+set "%monster%.distance_from_player=!errorlevel!"
 set "%monster%.lit=false"
 
 set "dg.floor[%coord.y%][%coord.x%].creature_id=%monster_id%"
@@ -61,7 +63,7 @@ if "%~3"=="true" (
     ) else (
         set /a rnd_sleep=!creatures_list[%~2].sleep_counter!*10
         call rng.cmd :randomNumber !rnd_sleep!
-        set /a %monster%.sleep_count=!creatures_list[%~2].sleep_counter*2+!errorlevel!
+        set /a %monster%.sleep_count=!creatures_list[%~2].sleep_counter! * 2 + !errorlevel!
     )
 )
 exit /b 0
