@@ -1,4 +1,3 @@
-@echo off
 :: Weird hack needed because of how :compactMonsters is called
 set "hack_monptr=-1"
 call %*

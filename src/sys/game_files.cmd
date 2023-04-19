@@ -3,7 +3,6 @@
 :: with them. If you're looking at this file and comparing it to game_files.cpp
 :: to learn either batch or C++, this is not the file to be looking at.
 ::------------------------------------------------------------------------------
-@echo off
 call %*
 exit /b
 

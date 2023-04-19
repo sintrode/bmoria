@@ -1,10 +1,8 @@
 ::------------------------------------------------------------------------------
 :: A port of config.cpp
 ::------------------------------------------------------------------------------
-@echo off
 
 :: Data files used by bmoria
-:: Use relative paths to the main.cmd script
 set "config.files.splash_screen=..\data\splash.txt"
 set "config.files.welcome_screen=..\data\welcome.txt"
 set "config.files.license=..\LICENSE"

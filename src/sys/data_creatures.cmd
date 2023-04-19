@@ -1,6 +1,5 @@
 :: This one is pure data. There are 279 creatures to add, but through the magic
 :: of CTRL+C, CTRL+V, and CTRL+H, this isn't too bad to port over.
-@echo off
 set "monster_count=0"
 call :loadAttackData
 

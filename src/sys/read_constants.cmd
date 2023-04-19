@@ -5,7 +5,6 @@
 :: Arguments: None
 :: Returns:   None
 ::------------------------------------------------------------------------------
-@echo off
 
 ::----- general
 set "bool_values[false]=1"

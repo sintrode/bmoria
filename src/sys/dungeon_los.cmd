@@ -1,5 +1,3 @@
-
-@echo off
 call %*
 exit /b
 

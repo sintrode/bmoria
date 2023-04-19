@@ -1,6 +1,5 @@
 :: Data tables for attack and RNG including lists of names of things that the
 :: player will find down in the dungeons
-@echo off
 
 ::----- Arrays for descriptive pieces
 set "_index=0"

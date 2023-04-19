@@ -1,5 +1,5 @@
 :: Creates arrays for remembered monster descriptions
-@echo off
+
 set "recall_counter=0"
 for %%A in ("do something undefined" "attack" "weaken" "confuse" "terrify"
             "shoot flames" "shoot acid" "freeze" "shoot lightning" "corrode"

@@ -1,7 +1,6 @@
 :: Multidimensional arrays for Class rank title, racial biases, race stats,
 :: background information, class stats, class saves, magic spells, spell
 :: names, and initial starting gear. Pretty much just pure data.
-@echo off
 
 ::----- Class rank titles for different levels
 :: Warrior

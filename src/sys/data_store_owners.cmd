@@ -1,5 +1,4 @@
 :: Speech text for store owners
-@echo off
 
 set "owner_count=0"
 call :addOwnerToStoreOwners "Erick the Honest       (Human)      General Store"   250 175 108 4 0 12

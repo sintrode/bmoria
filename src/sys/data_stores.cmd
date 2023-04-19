@@ -1,5 +1,4 @@
 :: Data for use in stores
-@echo off
 
 :: Buying and selling adjustments for character race vs store owner race
 set "counter=0"

@@ -1,5 +1,4 @@
 :: Treasure data
-@echo off
 
 :: Object description:  Objects are defined here.  Each object has
 :: the following attributes:

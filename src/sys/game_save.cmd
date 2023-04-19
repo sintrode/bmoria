@@ -5,7 +5,6 @@
 :: directly has been emulated as closely as possible in order to be able to
 :: load in save files from the original game.
 ::------------------------------------------------------------------------------
-@echo off
 call %*
 exit /b
 

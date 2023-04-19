@@ -5,7 +5,6 @@
 :: is 0,0 and VT100 thinks the top-left corner is 1,1 but we can adjust values
 :: as necessary
 ::------------------------------------------------------------------------------
-@echo off
 call %*
 exit /b
 

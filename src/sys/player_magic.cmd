@@ -1,6 +1,5 @@
 :: TODO: Merge the four Cure subroutines into one subroutine and pass the
 :: impairment being cured
-@echo off
 call %*
 exit /b
 
