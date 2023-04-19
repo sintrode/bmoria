@@ -155,8 +155,7 @@ if "!errorlevel!"=="1" (
     if !j! GTR !i! set "i=!j!"
     set /a i_offset=!i!+!monster_levels[0]!
     
-    REM TODO: I'm *pretty* sure I can do this, but double-check...
-    set /a level=creatures_list[i_offset].level
+    set /a level=creatures_list[!i_offset!].level
 )
 
 set /a counter_dec=!level!-1
