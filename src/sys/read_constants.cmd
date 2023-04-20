@@ -29,9 +29,9 @@ set "tile_quartz_wall=14"
 set "tile_boundary_wall=15"
 
 ::----- dungeon.h
-set "ratio=3"                       %= Size ratio of the Map screen =%
-set "max_height=66"                 %= Multiple of 11, GEQ 22 =%
-set "max_width=198"                 %= Multiple of 33, GEQ 66 =%
+set "ratio=1"                       %= Size ratio of the Map screen =%
+set "max_height=22"                 %= Multiple of 11, GEQ 22 =%
+set "max_width=66"                 %= Multiple of 33, GEQ 66 =%
 set "screen_height=22"
 set "screen_width=66"
 set /a quart_height=screen_height/4
