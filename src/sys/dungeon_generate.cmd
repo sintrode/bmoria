@@ -111,10 +111,10 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :dungeonFillEmptyTilesWith
-set /a max_height=%dg.height%-2, max_width=%dg.width%-2
-for /L %%Y in (%max_height%,-1,1) do (
+set /a max_dungeon_height=%dg.height%-2, max_dungeon_width=%dg.width%-2
+for /L %%Y in (%max_dungeon_height%,-1,1) do (
     set "x=1"
-    for /L %%B in (%max_width%,-1,1) do (
+    for /L %%B in (%max_dungeon_width%,-1,1) do (
         for /f "delims=" %%X in ("!x!") do (
             if "!dg.floor[%%Y][%%X].feature_id!"=="%tile_null_wall%" set "dg.floor[%%Y][%%X].feature_id=%~1"
             if "!dg.floor[%%Y][%%X].feature_id!"=="%tmp1_wall%" set "dg.floor[%%Y][%%X].feature_id=%~1"
@@ -132,17 +132,17 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :dungeonPlaceBoundaryWalls
-set /a max_width=%dg.width%-1
-set /a max_height=%dg.height%-1
+set /a max_dungeon_width=%dg.width%-1
+set /a max_dungeon_height=%dg.height%-1
 
-for /L %%A in (0,1,%max_height%) do (
+for /L %%A in (0,1,%max_dungeon_height%) do (
     set "dg.floor[%%A][0].feature_id=%tile_boundary_wall%"
-    set "dg.floor[%%A][%max_width%].feature_id=%tile_boundary_wall%"
+    set "dg.floor[%%A][%max_dungeon_width%].feature_id=%tile_boundary_wall%"
 )
 
-for /L %%A in (0,1,%max_width%) do (
+for /L %%A in (0,1,%max_dungeon_width%) do (
     set "dg.floor[0][%%A].feature_id=%tile_boundary_wall%"
-    set "dg.floor[%max_height%][%%A].feature_id=%tile_boundary_wall%"
+    set "dg.floor[%max_dungeon_height%][%%A].feature_id=%tile_boundary_wall%"
 )
 exit /b
 
