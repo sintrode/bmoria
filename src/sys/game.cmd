@@ -86,6 +86,8 @@ if !normal_table[%iindex%]! GTR !tmp_random_number! (
     set "low=!iindex!"
     set /a "iindex=iindex + ((high-iindex) >> 1)"
 )
+goto :loopNormalDistribution
+
 :endLoopNormalDistribution
 set "low_shift="
 
@@ -96,7 +98,7 @@ if !normal_table[%iindex%]! LSS !tmp_random_number! (
 set /a "offset=((%~2*!iindex!)+(%normal_table_sd% >> 1)) / %normal_table_sd%"
 
 call rng.cmd :randomNumber 2
-if "!errorlevel!"=="1" set /a offset=-!offset!
+if "!errorlevel!"=="1" set /a offset=!offset!*-1
 set /a sd=%~1+!offset!
 exit /b !sd!
 
