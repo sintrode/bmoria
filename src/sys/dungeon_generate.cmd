@@ -90,8 +90,8 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :dungeonBlankEntireCave
-for /L %%A in (0,1,66) do (
-    for /L %%B in (0,1,198) do (
+for /L %%A in (0,1,%max_height%) do (
+    for /L %%B in (0,1,%max_width%) do (
         set "dg.floor[%%A][%%B].creature_id=0"
         set "dg.floor[%%A][%%B].treasure_id=0"
         set "dg.floor[%%A][%%B].feature_id=0"
