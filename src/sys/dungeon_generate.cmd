@@ -645,16 +645,17 @@ exit /b
 for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
     set /a coord.y_dec=%%~A-1
     set /a coord.y_inc=%%~A+1
+    set "coord.x=%%~B"
     set /a coord.x_dec=%%~B-1
     set /a coord.x_inc=%%~B+1
-
-    for /L %%Y in (!coord.y_dec!,1,!coord.y_inc!) do (
-        set "dg.floor[%%Y][!coord.x_dec!].feature_id=%TMP1_WALL%"
-        set "dg.floor[%%Y][!coord.x_inc!].feature_id=%TMP1_WALL%"
-    )
-    set "dg.floor[!coord.y_dec!][!coord.x!].feature_id=%TMP1_WALL%"
-    set "dg.floor[!coord.y_inc!][!coord.x!].feature_id=%TMP1_WALL%"
 )
+
+for /L %%Y in (!coord.y_dec!,1,!coord.y_inc!) do (
+    set "dg.floor[%%Y][!coord.x_dec!].feature_id=%TMP1_WALL%"
+    set "dg.floor[%%Y][!coord.x_inc!].feature_id=%TMP1_WALL%"
+)
+set "dg.floor[!coord.y_dec!][!coord.x!].feature_id=%TMP1_WALL%"
+set "dg.floor[!coord.y_inc!][!coord.x!].feature_id=%TMP1_WALL%"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -900,7 +901,7 @@ if "!inner_room_type!"=="%InnerRoomTypes.Pillars%" (
 )
 if "!inner_room_type!"=="%InnerRoomTypes.Maze%" (
     call :dungeonPlaceRandomSecretDoor "%~1" !depth! !height! !left! !right!
-    call :dungeonPlaceMazeInsideRoomcall !depth! !height! !left! !right!
+    call :dungeonPlaceMazeInsideRoom !depth! !height! !left! !right!
 
     call rng.cmd :randomNumber 3
     call :dungeonPlaceVaultMonster "!coord.y!;!coord.x_5dec!" !errorlevel!
