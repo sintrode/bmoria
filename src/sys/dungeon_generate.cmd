@@ -1343,7 +1343,7 @@ exit /b 1
 ::            1 if the tile is neither a coor_floor nor a blocked_floor tile
 ::------------------------------------------------------------------------------
 :setCorridors
-if "%~1"=="%tile_coor_floor%" exit /b 0
+if "%~1"=="%tile_corr_floor%" exit /b 0
 if "%~1"=="%tile_blocked_floor%" exit /b 0
 exit /b 1
 
@@ -1580,6 +1580,7 @@ exit /b
 
 ::------------------------------------------------------------------------------
 :: Link all free space in monster list together
+:: PHASE 3: Replace with a complete variable purge
 ::
 :: Arguments: None
 :: Returns:   None
