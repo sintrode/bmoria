@@ -326,7 +326,9 @@ if "%~1"=="%PlayerEquipment.Arm%"       set "%~2=Worn on shield arm"
 if "%~1"=="%PlayerEquipment.Hands%"     set "%~2=Worn on hands     "
 if "%~1"=="%PlayerEquipment.Right%"     set "%~2=Right ring finger "
 if "%~1"=="%PlayerEquipment.Left%"      set "%~2=Left  ring finger "
+if "%~1"=="%PlayerEquipment.Feet%"      set "%~2=Worn on feet      "
 if "%~1"=="%PlayerEquipment.Outer%"     set "%~2=Worn about body   "
+if "%~1"=="%PlayerEquipment.Light%"     set "%~2=Light source is   "
 if "%~1"=="%PlayerEquipment.Auxiliary%" set "%~2=Secondary weapon  "
 exit /b
 

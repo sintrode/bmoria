@@ -124,7 +124,7 @@ set "item_group_max=255"
 set "inscrip_size=13"
 
 set "counter=22"
-for %%A in (wield head neck bock arm hands right left feet outer light auxiliary) do (
+for %%A in (wield head neck body arm hands right left feet outer light auxiliary) do (
     set "PlayerEquipment.%%A=!counter!"
     set /a counter+=1
 )
