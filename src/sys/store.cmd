@@ -13,15 +13,15 @@ set /a count=%MAX_OWNERS%/%MAX_STORES%, store_dec=%MAX_STORES%-1
 for /L %%A in (0,1,%store_dec%) do (
     set "store=stores[%%A]"
     call rng.cmd :randomNumber %count%
-    set /a "%store%.owner_id=%MAX_STORES% * (!errorlevel! - 1) + %%A"
+    set /a "!store!.owner_id=%MAX_STORES% * (!errorlevel! - 1) + %%A"
     for %%B in (insults_counter turns_left_before_closing
                 unique_items_counter good_purchases bad_purchases) do (
-        set "%store%.%%~B=0"
+        set "!store!.%%~B=0"
     )
 
-    for /L %%A in (0,1,23) do (
-        call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.OBJ_NOTHING%" "%store%.inventory[%%A].item"
-        set "%store%.inventory[%%A].cost=0"
+    for /L %%B in (0,1,23) do (
+        call inventory.cmd :inventoryItemCopyTo "%config.dungeon.objects.OBJ_NOTHING%" "!store!.inventory[%%B].item"
+        set "!store!.inventory[%%B].cost=0"
     )
 )
 exit /b
@@ -134,7 +134,7 @@ exit /b
 call ui_io.cmd :putStringClearToEOL "You may:" "20;0"
 call ui_io.cmd :putStringClearToEOL " p) Purchase an item.           b) Browse store's inventory." "21;0"
 call ui_io.cmd :putStringClearToEOL " s) Sell an item.               i/e/t/w/x) Inventory/Equipment Lists." "22;0"
-call ui_io.cmd :putStringClearToEOL " Q) Exit from Building.        R) Redraw the screen." "23;0"
+call ui_io.cmd :putStringClearToEOL " Q) Exit from Building.         R) Redraw the screen." "23;0"
 exit /b
 
 ::------------------------------------------------------------------------------

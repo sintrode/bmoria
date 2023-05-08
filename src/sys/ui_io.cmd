@@ -168,7 +168,7 @@ exit /b
 :: Returns:   None
 ::------------------------------------------------------------------------------
 :eraseLine
-for /f "tokens=1,2 delims=;" %%A in ("%~2") do (
+for /f "tokens=1,2 delims=;" %%A in ("%~1") do (
     if "%%~B"=="%MSG_LINE%" (
         if "!message_ready_to_print!"=="true" (
             call :printMessage "CNIL"
@@ -176,7 +176,7 @@ for /f "tokens=1,2 delims=;" %%A in ("%~2") do (
     )
 )
 
-<nul set /p ".=%ESC%[%~2H%ESC%[0K"
+<nul set /p ".=%ESC%[%~1H%ESC%[0K"
 exit /b
 
 ::------------------------------------------------------------------------------
@@ -218,7 +218,7 @@ echo %ESC%7
 
 set "message=%~1"
 set "message=!message:~0,79!"
-<nul set /p ".=%ESC%[0;0H%ESC%[0J!message!"
+<nul set /p ".=%ESC%[0;0H%ESC%[0K!message!"
 
 :: Restore the cursor position
 echo %ESC%8
