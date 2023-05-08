@@ -216,8 +216,12 @@ exit /b
 :: Save the current cursor position
 echo %ESC%7
 
+:: Truncate to 80 characters (should actually be based on screen width)
+:: and replace underscores with exclamation points. Underscores were used
+:: because exclamation points did not travel well between three subroutines.
 set "message=%~1"
 set "message=!message:~0,79!"
+set "message=%message:_=^!%"
 <nul set /p ".=%ESC%[0;0H%ESC%[0K!message!"
 
 :: Restore the cursor position
