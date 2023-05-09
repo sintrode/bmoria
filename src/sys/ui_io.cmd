@@ -274,7 +274,7 @@ if "!message_ready_to_print!"=="true" (
     )
 )
 
-if "!combine_messages!"=="false" call :eraseLine "%MSG_LINE%;0"
+if "!combine_messages!"=="false" <nul set /p ".=%ESC%[%MSG_LINE%;0H%ESC%[0K"
 
 if "%~1"=="" (
     set "message_ready_to_print=false"
